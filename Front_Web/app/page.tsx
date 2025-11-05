@@ -1,6 +1,7 @@
-import { getSupabaseServer } from "/lib/supabaseClient";
+import { getSupabaseServer } from "../lib/supabaseClient";
 
-export const revalidate = 0; // SSR sem cache
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function Page() {
   const supabase = getSupabaseServer();
@@ -19,9 +20,7 @@ export default async function Page() {
       ) : (
         <pre>{JSON.stringify(data, null, 2)}</pre>
       )}
-      <p style={{marginTop:12}}>
-        Healthcheck API: <code>/api/health</code>
-      </p>
+      <p style={{marginTop:12}}>Healthcheck: <code>/api/health</code></p>
     </main>
   );
 }
