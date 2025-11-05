@@ -1,0 +1,28 @@
+name: Supabase CI/CD
+on:
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with: { version: latest }
+
+      # Link não interativo usando os segredos
+      - run: supabase link --project-ref $PROJECT_REF --password $SUPABASE_DB_PASSWORD
+
+      # DB como código
+      - run: supabase db push
+
+      # Edge Functions (se houver em supabase/functions)
+      - run: supabase functions deploy --project-ref $PROJECT_REF
+
+      # Types (opcional). Se não tiver front/TS, remova esta etapa.
+      - run: mkdir -p src/lib && supabase gen types typescript --project-id $PROJECT_REF --schema public > src/lib/database.types.ts
