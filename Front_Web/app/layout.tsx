@@ -1,4 +1,7 @@
-export const metadata = { title: "Financeiro" };
+export const metadata = {
+  title: "Financeiro",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://financeiro-germani.vercel.app"),
+};
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-br">
