@@ -50,4 +50,4 @@ jobs:
       - name: Generate Types for Front_Web
         run: |
           mkdir -p Front_Web/src/lib
-          supabase gen types typescript --project-id $PROJECT_REF --schema public,financas > Front_Web/src/lib/database.types.ts
+          supabase gen types typescript --project-id $PROJECT_REF --schema financas > Front_Web/src/lib/database.types.ts
