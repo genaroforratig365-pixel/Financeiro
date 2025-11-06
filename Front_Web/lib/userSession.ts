@@ -3,28 +3,95 @@
  * Gerenciamento de sessão de usuário sem login usando localStorage
  */
 
-const USER_ID_KEY = 'financeiro_user_id';
-const USER_NAME_KEY = 'financeiro_user_name';
-const USER_EMAIL_KEY = 'financeiro_user_email';
+import {
+  USER_EMAIL_STORAGE_KEY,
+  USER_ID_STORAGE_KEY,
+  USER_NAME_STORAGE_KEY,
+} from "./sessionKeys";
+
+function isBrowser(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.localStorage !== "undefined"
+  );
+}
+
+function safeGetItem(key: string): string | null {
+  if (!isBrowser()) {
+    return null;
+  }
+
+  try {
+    return window.localStorage.getItem(key);
+  } catch (error) {
+    console.warn(
+      `[userSession] Não foi possível ler a chave "${key}" do localStorage.`,
+      error
+    );
+    return null;
+  }
+}
+
+function safeSetItem(key: string, value: string): void {
+  if (!isBrowser()) {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(key, value);
+  } catch (error) {
+    console.warn(
+      `[userSession] Não foi possível salvar a chave "${key}" no localStorage.`,
+      error
+    );
+  }
+}
+
+function safeRemoveItem(key: string): void {
+  if (!isBrowser()) {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(key);
+  } catch (error) {
+    console.warn(
+      `[userSession] Não foi possível remover a chave "${key}" do localStorage.`,
+      error
+    );
+  }
+}
+
+function generateUserId(): string {
+  if (isBrowser()) {
+    const cryptoApi = window.crypto || (window as unknown as { msCrypto?: Crypto }).msCrypto;
+    if (cryptoApi && typeof cryptoApi.randomUUID === "function") {
+      return cryptoApi.randomUUID();
+    }
+  }
+
+  // Fallback simples caso o browser não suporte crypto.randomUUID
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 /**
  * Obtém o ID do usuário atual.
  * Se não existir, gera um novo UUID e armazena.
  */
 export function getUserId(): string {
-  if (typeof window === 'undefined') {
+  if (!isBrowser()) {
     // Server-side: retorna vazio ou um valor padrão
-    return '';
+    return "";
   }
 
-  const stored = localStorage.getItem(USER_ID_STORAGE_KEY);
-  if (stored) {
+  const stored = safeGetItem(USER_ID_STORAGE_KEY);
+  if (stored && stored.trim().length > 0) {
     return stored;
   }
 
   // Gera novo UUID
-  const newId = crypto.randomUUID();
-  localStorage.setItem(USER_ID_STORAGE_KEY, newId);
+  const newId = generateUserId();
+  safeSetItem(USER_ID_STORAGE_KEY, newId);
 
   return newId;
 }
@@ -34,100 +101,65 @@ export function getUserId(): string {
  */
 export function getUserName(): string | null {
   const value = safeGetItem(USER_NAME_STORAGE_KEY);
-  return value && value.trim().length > 0 ? value : null;
-}
+  if (!value) {
+    return null;
+  }
 
-  return localStorage.getItem(USER_NAME_STORAGE_KEY);
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 /**
  * Obtém o e-mail do usuário (se definido)
  */
 export function getUserEmail(): string | null {
-  if (typeof window === 'undefined') {
+  const value = safeGetItem(USER_EMAIL_STORAGE_KEY);
+  if (!value) {
     return null;
   }
 
-  return localStorage.getItem(USER_EMAIL_STORAGE_KEY);
-}
-
-/**
- * Obtém o e-mail do usuário (se definido)
- */
-export function getUserEmail(): string | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  return localStorage.getItem(USER_EMAIL_KEY);
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 /**
  * Define o nome/apelido do usuário
  */
 export function setUserName(name: string): void {
-  if (!name || name.trim().length === 0) {
+  const trimmed = name?.trim?.() ?? "";
+  if (trimmed.length === 0) {
     safeRemoveItem(USER_NAME_STORAGE_KEY);
     return;
   }
 
-  localStorage.setItem(USER_NAME_STORAGE_KEY, name);
+  safeSetItem(USER_NAME_STORAGE_KEY, trimmed);
+}
+
+/**
+ * Remove o nome/apelido do usuário armazenado
+ */
+export function clearUserName(): void {
+  safeRemoveItem(USER_NAME_STORAGE_KEY);
 }
 
 /**
  * Define o e-mail do usuário
  */
 export function setUserEmail(email: string): void {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  localStorage.setItem(USER_EMAIL_STORAGE_KEY, email);
-}
-
-/**
- * Define o e-mail do usuário
- */
-export function setUserEmail(email: string): void {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  localStorage.setItem(USER_EMAIL_KEY, email);
-}
-
-/**
- * Define o e-mail do usuário
- */
-export function setUserEmail(email: string): void {
-  if (!email || email.trim().length === 0) {
+  const trimmed = email?.trim?.() ?? "";
+  if (trimmed.length === 0) {
     safeRemoveItem(USER_EMAIL_STORAGE_KEY);
     return;
   }
 
-  localStorage.removeItem(USER_NAME_STORAGE_KEY);
+  safeSetItem(USER_EMAIL_STORAGE_KEY, trimmed);
 }
 
 /**
  * Remove o e-mail do usuário
  */
 export function clearUserEmail(): void {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  localStorage.removeItem(USER_EMAIL_STORAGE_KEY);
-}
-
-/**
- * Remove o e-mail do usuário
- */
-export function clearUserEmail(): void {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  localStorage.removeItem(USER_EMAIL_KEY);
+  safeRemoveItem(USER_EMAIL_STORAGE_KEY);
 }
 
 /**
@@ -135,13 +167,9 @@ export function clearUserEmail(): void {
  * CUIDADO: Isso fará com que o usuário perca acesso aos seus dados
  */
 export function clearUserSession(): void {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  localStorage.removeItem(USER_ID_KEY);
-  localStorage.removeItem(USER_NAME_KEY);
-  localStorage.removeItem(USER_EMAIL_KEY);
+  safeRemoveItem(USER_ID_STORAGE_KEY);
+  safeRemoveItem(USER_NAME_STORAGE_KEY);
+  safeRemoveItem(USER_EMAIL_STORAGE_KEY);
 }
 
 export type UserSessionSnapshot = {
@@ -160,10 +188,10 @@ export function getUserSession(): UserSessionSnapshot {
   const userEmail = getUserEmail();
 
   return {
-    userId: getUserId(),
-    userName: getUserName(),
-    userEmail: getUserEmail(),
-    displayName: getUserName() || 'Usuário Anônimo',
+    userId,
+    userName,
+    userEmail,
+    displayName: userName ?? "Usuário Anônimo",
   };
 }
 
@@ -171,9 +199,6 @@ export function getUserSession(): UserSessionSnapshot {
  * Verifica se o usuário tem sessão ativa
  */
 export function hasActiveSession(): boolean {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  return !!localStorage.getItem(USER_ID_STORAGE_KEY);
+  const userId = safeGetItem(USER_ID_STORAGE_KEY);
+  return !!(userId && userId.trim().length > 0);
 }

@@ -1,4 +1,11 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import {
+  createClient,
+  type PostgrestError,
+  type SupabaseClient,
+} from "@supabase/supabase-js";
+
+import { USER_ID_STORAGE_KEY } from "./sessionKeys";
+import { getUserId } from "./userSession";
 
 // ENV obrigatórias
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -32,6 +39,19 @@ type ClientOptions = {
    * Cabeçalhos adicionais a serem enviados com todas as requisições.
    */
   headers?: Record<string, string | undefined>;
+};
+
+export type UsuarioRow = {
+  usr_id: string;
+  usr_identificador: string;
+  usr_nome: string | null;
+  usr_email: string | null;
+  usr_ativo: boolean;
+};
+
+type GetOrCreateUserResult = {
+  data: UsuarioRow | null;
+  error: PostgrestError | null;
 };
 
 export function getSupabaseClient(options: ClientOptions = {}) {
@@ -101,30 +121,43 @@ export async function getOrCreateUser(
   identificador: string,
   nome?: string | null,
   email?: string | null
-) {
+): Promise<GetOrCreateUserResult> {
   const { data: existing, error: findErr } = await supabase
     .from("usr_usuarios")
     .select("*")
     .eq("usr_identificador", identificador)
     .maybeSingle();
   if (findErr) return { data: null, error: findErr };
-  if (existing) {
-    const updates: Record<string, unknown> = {};
-    if (nome && nome !== existing.usr_nome) {
+
+  const usuarioExistente = existing as UsuarioRow | null;
+  if (usuarioExistente) {
+    const updates: Partial<Pick<UsuarioRow, "usr_nome" | "usr_email">> = {};
+    if (nome && nome !== usuarioExistente.usr_nome) {
       updates.usr_nome = nome;
     }
-    if (email && email !== (existing as any).usr_email) {
+    if (email && email !== usuarioExistente.usr_email) {
       updates.usr_email = email;
     }
 
     if (Object.keys(updates).length > 0) {
-      await supabase
+      const { error: updateErr } = await supabase
         .from("usr_usuarios")
         .update(updates)
-        .eq("usr_id", existing.usr_id);
+        .eq("usr_id", usuarioExistente.usr_id);
+
+      if (updateErr) {
+        return { data: usuarioExistente, error: updateErr };
+      }
+
+      const updated: UsuarioRow = {
+        ...usuarioExistente,
+        ...updates,
+      };
+
+      return { data: updated, error: null };
     }
 
-    return { data: { ...existing, ...updates }, error: null };
+    return { data: usuarioExistente, error: null };
   }
 
   const { data: inserted, error: insertErr } = await supabase
@@ -138,8 +171,12 @@ export async function getOrCreateUser(
     .select()
     .single();
 
+  if (insertErr) {
+    return { data: null, error: insertErr };
+  }
+
   return {
     data: (inserted as UsuarioRow | null) ?? null,
-    error: insertErr ?? null,
+    error: null,
   };
 }

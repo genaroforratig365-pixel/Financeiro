@@ -7,6 +7,7 @@ import { Card, Loading } from '@/components/ui';
 import { AreaForm, type AreaFormValues } from '@/components/forms/AreaForm';
 import { getSupabaseClient, getOrCreateUser } from '@/lib/supabaseClient';
 import { getUserSession } from '@/lib/userSession';
+import { traduzirErroSupabase } from '@/lib/supabaseErrors';
 
 export default function NovaAreaPage() {
   const router = useRouter();
@@ -52,7 +53,10 @@ export default function NovaAreaPage() {
     } catch (error: any) {
       console.error('Erro ao salvar área:', error);
       setFeedback(
-        error?.message || 'Não foi possível salvar a área. Tente novamente mais tarde.',
+        traduzirErroSupabase(
+          error,
+          'Não foi possível salvar a área. Tente novamente mais tarde.',
+        ),
       );
     } finally {
       setSubmitting(false);

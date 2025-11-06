@@ -7,6 +7,7 @@ import { Card, Loading } from '@/components/ui';
 import { BancoForm, type BancoFormValues } from '@/components/forms/BancoForm';
 import { getSupabaseClient, getOrCreateUser } from '@/lib/supabaseClient';
 import { getUserSession } from '@/lib/userSession';
+import { traduzirErroSupabase } from '@/lib/supabaseErrors';
 
 export default function NovoBancoPage() {
   const router = useRouter();
@@ -49,7 +50,12 @@ export default function NovoBancoPage() {
       router.refresh();
     } catch (error: any) {
       console.error('Erro ao salvar banco:', error);
-      setFeedback(error?.message || 'Não foi possível salvar a conta bancária.');
+      setFeedback(
+        traduzirErroSupabase(
+          error,
+          'Não foi possível salvar a conta bancária.',
+        ),
+      );
     } finally {
       setSubmitting(false);
     }
