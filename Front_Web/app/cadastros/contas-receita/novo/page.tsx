@@ -10,6 +10,7 @@ import {
 } from '@/components/forms/ContaReceitaForm';
 import { getSupabaseClient, getOrCreateUser } from '@/lib/supabaseClient';
 import { getUserSession } from '@/lib/userSession';
+import { traduzirErroSupabase } from '@/lib/supabaseErrors';
 
 export default function NovaContaReceitaPage() {
   const router = useRouter();
@@ -48,7 +49,10 @@ export default function NovaContaReceitaPage() {
     } catch (error: any) {
       console.error('Erro ao salvar conta de receita:', error);
       setFeedback(
-        error?.message || 'Não foi possível salvar a conta. Verifique os dados e tente novamente.',
+        traduzirErroSupabase(
+          error,
+          'Não foi possível salvar a conta. Verifique os dados e tente novamente.',
+        ),
       );
     } finally {
       setSubmitting(false);
