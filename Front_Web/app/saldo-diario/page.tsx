@@ -54,14 +54,120 @@ interface SaldoBanco {
 
 type MaybeArray<T> = T | T[] | null | undefined;
 
-const normalizeRelation = <T extends Record<string, unknown>>(value: MaybeArray<T>) => {
+function normalizeRelation<T>(value: MaybeArray<T>): Exclude<T, null | undefined>[] {
   if (!value) {
-    return [] as T[];
+    return [];
   }
 
   const arrayValue = Array.isArray(value) ? value : [value];
-  return arrayValue.map((item) => ({ ...item })) as T[];
+  return arrayValue.filter((item): item is Exclude<T, null | undefined> => item != null);
+}
+
+const toNumber = (value: unknown, fallback = 0): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 };
+
+const toString = (value: unknown, fallback = ''): string => {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+  return String(value);
+};
+
+const toStringOrNull = (value: unknown): string | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  return String(value);
+};
+
+type AreaRelacionadaRow = {
+  are_nome?: unknown;
+};
+
+type ContaReceitaRelacionadaRow = {
+  ctr_nome?: unknown;
+};
+
+type BancoRelacionadoRow = {
+  ban_nome?: unknown;
+};
+
+type PagamentoAreaRow = {
+  pag_id?: unknown;
+  pag_valor?: unknown;
+  pag_descricao?: unknown;
+  are_areas?: MaybeArray<AreaRelacionadaRow | null>;
+};
+
+type ReceitaRow = {
+  rec_id?: unknown;
+  rec_valor?: unknown;
+  rec_descricao?: unknown;
+  ctr_contas_receita?: MaybeArray<ContaReceitaRelacionadaRow | null>;
+};
+
+type PagamentoBancoRow = {
+  pbk_id?: unknown;
+  pbk_valor?: unknown;
+  pbk_descricao?: unknown;
+  ban_bancos?: MaybeArray<BancoRelacionadoRow | null>;
+};
+
+type SaldoBancoRow = {
+  sdb_id?: unknown;
+  sdb_saldo?: unknown;
+  ban_bancos?: MaybeArray<BancoRelacionadoRow | null>;
+};
+
+const normalizeAreas = (value: MaybeArray<AreaRelacionadaRow | null>): AreaRelacionada[] =>
+  normalizeRelation(value).map((area) => ({
+    are_nome: toStringOrNull(area.are_nome),
+  }));
+
+const normalizeContasReceita = (
+  value: MaybeArray<ContaReceitaRelacionadaRow | null>,
+): ContaReceitaRelacionada[] =>
+  normalizeRelation(value).map((conta) => ({
+    ctr_nome: toStringOrNull(conta.ctr_nome),
+  }));
+
+const normalizeBancos = (value: MaybeArray<BancoRelacionadoRow | null>): BancoRelacionado[] =>
+  normalizeRelation(value).map((banco) => ({
+    ban_nome: toStringOrNull(banco.ban_nome),
+  }));
+
+const normalizePagamentosArea = (rows: MaybeArray<PagamentoAreaRow | null>): PagamentoArea[] =>
+  normalizeRelation(rows).map((row) => ({
+    pag_id: toNumber(row.pag_id),
+    pag_valor: toNumber(row.pag_valor),
+    pag_descricao: toString(row.pag_descricao),
+    are_areas: normalizeAreas(row.are_areas ?? null),
+  }));
+
+const normalizeReceitas = (rows: MaybeArray<ReceitaRow | null>): Receita[] =>
+  normalizeRelation(rows).map((row) => ({
+    rec_id: toNumber(row.rec_id),
+    rec_valor: toNumber(row.rec_valor),
+    rec_descricao: toString(row.rec_descricao),
+    ctr_contas_receita: normalizeContasReceita(row.ctr_contas_receita ?? null),
+  }));
+
+const normalizePagamentosBanco = (rows: MaybeArray<PagamentoBancoRow | null>): PagamentoBanco[] =>
+  normalizeRelation(rows).map((row) => ({
+    pbk_id: toNumber(row.pbk_id),
+    pbk_valor: toNumber(row.pbk_valor),
+    pbk_descricao: toString(row.pbk_descricao),
+    ban_bancos: normalizeBancos(row.ban_bancos ?? null),
+  }));
+
+const normalizeSaldosBanco = (rows: MaybeArray<SaldoBancoRow | null>): SaldoBanco[] =>
+  normalizeRelation(rows).map((row) => ({
+    sdb_id: toNumber(row.sdb_id),
+    sdb_saldo: toNumber(row.sdb_saldo),
+    ban_bancos: normalizeBancos(row.ban_bancos ?? null),
+  }));
 
 export default function SaldoDiarioPage() {
   const [loading, setLoading] = useState(true);
@@ -123,92 +229,12 @@ export default function SaldoDiarioPage() {
           .limit(10),
       ]);
 
-      type PagamentoAreaResponse = Omit<PagamentoArea, 'are_areas'> & {
-        are_areas: AreaRelacionada | AreaRelacionada[] | null;
-      };
-
-      const pagamentosAreaData = ((pagAreaRes.data ?? []) as PagamentoAreaResponse[]).map<PagamentoArea>((item) => {
-        const areasRelacionadas = item.are_areas;
-        const normalizadas: AreaRelacionada[] = Array.isArray(areasRelacionadas)
-          ? areasRelacionadas.map((area) => ({ are_nome: area?.are_nome ?? null }))
-          : areasRelacionadas
-            ? [{ are_nome: areasRelacionadas.are_nome ?? null }]
-            : [];
-
-        return {
-          pag_id: item.pag_id,
-          pag_valor: item.pag_valor,
-          pag_descricao: item.pag_descricao,
-          are_areas: normalizadas,
-        };
-      });
-
-      setPagamentosArea(pagamentosAreaData);
-
-      type ReceitaResponse = Omit<Receita, 'ctr_contas_receita'> & {
-        ctr_contas_receita: ContaReceitaRelacionada | ContaReceitaRelacionada[] | null;
-      };
-
-      const receitasData = ((recRes.data ?? []) as ReceitaResponse[]).map<Receita>((item) => {
-        const contasRelacionadas = item.ctr_contas_receita;
-        const normalizadas: ContaReceitaRelacionada[] = Array.isArray(contasRelacionadas)
-          ? contasRelacionadas.map((conta) => ({ ctr_nome: conta?.ctr_nome ?? null }))
-          : contasRelacionadas
-            ? [{ ctr_nome: contasRelacionadas.ctr_nome ?? null }]
-            : [];
-
-        return {
-          rec_id: item.rec_id,
-          rec_valor: item.rec_valor,
-          rec_descricao: item.rec_descricao,
-          ctr_contas_receita: normalizadas,
-        };
-      });
-
-      setReceitas(receitasData);
-
-      type PagamentoBancoResponse = Omit<PagamentoBanco, 'ban_bancos'> & {
-        ban_bancos: BancoRelacionado | BancoRelacionado[] | null;
-      };
-
-      const pagamentosBancoData = ((pagBancoRes.data ?? []) as PagamentoBancoResponse[]).map<PagamentoBanco>((item) => {
-        const bancosRelacionados = item.ban_bancos;
-        const normalizados: BancoRelacionado[] = Array.isArray(bancosRelacionados)
-          ? bancosRelacionados.map((banco) => ({ ban_nome: banco?.ban_nome ?? null }))
-          : bancosRelacionados
-            ? [{ ban_nome: bancosRelacionados.ban_nome ?? null }]
-            : [];
-
-        return {
-          pbk_id: item.pbk_id,
-          pbk_valor: item.pbk_valor,
-          pbk_descricao: item.pbk_descricao,
-          ban_bancos: normalizados,
-        };
-      });
-
-      setPagamentosBanco(pagamentosBancoData);
-
-      type SaldoBancoResponse = Omit<SaldoBanco, 'ban_bancos'> & {
-        ban_bancos: BancoRelacionado | BancoRelacionado[] | null;
-      };
-
-      const saldosBancoData = ((saldoRes.data ?? []) as SaldoBancoResponse[]).map<SaldoBanco>((item) => {
-        const bancosRelacionados = item.ban_bancos;
-        const normalizados: BancoRelacionado[] = Array.isArray(bancosRelacionados)
-          ? bancosRelacionados.map((banco) => ({ ban_nome: banco?.ban_nome ?? null }))
-          : bancosRelacionados
-            ? [{ ban_nome: bancosRelacionados.ban_nome ?? null }]
-            : [];
-
-        return {
-          sdb_id: item.sdb_id,
-          sdb_saldo: item.sdb_saldo,
-          ban_bancos: normalizados,
-        };
-      });
-
-      setSaldosBanco(saldosBancoData);
+      setPagamentosArea(normalizePagamentosArea(pagAreaRes.data as MaybeArray<PagamentoAreaRow | null>));
+      setReceitas(normalizeReceitas(recRes.data as MaybeArray<ReceitaRow | null>));
+      setPagamentosBanco(
+        normalizePagamentosBanco(pagBancoRes.data as MaybeArray<PagamentoBancoRow | null>),
+      );
+      setSaldosBanco(normalizeSaldosBanco(saldoRes.data as MaybeArray<SaldoBancoRow | null>));
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     } finally {
@@ -225,7 +251,7 @@ export default function SaldoDiarioPage() {
   if (loading) {
     return (
       <>
-        <Header title="Saldo Diário" />
+        <Header title="Movimentação Diária" />
         <div className="page-content flex items-center justify-center h-96">
           <Loading size="lg" text="Carregando dados..." />
         </div>
@@ -236,8 +262,8 @@ export default function SaldoDiarioPage() {
   return (
     <>
       <Header
-        title="Saldo Diário"
-        subtitle={`Dashboard financeiro - ${new Date().toLocaleDateString('pt-BR')}`}
+        title="Movimentação Diária"
+        subtitle={`Resumo operacional do dia - ${new Date().toLocaleDateString('pt-BR')}`}
         actions={
           <Button variant="secondary" onClick={loadData}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

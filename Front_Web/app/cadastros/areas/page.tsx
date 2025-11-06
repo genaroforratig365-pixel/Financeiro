@@ -72,17 +72,23 @@ export default function AreasPage() {
 
       const { error } = await supabase
         .from('are_areas')
-        .delete()
+        .update({ are_ativo: false })
         .eq('are_id', areaToDelete.are_id);
 
       if (error) throw error;
 
-      setAreas(areas.filter((a) => a.are_id !== areaToDelete.are_id));
+      setAreas((prev) =>
+        prev.map((area) =>
+          area.are_id === areaToDelete.are_id
+            ? { ...area, are_ativo: false }
+            : area,
+        ),
+      );
       setDeleteModalOpen(false);
       setAreaToDelete(null);
     } catch (error) {
       console.error('Erro ao deletar área:', error);
-      alert('Erro ao deletar área. Verifique se não há registros vinculados.');
+      alert('Erro ao desativar área. Verifique se não há registros vinculados.');
     } finally {
       setDeleting(false);
     }
@@ -179,7 +185,9 @@ export default function AreasPage() {
             columns={columns}
             data={filteredAreas}
             keyExtractor={(area) => area.are_id}
-            onRowClick={(area) => router.push(`/cadastros/areas/${area.are_id}`)}
+            onRowClick={(area) =>
+              router.push(`/cadastros/areas/${area.are_id}/editar`)
+            }
             loading={loading}
             emptyMessage={
               searchTerm
@@ -191,7 +199,7 @@ export default function AreasPage() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    router.push(`/cadastros/areas/${area.are_id}`);
+                    router.push(`/cadastros/areas/${area.are_id}/editar`);
                   }}
                   className="text-primary-600 hover:text-primary-900"
                   title="Editar"
@@ -228,9 +236,9 @@ export default function AreasPage() {
         }}
         onConfirm={handleDelete}
         title="Excluir Área"
-        message={`Tem certeza que deseja excluir a área "${areaToDelete?.are_nome}"? Esta ação não pode ser desfeita.`}
-        confirmText="Excluir"
-        cancelText="Cancelar"
+        message={`Tem certeza que deseja inativar a área "${areaToDelete?.are_nome}"? Você poderá reativá-la posteriormente.`}
+        confirmText="Inativar"
+        cancelText="Manter ativa"
         variant="danger"
         loading={deleting}
       />

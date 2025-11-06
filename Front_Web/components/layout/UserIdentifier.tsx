@@ -6,7 +6,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { getUserSession, setUserName as saveUserName } from '@/lib/userSession';
+import {
+  getUserSession,
+  setUserName as saveUserName,
+  setUserEmail as saveUserEmail,
+  clearUserEmail,
+} from '@/lib/userSession';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Modal } from '../ui/Modal';
@@ -14,6 +19,7 @@ import { Modal } from '../ui/Modal';
 interface UserSessionData {
   userId: string;
   userName: string | null;
+  userEmail: string | null;
   displayName: string;
 }
 
@@ -21,23 +27,36 @@ export const UserIdentifier: React.FC = () => {
   const [session, setSession] = useState<UserSessionData>({
     userId: '',
     userName: null,
+    userEmail: null,
     displayName: 'Usuário Anônimo',
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newName, setNewName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
 
   useEffect(() => {
     const userSession = getUserSession();
     setSession(userSession);
     setNewName(userSession.userName || '');
+    setNewEmail(userSession.userEmail || '');
   }, []);
 
   const handleSaveName = () => {
-    if (newName.trim()) {
-      saveUserName(newName.trim());
-      setSession(getUserSession());
-      setIsModalOpen(false);
+    const nameToSave = newName.trim();
+    const emailToSave = newEmail.trim();
+
+    if (nameToSave) {
+      saveUserName(nameToSave);
     }
+
+    if (emailToSave) {
+      saveUserEmail(emailToSave);
+    } else {
+      clearUserEmail();
+    }
+
+    setSession(getUserSession());
+    setIsModalOpen(false);
   };
 
   return (
@@ -59,6 +78,11 @@ export const UserIdentifier: React.FC = () => {
             <p className="text-xs text-gray-500">
               ID: {session.userId.slice(0, 8)}...
             </p>
+            {session.userEmail && (
+              <p className="text-xs text-gray-500 mt-0.5">
+                {session.userEmail}
+              </p>
+            )}
           </div>
         </div>
 
@@ -120,6 +144,16 @@ export const UserIdentifier: React.FC = () => {
             placeholder="Digite seu nome"
             autoFocus
             fullWidth
+          />
+
+          <Input
+            label="E-mail para contato"
+            type="email"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            placeholder="nome@empresa.com"
+            fullWidth
+            helperText="Este e-mail será usado para notificações e relatórios."
           />
 
           <div className="p-3 bg-gray-50 rounded-md">

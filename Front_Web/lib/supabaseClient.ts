@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 // ENV obrigatórias
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -33,10 +33,13 @@ export function getSupabaseClient() {
 }
 
 /** Helper opcional */
+type AnySupabaseClient = SupabaseClient<any, any, any>;
+
 export async function getOrCreateUser(
-  supabase: ReturnType<typeof getSupabaseServer>,
+  supabase: AnySupabaseClient,
   identificador: string,
-  nome?: string
+  nome?: string | null,
+  email?: string | null
 ) {
   const { data: existing, error: findErr } = await supabase
     .from("usr_usuarios")
@@ -44,13 +47,31 @@ export async function getOrCreateUser(
     .eq("usr_identificador", identificador)
     .maybeSingle();
   if (findErr) return { data: null, error: findErr };
-  if (existing) return { data: existing, error: null };
+  if (existing) {
+    const updates: Record<string, unknown> = {};
+    if (nome && nome !== existing.usr_nome) {
+      updates.usr_nome = nome;
+    }
+    if (email && email !== (existing as any).usr_email) {
+      updates.usr_email = email;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await supabase
+        .from("usr_usuarios")
+        .update(updates)
+        .eq("usr_id", existing.usr_id);
+    }
+
+    return { data: { ...existing, ...updates }, error: null };
+  }
 
   const { data: inserted, error: insertErr } = await supabase
     .from("usr_usuarios")
     .insert({
       usr_identificador: identificador,
       usr_nome: nome ?? null,
+      usr_email: email ?? null,
       usr_ativo: true,
     })
     .select()
