@@ -42,7 +42,8 @@ jobs:
 
       # Sem --remote: por padrão empurra para o projeto linkado
       - name: Aplicar migrations no banco remoto
-        run: supabase db push -y
+      - run: supabase db push -y
+      + run: supabase db push --yes
 
       - name: Deploy edge functions (optional)
         run: supabase functions deploy --project-ref "$PROJECT_REF" || true
