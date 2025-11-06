@@ -91,7 +91,7 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Navigation */}
-      <nav className="p-4 space-y-6">
+      <nav className="p-4 space-y-6 pb-24">
         {navigationSections.map((section) => (
           <div key={section.title}>
             <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">

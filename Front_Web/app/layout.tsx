@@ -1,5 +1,6 @@
 import "./globals.css"; // 👈 importa estilos globais
 import type { Metadata } from "next";
+import { Sidebar } from "@/components/layout";
 
 export const metadata: Metadata = {
   title: "Financeiro",
@@ -9,7 +10,12 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body>
+        <div className="main-layout">
+          <Sidebar />
+          <main className="main-content">{children}</main>
+        </div>
+      </body>
     </html>
   );
 }
