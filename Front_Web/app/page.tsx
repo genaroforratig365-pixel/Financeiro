@@ -1,7 +1,6 @@
 import { getSupabaseServer } from "../lib/supabaseClient";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+import { redirect } from 'next/navigation';
 
 function parseTablesEnv(): string[] {
   const raw = process.env.NEXT_PUBLIC_FINANCAS_TABLES || "";
