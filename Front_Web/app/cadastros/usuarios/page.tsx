@@ -10,13 +10,14 @@ import {
   clearUserEmail,
   clearUserName,
 } from '@/lib/userSession';
-import {
-  getSupabaseClient,
-  getOrCreateUser,
-  type UsuarioRow,
-} from '@/lib/supabaseClient';
+import { getSupabaseClient, getOrCreateUser } from '@/lib/supabaseClient';
 
-type Usuario = UsuarioRow;
+interface Usuario {
+  usr_id: string;
+  usr_nome: string | null;
+  usr_email: string | null;
+  usr_ativo: boolean;
+}
 
 export default function CadastroUsuarioPage() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
@@ -49,12 +50,11 @@ export default function CadastroUsuarioPage() {
         setUsuario({
           usr_id: data.usr_id,
           usr_nome: data.usr_nome,
-          usr_email: data.usr_email,
+          usr_email: (data as any).usr_email ?? null,
           usr_ativo: data.usr_ativo,
-          usr_identificador: data.usr_identificador,
         });
         setNome(data.usr_nome ?? '');
-        setEmail(data.usr_email ?? '');
+        setEmail((data as any).usr_email ?? '');
       } catch (error) {
         console.error('Erro ao carregar usuário:', error);
         setFeedback('Não foi possível carregar os dados do usuário.');
@@ -82,10 +82,6 @@ export default function CadastroUsuarioPage() {
         })
         .eq('usr_id', usuario.usr_id);
 
-      if (error) {
-        throw error;
-      }
-
       if (nome.trim()) {
         setUserName(nome.trim());
       } else {
@@ -97,16 +93,6 @@ export default function CadastroUsuarioPage() {
       } else {
         clearUserEmail();
       }
-
-      setUsuario((prev) =>
-        prev
-          ? {
-              ...prev,
-              usr_nome: nome.trim() || null,
-              usr_email: email.trim() || null,
-            }
-          : prev,
-      );
 
       setFeedback('Informações atualizadas com sucesso.');
     } catch (error) {

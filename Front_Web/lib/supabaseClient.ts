@@ -1,5 +1,4 @@
-import { createClient, type PostgrestError, type SupabaseClient } from "@supabase/supabase-js";
-import { getUserId } from "./userSession";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 // ENV obrigatórias
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -74,75 +73,43 @@ export function getSupabaseClient(options: ClientOptions = {}) {
 /** Helper opcional */
 type AnySupabaseClient = SupabaseClient<any, any, any>;
 
-export type UsuarioRow = {
-  usr_id: string;
-  usr_identificador: string;
-  usr_nome: string | null;
-  usr_email: string | null;
-  usr_ativo: boolean;
-};
-
-function normalizeNullableString(value: string | null | undefined): string | null {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : null;
-  }
-
-  return value ?? null;
-}
-
 export async function getOrCreateUser(
   supabase: AnySupabaseClient,
   identificador: string,
   nome?: string | null,
   email?: string | null
-) : Promise<{ data: UsuarioRow | null; error: PostgrestError | null }> {
+) {
   const { data: existing, error: findErr } = await supabase
     .from("usr_usuarios")
     .select("*")
     .eq("usr_identificador", identificador)
     .maybeSingle();
   if (findErr) return { data: null, error: findErr };
-  const existingRow = (existing ?? null) as UsuarioRow | null;
-  if (existingRow) {
-    const updates: Partial<Pick<UsuarioRow, "usr_nome" | "usr_email">> = {};
-    if (typeof nome !== "undefined") {
-      const nomeNormalizado = normalizeNullableString(nome);
-      if (nomeNormalizado !== existingRow.usr_nome) {
-        updates.usr_nome = nomeNormalizado;
-      }
+  if (existing) {
+    const updates: Record<string, unknown> = {};
+    if (nome && nome !== existing.usr_nome) {
+      updates.usr_nome = nome;
     }
-    if (typeof email !== "undefined") {
-      const emailNormalizado = normalizeNullableString(email);
-      if (emailNormalizado !== existingRow.usr_email) {
-        updates.usr_email = emailNormalizado;
-      }
+    if (email && email !== (existing as any).usr_email) {
+      updates.usr_email = email;
     }
 
     if (Object.keys(updates).length > 0) {
-      const { data: updated, error: updateErr } = await supabase
+      await supabase
         .from("usr_usuarios")
         .update(updates)
-        .eq("usr_id", existingRow.usr_id)
-        .select()
-        .single();
-
-      if (updateErr) {
-        return { data: null, error: updateErr };
-      }
-
-      return { data: (updated as UsuarioRow) ?? null, error: null };
+        .eq("usr_id", existing.usr_id);
     }
 
-    return { data: existingRow, error: null };
+    return { data: { ...existing, ...updates }, error: null };
   }
 
   const { data: inserted, error: insertErr } = await supabase
     .from("usr_usuarios")
     .insert({
       usr_identificador: identificador,
-      usr_nome: normalizeNullableString(nome),
-      usr_email: normalizeNullableString(email),
+      usr_nome: nome ?? null,
+      usr_email: email ?? null,
       usr_ativo: true,
     })
     .select()
