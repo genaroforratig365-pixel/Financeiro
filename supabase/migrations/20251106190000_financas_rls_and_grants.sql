@@ -1,43 +1,40 @@
+-- MIGRATION SAFE: só habilita RLS / cria policy se a tabela existir
+
+-- grants base do schema (não quebra se já existir)
 create schema if not exists financas;
-
--- Permite que os papéis padrão acessem o schema
 grant usage on schema financas to anon, authenticated;
+grant select on all tables in schema financas to anon, authenticated;
 
--- Defaults: qualquer tabela nova em financas herda esses grants
-alter default privileges in schema financas
-  grant select, insert, update, delete on tables to authenticated;
-
--- Exemplo de RLS
--- MOVIMENTAÇÕES (cada user só vê/edita as suas)
-alter table financas.movimentacoes enable row level security;
-
-create policy "owner_can_all"
-on financas.movimentacoes
-for all
-to authenticated
-using (auth.uid() = usuario_id)
-with check (auth.uid() = usuario_id);
-
--- Trigger: se usuario_id vier nulo, define como auth.uid()
-create or replace function financas.set_usuario_id()
-returns trigger language plpgsql as $$
+-- MOVIMENTACOES (ajuste se sua tabela tiver outro nome)
+do $$
 begin
-  if new.usuario_id is null then
-    new.usuario_id := auth.uid();
+  if exists (
+    select 1
+    from information_schema.tables
+    where table_schema = 'financas' and table_name = 'movimentacoes'
+  ) then
+    alter table financas.movimentacoes enable row level security;
+    drop policy if exists public_read_movimentacoes on financas.movimentacoes;
+    create policy public_read_movimentacoes
+      on financas.movimentacoes
+      for select to anon, authenticated
+      using (true);
   end if;
-  return new;
 end $$;
 
-drop trigger if exists trg_set_usuario_id on financas.movimentacoes;
-create trigger trg_set_usuario_id
-before insert on financas.movimentacoes
-for each row execute function financas.set_usuario_id();
+-- OUTRAS TABELAS (copie o bloco e troque o nome):
+/*
+do $$
+begin
+  if exists (select 1 from information_schema.tables
+             where table_schema='financas' and table_name='usr_usuarios') then
+    alter table financas.usr_usuarios enable row level security;
+    drop policy if exists public_read_usr_usuarios on financas.usr_usuarios;
+    create policy public_read_usr_usuarios
+      on financas.usr_usuarios for select to anon, authenticated using (true);
+  end if;
+end $$;
+*/
 
--- CATEGORIAS (leitura pública; ajuste se quiser)
-alter table financas.categorias enable row level security;
-drop policy if exists "public_read" on financas.categorias;
-create policy "public_read"
-on financas.categorias
-for select
-to anon, authenticated
-using (true);
+-- Recarrega o cache do PostgREST
+notify pgrst, 'reload schema';
