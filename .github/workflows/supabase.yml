@@ -40,7 +40,7 @@ jobs:
 
       # Aplica migrations (pasta supabase/migrations)
       - name: Apply migrations
-        run: supabase db push
+        run: supabase db push --remote
 
       # Deploy de Edge Functions (se houver). O "|| true" evita falha quando não existirem.
       - name: Deploy edge functions (optional)
