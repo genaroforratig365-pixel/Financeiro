@@ -100,10 +100,10 @@ export default function SaldoDiarioPage() {
           .limit(10),
       ]);
 
-      setPagamentosArea(pagAreaRes.data || []);
-      setReceitas(recRes.data || []);
-      setPagamentosBanco(pagBancoRes.data || []);
-      setSaldosBanco(saldoRes.data || []);
+      setPagamentosArea((pagAreaRes.data as PagamentoArea[]) || []);
+      setReceitas((recRes.data as Receita[]) || []);
+      setPagamentosBanco((pagBancoRes.data as PagamentoBanco[]) || []);
+      setSaldosBanco((saldoRes.data as SaldoBanco[]) || []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     } finally {
