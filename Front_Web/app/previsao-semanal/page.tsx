@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Header } from '@/components/layout';
 import { Button, Card, Loading } from '@/components/ui';
@@ -47,7 +47,9 @@ type ContaOption = {
 type TipoReceitaOption = { id: number; nome: string; normalizado: string };
 type BancoOption = { id: number; nome: string };
 
-type DiaValor = { data: string; valor: number };
+type DiaValor = { data: string; valor: number; texto: string };
+
+type CabecalhoData = { coluna: number; data: string };
 
 type CabecalhoData = { coluna: number; data: string };
 
@@ -149,12 +151,67 @@ const parseNumero = (valor: unknown): number => {
     return Math.round(valor * 100) / 100;
   }
   if (typeof valor === 'string') {
-    const texto = valor
-      .replace(/[^0-9,.-]/g, '')
-      .replace(/\.(?=\d{3}(\D|$))/g, '')
-      .replace(',', '.');
-    const numero = Number(texto);
-    return Number.isFinite(numero) ? Math.round(numero * 100) / 100 : 0;
+    const textoNormalizado = valor
+      .replace(/\s+/g, '')
+      .replace(/[−–—]/g, '-')
+      .replace(/[^0-9.,-]/g, '');
+
+    if (!textoNormalizado) {
+      return 0;
+    }
+
+    const negativo = textoNormalizado.includes('-');
+    const semSinal = textoNormalizado.replace(/-/g, '');
+
+    const ultimoPonto = semSinal.lastIndexOf('.');
+    const ultimaVirgula = semSinal.lastIndexOf(',');
+
+    const construirNumero = (separadorIndex: number, separador: ',' | '.') => {
+      const parteInteira = semSinal.slice(0, separadorIndex);
+      const parteDecimal = semSinal.slice(separadorIndex + 1);
+      const inteiroLimpo =
+        separador === ',' ? parteInteira.replace(/\./g, '') : parteInteira.replace(/,/g, '');
+      const decimalLimpo =
+        separador === ',' ? parteDecimal.replace(/\./g, '') : parteDecimal.replace(/,/g, '');
+      return `${inteiroLimpo}.${decimalLimpo}`;
+    };
+
+    let numeroTexto = '';
+
+    if (ultimaVirgula !== -1 || ultimoPonto !== -1) {
+      let separador: ',' | '.' | null = null;
+
+      if (ultimaVirgula !== -1 && ultimoPonto !== -1) {
+        separador = ultimaVirgula > ultimoPonto ? ',' : '.';
+      } else if (ultimaVirgula !== -1) {
+        const decimais = semSinal.length - ultimaVirgula - 1;
+        separador = decimais > 0 && decimais <= 2 ? ',' : null;
+      } else if (ultimoPonto !== -1) {
+        const decimais = semSinal.length - ultimoPonto - 1;
+        separador = decimais > 0 && decimais <= 2 ? '.' : null;
+      }
+
+      if (separador) {
+        const indice = separador === ',' ? ultimaVirgula : ultimoPonto;
+        numeroTexto = construirNumero(indice, separador);
+      } else {
+        numeroTexto = semSinal.replace(/[.,]/g, '');
+      }
+    } else {
+      numeroTexto = semSinal;
+    }
+
+    if (!numeroTexto) {
+      return 0;
+    }
+
+    const numero = Number(numeroTexto);
+    if (!Number.isFinite(numero)) {
+      return 0;
+    }
+
+    const resultado = negativo ? -numero : numero;
+    return Math.round(resultado * 100) / 100;
   }
   return 0;
 };
@@ -183,6 +240,15 @@ const validarLinha = (linha: LinhaImportada): string[] => {
 
 const currentMondayIso = toISODate(getMonday(new Date()));
 const defaultSemanaIso = toISODate(addWeeks(getMonday(new Date()), 1));
+
+const formatarNumeroParaTexto = (valor: number): string =>
+  valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const criarDiaValor = (data: string, valor: number): DiaValor => ({
+  data,
+  valor,
+  texto: formatarNumeroParaTexto(valor),
+});
 
 const gerarSemanasDisponiveis = (): { value: string; label: string }[] => {
   const base = getMonday(new Date());
@@ -227,6 +293,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
 
   const [previsaoExistente, setPrevisaoExistente] = useState<SemanaResumo | null>(null);
   const [carregandoPrevisao, setCarregandoPrevisao] = useState(false);
+  const arquivoInputRef = useRef<HTMLInputElement | null>(null);
 
   const datasTabela = useMemo(() => {
     if (linhas.length > 0) {
@@ -472,6 +539,8 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
         return;
       }
 
+      setMensagem(null);
+      setLinhas([]);
       setProcessandoArquivo(true);
       try {
         const XLSX = await loadSheetJS();
@@ -610,10 +679,9 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
               id: gerarUUID(),
               tipo: 'saldo_inicial',
               titulo: 'Saldo inicial',
-              valores: valores.map((item, idx) => ({
-                data: item.data,
-                valor: idx === 0 ? item.valor : 0,
-              })),
+              valores: valores.map((item, idx) =>
+                idx === 0 ? item : criarDiaValor(item.data, 0),
+              ),
               selecionado: true,
               areaId: null,
               contaId: null,
@@ -682,6 +750,8 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
         });
       } catch (error) {
         console.error('Erro ao processar planilha da previsão semanal:', error);
+        setLinhas([]);
+        setArquivoNome(null);
         setMensagem({
           tipo: 'erro',
           texto:
@@ -701,6 +771,20 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
     if (!file) return;
     setArquivoNome(file.name);
     await parsePlanilha(file);
+    if (arquivoInputRef.current) {
+      arquivoInputRef.current.value = '';
+    }
+  };
+  const handleCancelarArquivo = () => {
+    if (processandoArquivo) {
+      return;
+    }
+    setArquivoNome(null);
+    setLinhas([]);
+    setMensagem(null);
+    if (arquivoInputRef.current) {
+      arquivoInputRef.current.value = '';
+    }
   };
   const handleToggleLinha = (id: string, selecionado: boolean) => {
     atualizarLinha(id, (linha) => {
@@ -715,11 +799,43 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
     });
   };
 
-  const handleValorChange = (linhaId: string, data: string, valor: number) => {
+  const handleValorChange = (linhaId: string, data: string, texto: string) => {
     atualizarLinha(linhaId, (linha) => {
-      const valoresAtualizados = linha.valores.map((item) =>
-        item.data === data ? { ...item, valor } : item,
-      );
+      const valoresAtualizados = linha.valores.map((item) => {
+        if (item.data !== data) {
+          return item;
+        }
+
+        const numero = parseNumero(texto);
+        return {
+          ...item,
+          valor: numero,
+          texto,
+        };
+      });
+      return {
+        ...linha,
+        valores: valoresAtualizados,
+      };
+    });
+  };
+
+  const handleValorBlur = (linhaId: string, data: string) => {
+    atualizarLinha(linhaId, (linha) => {
+      const valoresAtualizados = linha.valores.map((item) => {
+        if (item.data !== data) {
+          return item;
+        }
+
+        if (item.texto.trim() === '') {
+          return { ...item, valor: 0, texto: '' };
+        }
+
+        return {
+          ...item,
+          texto: formatarNumeroParaTexto(item.valor),
+        };
+      });
       return {
         ...linha,
         valores: valoresAtualizados,
@@ -1012,10 +1128,19 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                     type="file"
                     accept=".xlsx,.xls"
                     className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    ref={arquivoInputRef}
                     onChange={handleArquivoChange}
                     disabled={processandoArquivo || !edicaoPermitida}
                   />
                 </label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleCancelarArquivo}
+                  disabled={!arquivoNome || processandoArquivo}
+                >
+                  Cancelar seleção
+                </Button>
                 <Button
                   type="button"
                   variant="primary"
@@ -1174,17 +1299,17 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                             {linha.valores.map((valor) => (
                               <td key={valor.data} className="px-3 py-2 align-top text-right">
                                 <input
-                                  type="number"
-                                  step="0.01"
-                                  className="w-24 rounded-md border border-gray-300 px-2 py-1 text-right text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                  value={valor.valor}
+                                  type="text"
+                                  inputMode="decimal"
+                                  pattern="[0-9.,-]*"
+                                  placeholder="0,00"
+                                  autoComplete="off"
+                                  className="w-28 rounded-md border border-gray-300 px-2 py-1 text-right text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                  value={valor.texto}
                                   onChange={(event) =>
-                                    handleValorChange(
-                                      linha.id,
-                                      valor.data,
-                                      parseNumero(event.target.value),
-                                    )
+                                    handleValorChange(linha.id, valor.data, event.target.value)
                                   }
+                                  onBlur={() => handleValorBlur(linha.id, valor.data)}
                                   disabled={linha.tipo === 'saldo_inicial' && valor.data !== datasTabela[0]}
                                 />
                               </td>
