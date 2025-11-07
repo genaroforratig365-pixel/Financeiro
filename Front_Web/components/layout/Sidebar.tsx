@@ -131,6 +131,25 @@ const navigationSections: NavSection[] = [
     ],
   },
   {
+    title: 'Relatórios',
+    items: [
+      {
+        label: 'Previsão Semanal',
+        href: '/relatorios/previsao-semanal',
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4h16M4 8h16M5 4v16a1 1 0 001 1h12a1 1 0 001-1V4M8 12h4m-4 4h8"
+            />
+          </svg>
+        ),
+      },
+    ],
+  },
+  {
     title: 'Cadastros',
     items: [
       {

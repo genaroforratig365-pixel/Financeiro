@@ -30,6 +30,7 @@ type PagamentoAreaRow = {
   pag_id?: unknown;
   pag_valor?: unknown;
   pag_data?: unknown;
+  pag_are_id?: unknown;
   are_areas?: MaybeArray<{ are_nome?: unknown } | null>;
 };
 
@@ -37,6 +38,7 @@ type ReceitaRow = {
   rec_id?: unknown;
   rec_valor?: unknown;
   rec_data?: unknown;
+  rec_ctr_id?: unknown;
   ctr_contas_receita?: MaybeArray<{ ctr_nome?: unknown } | null>;
 };
 
@@ -44,6 +46,7 @@ type PagamentoBancoRow = {
   pbk_id?: unknown;
   pbk_valor?: unknown;
   pbk_data?: unknown;
+  pbk_ban_id?: unknown;
   ban_bancos?: MaybeArray<{ ban_nome?: unknown } | null>;
 };
 
@@ -51,6 +54,7 @@ type SaldoBancoRow = {
   sdb_id?: unknown;
   sdb_saldo?: unknown;
   sdb_data?: unknown;
+  sdb_ban_id?: unknown;
   ban_bancos?: MaybeArray<{ ban_nome?: unknown } | null>;
 };
 
@@ -59,6 +63,7 @@ type PagamentoArea = {
   valor: number;
   data: string;
   area: string;
+  areaId: number;
 };
 
 type Receita = {
@@ -66,6 +71,7 @@ type Receita = {
   valor: number;
   data: string;
   conta: string;
+  contaId: number;
 };
 
 type PagamentoBanco = {
@@ -73,6 +79,7 @@ type PagamentoBanco = {
   valor: number;
   data: string;
   banco: string;
+  bancoId: number;
 };
 
 type SaldoBanco = {
@@ -80,6 +87,7 @@ type SaldoBanco = {
   valor: number;
   data: string;
   banco: string;
+  bancoId: number;
 };
 
 type FormMapa = Record<number, string>;
@@ -113,6 +121,7 @@ const mapPagamentosArea = (rows: MaybeArray<PagamentoAreaRow | null>): Pagamento
     area: normalizeRelation(row.are_areas ?? null)[0]?.are_nome
       ? toString(normalizeRelation(row.are_areas ?? null)[0]?.are_nome)
       : 'Área não informada',
+    areaId: toNumber(row.pag_are_id),
   }));
 
 const mapReceitas = (rows: MaybeArray<ReceitaRow | null>): Receita[] =>
@@ -123,6 +132,7 @@ const mapReceitas = (rows: MaybeArray<ReceitaRow | null>): Receita[] =>
     conta: normalizeRelation(row.ctr_contas_receita ?? null)[0]?.ctr_nome
       ? toString(normalizeRelation(row.ctr_contas_receita ?? null)[0]?.ctr_nome)
       : 'Conta não informada',
+    contaId: toNumber(row.rec_ctr_id),
   }));
 
 const mapPagamentosBanco = (rows: MaybeArray<PagamentoBancoRow | null>): PagamentoBanco[] =>
@@ -133,6 +143,7 @@ const mapPagamentosBanco = (rows: MaybeArray<PagamentoBancoRow | null>): Pagamen
     banco: normalizeRelation(row.ban_bancos ?? null)[0]?.ban_nome
       ? toString(normalizeRelation(row.ban_bancos ?? null)[0]?.ban_nome)
       : 'Banco não informado',
+    bancoId: toNumber(row.pbk_ban_id),
   }));
 
 const mapSaldosBanco = (rows: MaybeArray<SaldoBancoRow | null>): SaldoBanco[] =>
@@ -143,6 +154,7 @@ const mapSaldosBanco = (rows: MaybeArray<SaldoBancoRow | null>): SaldoBanco[] =>
     banco: normalizeRelation(row.ban_bancos ?? null)[0]?.ban_nome
       ? toString(normalizeRelation(row.ban_bancos ?? null)[0]?.ban_nome)
       : 'Banco não informado',
+    bancoId: toNumber(row.sdb_ban_id),
   }));
 
 const sincronizarMapa = (options: { id: number }[], mapa: FormMapa): FormMapa => {
@@ -260,6 +272,12 @@ const SaldoDiarioPage: React.FC = () => {
     saldo: null,
   });
   const [registroEditando, setRegistroEditando] = useState<Record<Processo, number | null>>({
+    area: null,
+    receita: null,
+    banco: null,
+    saldo: null,
+  });
+  const [registroExcluindo, setRegistroExcluindo] = useState<Record<Processo, number | null>>({
     area: null,
     receita: null,
     banco: null,
@@ -385,25 +403,25 @@ const SaldoDiarioPage: React.FC = () => {
       const [pagAreaRes, recRes, pagBancoRes, saldoRes] = await Promise.all([
         supabase
           .from('pag_pagamentos_area')
-          .select('pag_id, pag_valor, pag_data, are_areas(are_nome)')
+          .select('pag_id, pag_valor, pag_data, pag_are_id, are_areas(are_nome)')
           .eq('pag_data', data)
           .order('pag_criado_em', { ascending: false })
           .limit(100),
         supabase
           .from('rec_receitas')
-          .select('rec_id, rec_valor, rec_data, ctr_contas_receita(ctr_nome)')
+          .select('rec_id, rec_valor, rec_data, rec_ctr_id, ctr_contas_receita(ctr_nome)')
           .eq('rec_data', data)
           .order('rec_criado_em', { ascending: false })
           .limit(100),
         supabase
           .from('pbk_pagamentos_banco')
-          .select('pbk_id, pbk_valor, pbk_data, ban_bancos(ban_nome)')
+          .select('pbk_id, pbk_valor, pbk_data, pbk_ban_id, ban_bancos(ban_nome)')
           .eq('pbk_data', data)
           .order('pbk_criado_em', { ascending: false })
           .limit(100),
         supabase
           .from('sdb_saldo_banco')
-          .select('sdb_id, sdb_saldo, sdb_data, ban_bancos(ban_nome)')
+          .select('sdb_id, sdb_saldo, sdb_data, sdb_ban_id, ban_bancos(ban_nome)')
           .eq('sdb_data', data)
           .order('sdb_criado_em', { ascending: false })
           .limit(100),
@@ -503,31 +521,42 @@ const SaldoDiarioPage: React.FC = () => {
       return;
     }
 
-    const registros = areaOptions
-      .map((area) => {
-        const valorCalculado = avaliarEntrada(pagamentosAreaForm[area.id]);
-        if (valorCalculado === null || valorCalculado <= 0) {
-          return null;
-        }
-
-        return {
-          pag_are_id: area.id,
-          pag_usr_id: usuario.usr_id,
-          pag_data: dataReferencia,
-          pag_valor: valorCalculado,
-        };
-      })
-      .filter(Boolean) as {
+    const novos: {
       pag_are_id: number;
       pag_usr_id: string;
       pag_data: string;
       pag_valor: number;
-    }[];
+    }[] = [];
+    const atualizacoes: PagamentoArea[] = [];
 
-    if (registros.length === 0) {
+    areaOptions.forEach((area) => {
+      const valorCalculado = avaliarEntrada(pagamentosAreaForm[area.id]);
+      if (valorCalculado === null || valorCalculado <= 0) {
+        return;
+      }
+
+      const existente = pagamentosAreaPorAreaId.get(area.id);
+      if (existente) {
+        if (Math.abs(valorCalculado - existente.valor) > 0.009) {
+          atualizacoes.push({
+            ...existente,
+            valor: valorCalculado,
+          });
+        }
+      } else {
+        novos.push({
+          pag_are_id: area.id,
+          pag_usr_id: usuario.usr_id,
+          pag_data: dataReferencia,
+          pag_valor: valorCalculado,
+        });
+      }
+    });
+
+    if (novos.length === 0 && atualizacoes.length === 0) {
       atualizarMensagem('area', {
         tipo: 'erro',
-        texto: 'Informe valores válidos para pelo menos uma área antes de registrar.',
+        texto: 'Informe valores válidos ou diferentes do que já está registrado antes de salvar.',
       });
       return;
     }
@@ -537,24 +566,53 @@ const SaldoDiarioPage: React.FC = () => {
       atualizarMensagem('area', null);
 
       const supabase = getSupabaseClient();
-      const { error } = await supabase.from('pag_pagamentos_area').insert(registros);
+      if (novos.length > 0) {
+        const { error: inserirErro } = await supabase.from('pag_pagamentos_area').insert(novos);
+        if (inserirErro) throw inserirErro;
+      }
 
-      if (error) throw error;
+      if (atualizacoes.length > 0) {
+        const payload = atualizacoes.map((registro) => ({
+          pag_id: registro.id,
+          pag_are_id: registro.areaId,
+          pag_usr_id: usuario.usr_id,
+          pag_data: dataReferencia,
+          pag_valor: registro.valor,
+        }));
+        const { error: atualizarErro } = await supabase
+          .from('pag_pagamentos_area')
+          .upsert(payload, { onConflict: 'pag_id' });
+        if (atualizarErro) throw atualizarErro;
+      }
 
-      setPagamentosAreaForm((prev) => {
-        const next = { ...prev };
-        registros.forEach((registro) => {
-          next[registro.pag_are_id] = '';
+      const areasProcessadas = new Set<number>();
+      novos.forEach((item) => areasProcessadas.add(item.pag_are_id));
+      atualizacoes.forEach((item) => areasProcessadas.add(item.areaId));
+
+      if (areasProcessadas.size > 0) {
+        setPagamentosAreaForm((prev) => {
+          const next = { ...prev };
+          areasProcessadas.forEach((id) => {
+            next[id] = '';
+          });
+          return next;
         });
-        return next;
-      });
+      }
+
+      const mensagemPartes: string[] = [];
+      if (novos.length > 0) {
+        mensagemPartes.push(`${novos.length} novo${novos.length > 1 ? 's' : ''}`);
+      }
+      if (atualizacoes.length > 0) {
+        mensagemPartes.push(`${atualizacoes.length} atualizado${atualizacoes.length > 1 ? 's' : ''}`);
+      }
 
       atualizarMensagem('area', {
         tipo: 'sucesso',
         texto:
-          registros.length === 1
-            ? 'Pagamento por área registrado com sucesso.'
-            : `${registros.length} pagamentos por área registrados com sucesso.`,
+          mensagemPartes.length === 0
+            ? 'Pagamentos por área registrados.'
+            : `Pagamentos por área salvos (${mensagemPartes.join(' e ')}).`,
       });
       await carregarMovimentacoes(dataReferencia);
     } catch (error) {
@@ -583,31 +641,42 @@ const SaldoDiarioPage: React.FC = () => {
       return;
     }
 
-    const registros = contaOptions
-      .map((conta) => {
-        const valorCalculado = avaliarEntrada(receitasForm[conta.id]);
-        if (valorCalculado === null || valorCalculado <= 0) {
-          return null;
-        }
-
-        return {
-          rec_ctr_id: conta.id,
-          rec_usr_id: usuario.usr_id,
-          rec_data: dataReferencia,
-          rec_valor: valorCalculado,
-        };
-      })
-      .filter(Boolean) as {
+    const novos: {
       rec_ctr_id: number;
       rec_usr_id: string;
       rec_data: string;
       rec_valor: number;
-    }[];
+    }[] = [];
+    const atualizacoes: Receita[] = [];
 
-    if (registros.length === 0) {
+    contaOptions.forEach((conta) => {
+      const valorCalculado = avaliarEntrada(receitasForm[conta.id]);
+      if (valorCalculado === null || valorCalculado <= 0) {
+        return;
+      }
+
+      const existente = receitasPorContaId.get(conta.id);
+      if (existente) {
+        if (Math.abs(valorCalculado - existente.valor) > 0.009) {
+          atualizacoes.push({
+            ...existente,
+            valor: valorCalculado,
+          });
+        }
+      } else {
+        novos.push({
+          rec_ctr_id: conta.id,
+          rec_usr_id: usuario.usr_id,
+          rec_data: dataReferencia,
+          rec_valor: valorCalculado,
+        });
+      }
+    });
+
+    if (novos.length === 0 && atualizacoes.length === 0) {
       atualizarMensagem('receita', {
         tipo: 'erro',
-        texto: 'Informe valores válidos para pelo menos uma conta de receita antes de registrar.',
+        texto: 'Informe valores válidos ou diferentes do que já está registrado antes de salvar.',
       });
       return;
     }
@@ -617,24 +686,53 @@ const SaldoDiarioPage: React.FC = () => {
       atualizarMensagem('receita', null);
 
       const supabase = getSupabaseClient();
-      const { error } = await supabase.from('rec_receitas').insert(registros);
+      if (novos.length > 0) {
+        const { error: inserirErro } = await supabase.from('rec_receitas').insert(novos);
+        if (inserirErro) throw inserirErro;
+      }
 
-      if (error) throw error;
+      if (atualizacoes.length > 0) {
+        const payload = atualizacoes.map((registro) => ({
+          rec_id: registro.id,
+          rec_ctr_id: registro.contaId,
+          rec_usr_id: usuario.usr_id,
+          rec_data: dataReferencia,
+          rec_valor: registro.valor,
+        }));
+        const { error: atualizarErro } = await supabase
+          .from('rec_receitas')
+          .upsert(payload, { onConflict: 'rec_id' });
+        if (atualizarErro) throw atualizarErro;
+      }
 
-      setReceitasForm((prev) => {
-        const next = { ...prev };
-        registros.forEach((registro) => {
-          next[registro.rec_ctr_id] = '';
+      const contasProcessadas = new Set<number>();
+      novos.forEach((item) => contasProcessadas.add(item.rec_ctr_id));
+      atualizacoes.forEach((item) => contasProcessadas.add(item.contaId));
+
+      if (contasProcessadas.size > 0) {
+        setReceitasForm((prev) => {
+          const next = { ...prev };
+          contasProcessadas.forEach((id) => {
+            next[id] = '';
+          });
+          return next;
         });
-        return next;
-      });
+      }
+
+      const mensagemPartes: string[] = [];
+      if (novos.length > 0) {
+        mensagemPartes.push(`${novos.length} nova${novos.length > 1 ? 's' : ''}`);
+      }
+      if (atualizacoes.length > 0) {
+        mensagemPartes.push(`${atualizacoes.length} atualizada${atualizacoes.length > 1 ? 's' : ''}`);
+      }
 
       atualizarMensagem('receita', {
         tipo: 'sucesso',
         texto:
-          registros.length === 1
-            ? 'Receita registrada com sucesso.'
-            : `${registros.length} receitas registradas com sucesso.`,
+          mensagemPartes.length === 0
+            ? 'Receitas registradas com sucesso.'
+            : `Receitas salvas (${mensagemPartes.join(' e ')}).`,
       });
       await carregarMovimentacoes(dataReferencia);
     } catch (error) {
@@ -663,31 +761,42 @@ const SaldoDiarioPage: React.FC = () => {
       return;
     }
 
-    const registros = bancoOptions
-      .map((banco) => {
-        const valorCalculado = avaliarEntrada(pagamentosBancoForm[banco.id]);
-        if (valorCalculado === null || valorCalculado <= 0) {
-          return null;
-        }
-
-        return {
-          pbk_ban_id: banco.id,
-          pbk_usr_id: usuario.usr_id,
-          pbk_data: dataReferencia,
-          pbk_valor: valorCalculado,
-        };
-      })
-      .filter(Boolean) as {
+    const novos: {
       pbk_ban_id: number;
       pbk_usr_id: string;
       pbk_data: string;
       pbk_valor: number;
-    }[];
+    }[] = [];
+    const atualizacoes: PagamentoBanco[] = [];
 
-    if (registros.length === 0) {
+    bancoOptions.forEach((banco) => {
+      const valorCalculado = avaliarEntrada(pagamentosBancoForm[banco.id]);
+      if (valorCalculado === null || valorCalculado <= 0) {
+        return;
+      }
+
+      const existente = pagamentosBancoPorBancoId.get(banco.id);
+      if (existente) {
+        if (Math.abs(valorCalculado - existente.valor) > 0.009) {
+          atualizacoes.push({
+            ...existente,
+            valor: valorCalculado,
+          });
+        }
+      } else {
+        novos.push({
+          pbk_ban_id: banco.id,
+          pbk_usr_id: usuario.usr_id,
+          pbk_data: dataReferencia,
+          pbk_valor: valorCalculado,
+        });
+      }
+    });
+
+    if (novos.length === 0 && atualizacoes.length === 0) {
       atualizarMensagem('banco', {
         tipo: 'erro',
-        texto: 'Informe valores válidos para pelo menos um banco antes de registrar.',
+        texto: 'Informe valores válidos ou diferentes do que já está registrado antes de salvar.',
       });
       return;
     }
@@ -697,24 +806,53 @@ const SaldoDiarioPage: React.FC = () => {
       atualizarMensagem('banco', null);
 
       const supabase = getSupabaseClient();
-      const { error } = await supabase.from('pbk_pagamentos_banco').insert(registros);
+      if (novos.length > 0) {
+        const { error: inserirErro } = await supabase.from('pbk_pagamentos_banco').insert(novos);
+        if (inserirErro) throw inserirErro;
+      }
 
-      if (error) throw error;
+      if (atualizacoes.length > 0) {
+        const payload = atualizacoes.map((registro) => ({
+          pbk_id: registro.id,
+          pbk_ban_id: registro.bancoId,
+          pbk_usr_id: usuario.usr_id,
+          pbk_data: dataReferencia,
+          pbk_valor: registro.valor,
+        }));
+        const { error: atualizarErro } = await supabase
+          .from('pbk_pagamentos_banco')
+          .upsert(payload, { onConflict: 'pbk_id' });
+        if (atualizarErro) throw atualizarErro;
+      }
 
-      setPagamentosBancoForm((prev) => {
-        const next = { ...prev };
-        registros.forEach((registro) => {
-          next[registro.pbk_ban_id] = '';
+      const bancosProcessados = new Set<number>();
+      novos.forEach((item) => bancosProcessados.add(item.pbk_ban_id));
+      atualizacoes.forEach((item) => bancosProcessados.add(item.bancoId));
+
+      if (bancosProcessados.size > 0) {
+        setPagamentosBancoForm((prev) => {
+          const next = { ...prev };
+          bancosProcessados.forEach((id) => {
+            next[id] = '';
+          });
+          return next;
         });
-        return next;
-      });
+      }
+
+      const mensagemPartes: string[] = [];
+      if (novos.length > 0) {
+        mensagemPartes.push(`${novos.length} novo${novos.length > 1 ? 's' : ''}`);
+      }
+      if (atualizacoes.length > 0) {
+        mensagemPartes.push(`${atualizacoes.length} atualizado${atualizacoes.length > 1 ? 's' : ''}`);
+      }
 
       atualizarMensagem('banco', {
         tipo: 'sucesso',
         texto:
-          registros.length === 1
-            ? 'Pagamento bancário registrado com sucesso.'
-            : `${registros.length} pagamentos bancários registrados com sucesso.`,
+          mensagemPartes.length === 0
+            ? 'Pagamentos bancários registrados.'
+            : `Pagamentos bancários salvos (${mensagemPartes.join(' e ')}).`,
       });
       await carregarMovimentacoes(dataReferencia);
     } catch (error) {
@@ -872,6 +1010,43 @@ const SaldoDiarioPage: React.FC = () => {
     }
   };
 
+  const handleExcluirPagamentoArea = async (registro: PagamentoArea) => {
+    if (!usuario) return;
+    if (!edicaoLiberada) {
+      atualizarMensagem('area', {
+        tipo: 'erro',
+        texto: `As exclusões só podem ser realizadas para o último dia útil (${formatarData(ultimoDiaUtil)}).`,
+      });
+      return;
+    }
+
+    try {
+      setRegistroExcluindo((prev) => ({ ...prev, area: registro.id }));
+      atualizarMensagem('area', null);
+
+      const supabase = getSupabaseClient();
+      const { error } = await supabase.from('pag_pagamentos_area').delete().eq('pag_id', registro.id);
+      if (error) throw error;
+
+      atualizarMensagem('area', {
+        tipo: 'sucesso',
+        texto: 'Pagamento por área removido com sucesso.',
+      });
+      await carregarMovimentacoes(dataReferencia);
+    } catch (error) {
+      console.error('Erro ao excluir pagamento por área:', error);
+      atualizarMensagem('area', {
+        tipo: 'erro',
+        texto: traduzirErroSupabase(
+          error,
+          'Não foi possível remover o pagamento selecionado. Tente novamente.',
+        ),
+      });
+    } finally {
+      setRegistroExcluindo((prev) => ({ ...prev, area: null }));
+    }
+  };
+
   const handleAtualizarReceitaExistente = async (registro: Receita) => {
     if (!usuario) return;
     if (!edicaoLiberada) {
@@ -928,6 +1103,43 @@ const SaldoDiarioPage: React.FC = () => {
       });
     } finally {
       setRegistroEditando((prev) => ({ ...prev, receita: null }));
+    }
+  };
+
+  const handleExcluirReceita = async (registro: Receita) => {
+    if (!usuario) return;
+    if (!edicaoLiberada) {
+      atualizarMensagem('receita', {
+        tipo: 'erro',
+        texto: `As exclusões só podem ser realizadas para o último dia útil (${formatarData(ultimoDiaUtil)}).`,
+      });
+      return;
+    }
+
+    try {
+      setRegistroExcluindo((prev) => ({ ...prev, receita: registro.id }));
+      atualizarMensagem('receita', null);
+
+      const supabase = getSupabaseClient();
+      const { error } = await supabase.from('rec_receitas').delete().eq('rec_id', registro.id);
+      if (error) throw error;
+
+      atualizarMensagem('receita', {
+        tipo: 'sucesso',
+        texto: 'Receita removida com sucesso.',
+      });
+      await carregarMovimentacoes(dataReferencia);
+    } catch (error) {
+      console.error('Erro ao excluir receita:', error);
+      atualizarMensagem('receita', {
+        tipo: 'erro',
+        texto: traduzirErroSupabase(
+          error,
+          'Não foi possível remover a receita selecionada. Tente novamente.',
+        ),
+      });
+    } finally {
+      setRegistroExcluindo((prev) => ({ ...prev, receita: null }));
     }
   };
 
@@ -990,6 +1202,43 @@ const SaldoDiarioPage: React.FC = () => {
     }
   };
 
+  const handleExcluirPagamentoBanco = async (registro: PagamentoBanco) => {
+    if (!usuario) return;
+    if (!edicaoLiberada) {
+      atualizarMensagem('banco', {
+        tipo: 'erro',
+        texto: `As exclusões só podem ser realizadas para o último dia útil (${formatarData(ultimoDiaUtil)}).`,
+      });
+      return;
+    }
+
+    try {
+      setRegistroExcluindo((prev) => ({ ...prev, banco: registro.id }));
+      atualizarMensagem('banco', null);
+
+      const supabase = getSupabaseClient();
+      const { error } = await supabase.from('pbk_pagamentos_banco').delete().eq('pbk_id', registro.id);
+      if (error) throw error;
+
+      atualizarMensagem('banco', {
+        tipo: 'sucesso',
+        texto: 'Pagamento bancário removido com sucesso.',
+      });
+      await carregarMovimentacoes(dataReferencia);
+    } catch (error) {
+      console.error('Erro ao excluir pagamento bancário:', error);
+      atualizarMensagem('banco', {
+        tipo: 'erro',
+        texto: traduzirErroSupabase(
+          error,
+          'Não foi possível remover o pagamento bancário selecionado. Tente novamente.',
+        ),
+      });
+    } finally {
+      setRegistroExcluindo((prev) => ({ ...prev, banco: null }));
+    }
+  };
+
   const handleAtualizarSaldoBancoExistente = async (registro: SaldoBanco) => {
     if (!usuario) return;
     if (!edicaoLiberada) {
@@ -1049,6 +1298,43 @@ const SaldoDiarioPage: React.FC = () => {
     }
   };
 
+  const handleExcluirSaldoBanco = async (registro: SaldoBanco) => {
+    if (!usuario) return;
+    if (!edicaoLiberada) {
+      atualizarMensagem('saldo', {
+        tipo: 'erro',
+        texto: `As exclusões só podem ser realizadas para o último dia útil (${formatarData(ultimoDiaUtil)}).`,
+      });
+      return;
+    }
+
+    try {
+      setRegistroExcluindo((prev) => ({ ...prev, saldo: registro.id }));
+      atualizarMensagem('saldo', null);
+
+      const supabase = getSupabaseClient();
+      const { error } = await supabase.from('sdb_saldo_banco').delete().eq('sdb_id', registro.id);
+      if (error) throw error;
+
+      atualizarMensagem('saldo', {
+        tipo: 'sucesso',
+        texto: 'Saldo bancário removido com sucesso.',
+      });
+      await carregarMovimentacoes(dataReferencia);
+    } catch (error) {
+      console.error('Erro ao excluir saldo bancário:', error);
+      atualizarMensagem('saldo', {
+        tipo: 'erro',
+        texto: traduzirErroSupabase(
+          error,
+          'Não foi possível remover o saldo selecionado. Tente novamente.',
+        ),
+      });
+    } finally {
+      setRegistroExcluindo((prev) => ({ ...prev, saldo: null }));
+    }
+  };
+
   const totalPagamentosArea = useMemo(
     () => pagamentosArea.reduce((sum, p) => sum + Number(p.valor), 0),
     [pagamentosArea]
@@ -1101,6 +1387,46 @@ const SaldoDiarioPage: React.FC = () => {
       }, 0),
     [bancoOptions, saldosBancoForm]
   );
+
+  const pagamentosAreaPorAreaId = useMemo(() => {
+    const mapa = new Map<number, PagamentoArea>();
+    pagamentosArea.forEach((registro) => {
+      if (registro.areaId) {
+        mapa.set(registro.areaId, registro);
+      }
+    });
+    return mapa;
+  }, [pagamentosArea]);
+
+  const receitasPorContaId = useMemo(() => {
+    const mapa = new Map<number, Receita>();
+    receitas.forEach((registro) => {
+      if (registro.contaId) {
+        mapa.set(registro.contaId, registro);
+      }
+    });
+    return mapa;
+  }, [receitas]);
+
+  const pagamentosBancoPorBancoId = useMemo(() => {
+    const mapa = new Map<number, PagamentoBanco>();
+    pagamentosBanco.forEach((registro) => {
+      if (registro.bancoId) {
+        mapa.set(registro.bancoId, registro);
+      }
+    });
+    return mapa;
+  }, [pagamentosBanco]);
+
+  const saldosBancoPorBancoId = useMemo(() => {
+    const mapa = new Map<number, SaldoBanco>();
+    saldosBanco.forEach((registro) => {
+      if (registro.bancoId) {
+        mapa.set(registro.bancoId, registro);
+      }
+    });
+    return mapa;
+  }, [saldosBanco]);
 
   const helperValor = (valor: string | undefined): string | undefined => {
     const resultado = avaliarEntrada(valor);
@@ -1182,9 +1508,6 @@ const SaldoDiarioPage: React.FC = () => {
             <div className="space-y-5">
               <form className="space-y-4" onSubmit={handleRegistrarPagamentosArea}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-gray-600">
-                    Informe os valores consolidados de pagamentos por área para o dia selecionado.
-                  </p>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
@@ -1208,11 +1531,10 @@ const SaldoDiarioPage: React.FC = () => {
                       Registrar pagamentos
                     </Button>
                   </div>
-                </div>
-
-                <div className="flex items-center justify-between rounded-md border border-dashed border-primary-200 bg-primary-50/40 px-4 py-2 text-sm text-primary-800">
-                  <span>Total a registrar:</span>
-                  <strong>{formatCurrency(totalFormArea)}</strong>
+                  <div className="rounded-md border border-dashed border-primary-200 bg-primary-50/40 px-4 py-2 text-sm text-primary-800">
+                    <span>Total a registrar: </span>
+                    <strong>{formatCurrency(totalFormArea)}</strong>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto rounded-lg border border-gray-200">
@@ -1220,39 +1542,101 @@ const SaldoDiarioPage: React.FC = () => {
                     <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                       <tr>
                         <th className="px-4 py-3 text-left font-semibold">Área</th>
-                        <th className="px-4 py-3 text-left font-semibold w-48">Valor / Expressão</th>
+                        <th className="px-4 py-3 text-left font-semibold w-52">Valor / Expressão</th>
+                        <th className="px-4 py-3 text-left font-semibold min-w-[280px]">Registrado</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white/80">
                       {areaOptions.length === 0 ? (
                         <tr>
-                          <td colSpan={2} className="px-4 py-6 text-center text-sm text-gray-500">
+                          <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-500">
                             Cadastre áreas no menu Cadastros &gt; Áreas para liberar esta seção.
                           </td>
                         </tr>
                       ) : (
-                        areaOptions.map((area) => (
-                          <tr key={area.id}>
-                            <td className="px-4 py-3 font-medium text-gray-700">{area.nome}</td>
-                            <td className="px-4 py-3">
-                              <Input
-                                type="text"
-                                inputMode="decimal"
-                                placeholder="Ex.: 10+20+30"
-                                value={pagamentosAreaForm[area.id] ?? ''}
-                                onChange={(event) =>
-                                  setPagamentosAreaForm((prev) => ({
-                                    ...prev,
-                                    [area.id]: event.target.value,
-                                  }))
-                                }
-                                disabled={processando.area || !edicaoLiberada}
-                                helperText={helperValor(pagamentosAreaForm[area.id])}
-                                fullWidth
-                              />
-                            </td>
-                          </tr>
-                        ))
+                        areaOptions.map((area) => {
+                          const registro = pagamentosAreaPorAreaId.get(area.id);
+                          return (
+                            <tr key={area.id}>
+                              <td className="px-4 py-3 font-medium text-gray-700">{area.nome}</td>
+                              <td className="px-4 py-3 align-top">
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  placeholder="Ex.: 10+20+30"
+                                  value={pagamentosAreaForm[area.id] ?? ''}
+                                  onChange={(event) =>
+                                    setPagamentosAreaForm((prev) => ({
+                                      ...prev,
+                                      [area.id]: event.target.value,
+                                    }))
+                                  }
+                                  disabled={processando.area || !edicaoLiberada}
+                                  helperText={helperValor(pagamentosAreaForm[area.id])}
+                                  fullWidth
+                                />
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                {registro ? (
+                                  <div className="space-y-2">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <span className="font-semibold text-primary-700">
+                                        {formatCurrency(registro.valor)}
+                                      </span>
+                                      <span className="text-xs text-gray-400">
+                                        {formatarData(registro.data)}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                                      <Input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={pagamentosAreaEdicao[registro.id] ?? ''}
+                                        onChange={(event) =>
+                                          setPagamentosAreaEdicao((prev) => ({
+                                            ...prev,
+                                            [registro.id]: event.target.value,
+                                          }))
+                                        }
+                                        disabled={
+                                          !edicaoLiberada ||
+                                          registroEditando.area === registro.id ||
+                                          registroExcluindo.area === registro.id
+                                        }
+                                        helperText={helperValor(pagamentosAreaEdicao[registro.id])}
+                                        className="sm:w-44"
+                                      />
+                                      <div className="flex gap-2">
+                                        <Button
+                                          type="button"
+                                          variant="secondary"
+                                          size="sm"
+                                          onClick={() => handleAtualizarPagamentoAreaExistente(registro)}
+                                          disabled={!edicaoLiberada}
+                                          loading={registroEditando.area === registro.id}
+                                        >
+                                          Salvar
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="danger"
+                                          size="sm"
+                                          onClick={() => handleExcluirPagamentoArea(registro)}
+                                          disabled={!edicaoLiberada}
+                                          loading={registroExcluindo.area === registro.id}
+                                        >
+                                          Excluir
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-gray-400">Nenhum valor registrado</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
@@ -1273,244 +1657,12 @@ const SaldoDiarioPage: React.FC = () => {
                 )}
               </form>
 
-              <div className="border-t border-gray-200 pt-4">
-                <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                  <h3 className="text-sm font-semibold text-gray-700">Pagamentos registrados</h3>
-                  {!edicaoLiberada && (
-                    <span className="text-xs text-gray-500">
-                      Edição disponível apenas para o último dia útil ({formatarData(ultimoDiaUtil)}).
-                    </span>
-                  )}
-                </div>
-                {pagamentosArea.length === 0 ? (
-                  <p className="text-sm text-gray-500 text-center py-4">
-                    Nenhum pagamento registrado na data selecionada.
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto rounded-lg border border-gray-200">
-                    <table className="min-w-full divide-y divide-gray-200 text-sm">
-                      <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                        <tr>
-                          <th className="px-4 py-3 text-left font-semibold">Área</th>
-                          <th className="px-4 py-3 text-left font-semibold">Data</th>
-                          <th className="px-4 py-3 text-left font-semibold">Valor registrado</th>
-                          <th className="px-4 py-3 text-left font-semibold w-48">Novo valor</th>
-                          <th className="px-4 py-3 text-left font-semibold">Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 bg-white/80">
-                        {pagamentosArea.map((pag) => (
-                          <tr key={pag.id}>
-                            <td className="px-4 py-3 font-medium text-gray-700">{pag.area}</td>
-                            <td className="px-4 py-3 text-gray-500">{formatarData(pag.data)}</td>
-                            <td className="px-4 py-3 font-semibold text-gray-900">{formatCurrency(pag.valor)}</td>
-                            <td className="px-4 py-3">
-                              <Input
-                                type="text"
-                                inputMode="decimal"
-                                value={pagamentosAreaEdicao[pag.id] ?? ''}
-                                onChange={(event) =>
-                                  setPagamentosAreaEdicao((prev) => ({
-                                    ...prev,
-                                    [pag.id]: event.target.value,
-                                  }))
-                                }
-                                disabled={!edicaoLiberada || registroEditando.area === pag.id}
-                                helperText={helperValor(pagamentosAreaEdicao[pag.id])}
-                                fullWidth
-                              />
-                            </td>
-                            <td className="px-4 py-3">
-                              <Button
-                                type="button"
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => handleAtualizarPagamentoAreaExistente(pag)}
-                                disabled={!edicaoLiberada}
-                                loading={registroEditando.area === pag.id}
-                              >
-                                Salvar
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
-          </Card>
-          <Card title="Receitas" subtitle={`Total registrado: ${formatCurrency(totalReceitas)}`} variant="success">
-            <div className="space-y-5">
-              <form className="space-y-4" onSubmit={handleRegistrarReceitas}>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-gray-600">
-                    Distribua as receitas por conta para registrar o consolidado diário.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setReceitasForm(sincronizarMapa(contaOptions, {}));
-                        limparMensagem('receita');
-                      }}
-                      disabled={processando.receita || contaOptions.length === 0}
-                    >
-                      Limpar campos
-                    </Button>
-                    <Button
-                      type="submit"
-                      variant="primary"
-                      size="sm"
-                      loading={processando.receita}
-                      disabled={contaOptions.length === 0 || !edicaoLiberada}
-                    >
-                      Registrar receitas
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between rounded-md border border-dashed border-success-200 bg-success-50/40 px-4 py-2 text-sm text-success-800">
-                  <span>Total a registrar:</span>
-                  <strong>{formatCurrency(totalFormReceita)}</strong>
-                </div>
-
-                <div className="overflow-x-auto rounded-lg border border-gray-200">
-                  <table className="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                      <tr>
-                        <th className="px-4 py-3 text-left font-semibold">Conta de receita</th>
-                        <th className="px-4 py-3 text-left font-semibold w-48">Valor / Expressão</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white/80">
-                      {contaOptions.length === 0 ? (
-                        <tr>
-                          <td colSpan={2} className="px-4 py-6 text-center text-sm text-gray-500">
-                            Cadastre contas em Cadastros &gt; Contas de Receita para liberar esta seção.
-                          </td>
-                        </tr>
-                      ) : (
-                        contaOptions.map((conta) => (
-                          <tr key={conta.id}>
-                            <td className="px-4 py-3 font-medium text-gray-700">{conta.nome}</td>
-                            <td className="px-4 py-3">
-                              <Input
-                                type="text"
-                                inputMode="decimal"
-                                placeholder="Ex.: 500-125"
-                                value={receitasForm[conta.id] ?? ''}
-                                onChange={(event) =>
-                                  setReceitasForm((prev) => ({
-                                    ...prev,
-                                    [conta.id]: event.target.value,
-                                  }))
-                                }
-                                disabled={processando.receita || !edicaoLiberada}
-                                helperText={helperValor(receitasForm[conta.id])}
-                                fullWidth
-                              />
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {mensagens.receita && (
-                  <div
-                    className={`rounded-md border px-4 py-2 text-sm ${
-                      mensagens.receita.tipo === 'sucesso'
-                        ? 'border-success-200 bg-success-50 text-success-700'
-                        : mensagens.receita.tipo === 'erro'
-                        ? 'border-error-200 bg-error-50 text-error-700'
-                        : 'border-primary-200 bg-primary-50 text-primary-800'
-                    }`}
-                  >
-                    {mensagens.receita.texto}
-                  </div>
-                )}
-              </form>
-
-              <div className="border-t border-gray-200 pt-4">
-                <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                  <h3 className="text-sm font-semibold text-gray-700">Receitas registradas</h3>
-                  {!edicaoLiberada && (
-                    <span className="text-xs text-gray-500">
-                      Edição disponível apenas para o último dia útil ({formatarData(ultimoDiaUtil)}).
-                    </span>
-                  )}
-                </div>
-                {receitas.length === 0 ? (
-                  <p className="text-sm text-gray-500 text-center py-4">
-                    Nenhuma receita registrada na data selecionada.
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto rounded-lg border border-gray-200">
-                    <table className="min-w-full divide-y divide-gray-200 text-sm">
-                      <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                        <tr>
-                          <th className="px-4 py-3 text-left font-semibold">Conta de receita</th>
-                          <th className="px-4 py-3 text-left font-semibold">Data</th>
-                          <th className="px-4 py-3 text-left font-semibold">Valor registrado</th>
-                          <th className="px-4 py-3 text-left font-semibold w-48">Novo valor</th>
-                          <th className="px-4 py-3 text-left font-semibold">Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 bg-white/80">
-                        {receitas.map((rec) => (
-                          <tr key={rec.id}>
-                            <td className="px-4 py-3 font-medium text-gray-700">{rec.conta}</td>
-                            <td className="px-4 py-3 text-gray-500">{formatarData(rec.data)}</td>
-                            <td className="px-4 py-3 font-semibold text-success-700">{formatCurrency(rec.valor)}</td>
-                            <td className="px-4 py-3">
-                              <Input
-                                type="text"
-                                inputMode="decimal"
-                                value={receitasEdicao[rec.id] ?? ''}
-                                onChange={(event) =>
-                                  setReceitasEdicao((prev) => ({
-                                    ...prev,
-                                    [rec.id]: event.target.value,
-                                  }))
-                                }
-                                disabled={!edicaoLiberada || registroEditando.receita === rec.id}
-                                helperText={helperValor(receitasEdicao[rec.id])}
-                                fullWidth
-                              />
-                            </td>
-                            <td className="px-4 py-3">
-                              <Button
-                                type="button"
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => handleAtualizarReceitaExistente(rec)}
-                                disabled={!edicaoLiberada}
-                                loading={registroEditando.receita === rec.id}
-                              >
-                                Salvar
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
             </div>
           </Card>
           <Card title="Pagamentos por Banco" subtitle={`Total registrado: ${formatCurrency(totalPagamentosBanco)}`} variant="danger">
             <div className="space-y-5">
               <form className="space-y-4" onSubmit={handleRegistrarPagamentosBanco}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-gray-600">
-                    Informe os pagamentos consolidados por banco para o dia útil selecionado.
-                  </p>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
@@ -1534,11 +1686,10 @@ const SaldoDiarioPage: React.FC = () => {
                       Registrar pagamentos
                     </Button>
                   </div>
-                </div>
-
-                <div className="flex items-center justify-between rounded-md border border-dashed border-error-200 bg-error-50/50 px-4 py-2 text-sm text-error-700">
-                  <span>Total a registrar:</span>
-                  <strong>{formatCurrency(totalFormPagBanco)}</strong>
+                  <div className="rounded-md border border-dashed border-error-200 bg-error-50/50 px-4 py-2 text-sm text-error-700">
+                    <span>Total a registrar: </span>
+                    <strong>{formatCurrency(totalFormPagBanco)}</strong>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto rounded-lg border border-gray-200">
@@ -1546,39 +1697,99 @@ const SaldoDiarioPage: React.FC = () => {
                     <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                       <tr>
                         <th className="px-4 py-3 text-left font-semibold">Banco</th>
-                        <th className="px-4 py-3 text-left font-semibold w-48">Valor / Expressão</th>
+                        <th className="px-4 py-3 text-left font-semibold w-52">Valor / Expressão</th>
+                        <th className="px-4 py-3 text-left font-semibold min-w-[280px]">Registrado</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white/80">
                       {bancoOptions.length === 0 ? (
                         <tr>
-                          <td colSpan={2} className="px-4 py-6 text-center text-sm text-gray-500">
+                          <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-500">
                             Cadastre bancos no menu Cadastros &gt; Bancos para liberar esta seção.
                           </td>
                         </tr>
                       ) : (
-                        bancoOptions.map((banco) => (
-                          <tr key={banco.id}>
-                            <td className="px-4 py-3 font-medium text-gray-700">{banco.nome}</td>
-                            <td className="px-4 py-3">
-                              <Input
-                                type="text"
-                                inputMode="decimal"
-                                placeholder="Ex.: 1200/3"
-                                value={pagamentosBancoForm[banco.id] ?? ''}
-                                onChange={(event) =>
-                                  setPagamentosBancoForm((prev) => ({
-                                    ...prev,
-                                    [banco.id]: event.target.value,
-                                  }))
-                                }
-                                disabled={processando.banco || !edicaoLiberada}
-                                helperText={helperValor(pagamentosBancoForm[banco.id])}
-                                fullWidth
-                              />
-                            </td>
-                          </tr>
-                        ))
+                        bancoOptions.map((banco) => {
+                          const registro = pagamentosBancoPorBancoId.get(banco.id);
+                          return (
+                            <tr key={banco.id}>
+                              <td className="px-4 py-3 font-medium text-gray-700">{banco.nome}</td>
+                              <td className="px-4 py-3 align-top">
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  placeholder="Ex.: 1200/3"
+                                  value={pagamentosBancoForm[banco.id] ?? ''}
+                                  onChange={(event) =>
+                                    setPagamentosBancoForm((prev) => ({
+                                      ...prev,
+                                      [banco.id]: event.target.value,
+                                    }))
+                                  }
+                                  disabled={processando.banco || !edicaoLiberada}
+                                  helperText={helperValor(pagamentosBancoForm[banco.id])}
+                                  fullWidth
+                                />
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                {registro ? (
+                                  <div className="space-y-2">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <span className="font-semibold text-error-700">
+                                        {formatCurrency(registro.valor)}
+                                      </span>
+                                      <span className="text-xs text-gray-400">{formatarData(registro.data)}</span>
+                                    </div>
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                                      <Input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={pagamentosBancoEdicao[registro.id] ?? ''}
+                                        onChange={(event) =>
+                                          setPagamentosBancoEdicao((prev) => ({
+                                            ...prev,
+                                            [registro.id]: event.target.value,
+                                          }))
+                                        }
+                                        disabled={
+                                          !edicaoLiberada ||
+                                          registroEditando.banco === registro.id ||
+                                          registroExcluindo.banco === registro.id
+                                        }
+                                        helperText={helperValor(pagamentosBancoEdicao[registro.id])}
+                                        className="sm:w-44"
+                                      />
+                                      <div className="flex gap-2">
+                                        <Button
+                                          type="button"
+                                          variant="secondary"
+                                          size="sm"
+                                          onClick={() => handleAtualizarPagamentoBancoExistente(registro)}
+                                          disabled={!edicaoLiberada}
+                                          loading={registroEditando.banco === registro.id}
+                                        >
+                                          Salvar
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="danger"
+                                          size="sm"
+                                          onClick={() => handleExcluirPagamentoBanco(registro)}
+                                          disabled={!edicaoLiberada}
+                                          loading={registroExcluindo.banco === registro.id}
+                                        >
+                                          Excluir
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-gray-400">Nenhum valor registrado</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
@@ -1599,72 +1810,159 @@ const SaldoDiarioPage: React.FC = () => {
                 )}
               </form>
 
-              <div className="border-t border-gray-200 pt-4">
-                <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                  <h3 className="text-sm font-semibold text-gray-700">Pagamentos bancários registrados</h3>
-                  {!edicaoLiberada && (
-                    <span className="text-xs text-gray-500">
-                      Edição disponível apenas para o último dia útil ({formatarData(ultimoDiaUtil)}).
-                    </span>
-                  )}
+            </div>
+          </Card>
+          <Card title="Receitas" subtitle={`Total registrado: ${formatCurrency(totalReceitas)}`} variant="success">
+            <div className="space-y-5">
+              <form className="space-y-4" onSubmit={handleRegistrarReceitas}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setReceitasForm(sincronizarMapa(contaOptions, {}));
+                        limparMensagem('receita');
+                      }}
+                      disabled={processando.receita || contaOptions.length === 0}
+                    >
+                      Limpar campos
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="sm"
+                      loading={processando.receita}
+                      disabled={contaOptions.length === 0 || !edicaoLiberada}
+                    >
+                      Registrar receitas
+                    </Button>
+                  </div>
+                  <div className="rounded-md border border-dashed border-success-200 bg-success-50/40 px-4 py-2 text-sm text-success-800">
+                    <span>Total a registrar: </span>
+                    <strong>{formatCurrency(totalFormReceita)}</strong>
+                  </div>
                 </div>
-                {pagamentosBanco.length === 0 ? (
-                  <p className="text-sm text-gray-500 text-center py-4">
-                    Nenhum pagamento bancário registrado na data selecionada.
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto rounded-lg border border-gray-200">
-                    <table className="min-w-full divide-y divide-gray-200 text-sm">
-                      <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold">Conta de receita</th>
+                        <th className="px-4 py-3 text-left font-semibold w-52">Valor / Expressão</th>
+                        <th className="px-4 py-3 text-left font-semibold min-w-[280px]">Registrado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white/80">
+                      {contaOptions.length === 0 ? (
                         <tr>
-                          <th className="px-4 py-3 text-left font-semibold">Banco</th>
-                          <th className="px-4 py-3 text-left font-semibold">Data</th>
-                          <th className="px-4 py-3 text-left font-semibold">Valor registrado</th>
-                          <th className="px-4 py-3 text-left font-semibold w-48">Novo valor</th>
-                          <th className="px-4 py-3 text-left font-semibold">Ações</th>
+                          <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-500">
+                            Cadastre contas em Cadastros &gt; Contas de Receita para liberar esta seção.
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 bg-white/80">
-                        {pagamentosBanco.map((pag) => (
-                          <tr key={pag.id}>
-                            <td className="px-4 py-3 font-medium text-gray-700">{pag.banco}</td>
-                            <td className="px-4 py-3 text-gray-500">{formatarData(pag.data)}</td>
-                            <td className="px-4 py-3 font-semibold text-error-700">{formatCurrency(pag.valor)}</td>
-                            <td className="px-4 py-3">
-                              <Input
-                                type="text"
-                                inputMode="decimal"
-                                value={pagamentosBancoEdicao[pag.id] ?? ''}
-                                onChange={(event) =>
-                                  setPagamentosBancoEdicao((prev) => ({
-                                    ...prev,
-                                    [pag.id]: event.target.value,
-                                  }))
-                                }
-                                disabled={!edicaoLiberada || registroEditando.banco === pag.id}
-                                helperText={helperValor(pagamentosBancoEdicao[pag.id])}
-                                fullWidth
-                              />
-                            </td>
-                            <td className="px-4 py-3">
-                              <Button
-                                type="button"
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => handleAtualizarPagamentoBancoExistente(pag)}
-                                disabled={!edicaoLiberada}
-                                loading={registroEditando.banco === pag.id}
-                              >
-                                Salvar
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                      ) : (
+                        contaOptions.map((conta) => {
+                          const registro = receitasPorContaId.get(conta.id);
+                          return (
+                            <tr key={conta.id}>
+                              <td className="px-4 py-3 font-medium text-gray-700">{conta.nome}</td>
+                              <td className="px-4 py-3 align-top">
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  placeholder="Ex.: 500-125"
+                                  value={receitasForm[conta.id] ?? ''}
+                                  onChange={(event) =>
+                                    setReceitasForm((prev) => ({
+                                      ...prev,
+                                      [conta.id]: event.target.value,
+                                    }))
+                                  }
+                                  disabled={processando.receita || !edicaoLiberada}
+                                  helperText={helperValor(receitasForm[conta.id])}
+                                  fullWidth
+                                />
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                {registro ? (
+                                  <div className="space-y-2">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <span className="font-semibold text-success-700">
+                                        {formatCurrency(registro.valor)}
+                                      </span>
+                                      <span className="text-xs text-gray-400">{formatarData(registro.data)}</span>
+                                    </div>
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                                      <Input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={receitasEdicao[registro.id] ?? ''}
+                                        onChange={(event) =>
+                                          setReceitasEdicao((prev) => ({
+                                            ...prev,
+                                            [registro.id]: event.target.value,
+                                          }))
+                                        }
+                                        disabled={
+                                          !edicaoLiberada ||
+                                          registroEditando.receita === registro.id ||
+                                          registroExcluindo.receita === registro.id
+                                        }
+                                        helperText={helperValor(receitasEdicao[registro.id])}
+                                        className="sm:w-44"
+                                      />
+                                      <div className="flex gap-2">
+                                        <Button
+                                          type="button"
+                                          variant="secondary"
+                                          size="sm"
+                                          onClick={() => handleAtualizarReceitaExistente(registro)}
+                                          disabled={!edicaoLiberada}
+                                          loading={registroEditando.receita === registro.id}
+                                        >
+                                          Salvar
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="danger"
+                                          size="sm"
+                                          onClick={() => handleExcluirReceita(registro)}
+                                          disabled={!edicaoLiberada}
+                                          loading={registroExcluindo.receita === registro.id}
+                                        >
+                                          Excluir
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-gray-400">Nenhum valor registrado</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {mensagens.receita && (
+                  <div
+                    className={`rounded-md border px-4 py-2 text-sm ${
+                      mensagens.receita.tipo === 'sucesso'
+                        ? 'border-success-200 bg-success-50 text-success-700'
+                        : mensagens.receita.tipo === 'erro'
+                        ? 'border-error-200 bg-error-50 text-error-700'
+                        : 'border-primary-200 bg-primary-50 text-primary-800'
+                    }`}
+                  >
+                    {mensagens.receita.texto}
                   </div>
                 )}
-              </div>
+              </form>
+
             </div>
           </Card>
 
@@ -1672,9 +1970,6 @@ const SaldoDiarioPage: React.FC = () => {
             <div className="space-y-5">
               <form className="space-y-4" onSubmit={handleRegistrarSaldosBanco}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-gray-600">
-                    Atualize os saldos finais de cada banco para a data em edição.
-                  </p>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
@@ -1698,11 +1993,10 @@ const SaldoDiarioPage: React.FC = () => {
                       Atualizar saldos
                     </Button>
                   </div>
-                </div>
-
-                <div className="flex items-center justify-between rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-2 text-sm text-gray-700">
-                  <span>Total informado:</span>
-                  <strong>{formatCurrency(totalFormSaldoBanco)}</strong>
+                  <div className="rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-2 text-sm text-gray-700">
+                    <span>Total informado: </span>
+                    <strong>{formatCurrency(totalFormSaldoBanco)}</strong>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto rounded-lg border border-gray-200">
@@ -1710,39 +2004,103 @@ const SaldoDiarioPage: React.FC = () => {
                     <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                       <tr>
                         <th className="px-4 py-3 text-left font-semibold">Banco</th>
-                        <th className="px-4 py-3 text-left font-semibold w-48">Saldo / Expressão</th>
+                        <th className="px-4 py-3 text-left font-semibold w-52">Saldo / Expressão</th>
+                        <th className="px-4 py-3 text-left font-semibold min-w-[280px]">Registrado</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white/80">
                       {bancoOptions.length === 0 ? (
                         <tr>
-                          <td colSpan={2} className="px-4 py-6 text-center text-sm text-gray-500">
+                          <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-500">
                             Cadastre bancos no menu Cadastros &gt; Bancos para liberar esta seção.
                           </td>
                         </tr>
                       ) : (
-                        bancoOptions.map((banco) => (
-                          <tr key={banco.id}>
-                            <td className="px-4 py-3 font-medium text-gray-700">{banco.nome}</td>
-                            <td className="px-4 py-3">
-                              <Input
-                                type="text"
-                                inputMode="decimal"
-                                placeholder="Ex.: 1000-250"
-                                value={saldosBancoForm[banco.id] ?? ''}
-                                onChange={(event) =>
-                                  setSaldosBancoForm((prev) => ({
-                                    ...prev,
-                                    [banco.id]: event.target.value,
-                                  }))
-                                }
-                                disabled={processando.saldo || !edicaoLiberada}
-                                helperText={helperValor(saldosBancoForm[banco.id])}
-                                fullWidth
-                              />
-                            </td>
-                          </tr>
-                        ))
+                        bancoOptions.map((banco) => {
+                          const registro = saldosBancoPorBancoId.get(banco.id);
+                          return (
+                            <tr key={banco.id}>
+                              <td className="px-4 py-3 font-medium text-gray-700">{banco.nome}</td>
+                              <td className="px-4 py-3 align-top">
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  placeholder="Ex.: 1000-250"
+                                  value={saldosBancoForm[banco.id] ?? ''}
+                                  onChange={(event) =>
+                                    setSaldosBancoForm((prev) => ({
+                                      ...prev,
+                                      [banco.id]: event.target.value,
+                                    }))
+                                  }
+                                  disabled={processando.saldo || !edicaoLiberada}
+                                  helperText={helperValor(saldosBancoForm[banco.id])}
+                                  fullWidth
+                                />
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                {registro ? (
+                                  <div className="space-y-2">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <span
+                                        className={`font-semibold ${
+                                          registro.valor >= 0 ? 'text-success-700' : 'text-error-700'
+                                        }`}
+                                      >
+                                        {formatCurrency(registro.valor)}
+                                      </span>
+                                      <span className="text-xs text-gray-400">{formatarData(registro.data)}</span>
+                                    </div>
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                                      <Input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={saldosBancoEdicao[registro.id] ?? ''}
+                                        onChange={(event) =>
+                                          setSaldosBancoEdicao((prev) => ({
+                                            ...prev,
+                                            [registro.id]: event.target.value,
+                                          }))
+                                        }
+                                        disabled={
+                                          !edicaoLiberada ||
+                                          registroEditando.saldo === registro.id ||
+                                          registroExcluindo.saldo === registro.id
+                                        }
+                                        helperText={helperValor(saldosBancoEdicao[registro.id])}
+                                        className="sm:w-44"
+                                      />
+                                      <div className="flex gap-2">
+                                        <Button
+                                          type="button"
+                                          variant="secondary"
+                                          size="sm"
+                                          onClick={() => handleAtualizarSaldoBancoExistente(registro)}
+                                          disabled={!edicaoLiberada}
+                                          loading={registroEditando.saldo === registro.id}
+                                        >
+                                          Salvar
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="danger"
+                                          size="sm"
+                                          onClick={() => handleExcluirSaldoBanco(registro)}
+                                          disabled={!edicaoLiberada}
+                                          loading={registroExcluindo.saldo === registro.id}
+                                        >
+                                          Excluir
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-gray-400">Nenhum saldo registrado</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
@@ -1763,78 +2121,6 @@ const SaldoDiarioPage: React.FC = () => {
                 )}
               </form>
 
-              <div className="border-t border-gray-200 pt-4">
-                <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                  <h3 className="text-sm font-semibold text-gray-700">Saldos bancários registrados</h3>
-                  {!edicaoLiberada && (
-                    <span className="text-xs text-gray-500">
-                      Edição disponível apenas para o último dia útil ({formatarData(ultimoDiaUtil)}).
-                    </span>
-                  )}
-                </div>
-                {saldosBanco.length === 0 ? (
-                  <p className="text-sm text-gray-500 text-center py-4">
-                    Nenhum saldo registrado na data selecionada.
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto rounded-lg border border-gray-200">
-                    <table className="min-w-full divide-y divide-gray-200 text-sm">
-                      <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                        <tr>
-                          <th className="px-4 py-3 text-left font-semibold">Banco</th>
-                          <th className="px-4 py-3 text-left font-semibold">Data</th>
-                          <th className="px-4 py-3 text-left font-semibold">Saldo registrado</th>
-                          <th className="px-4 py-3 text-left font-semibold w-48">Novo saldo</th>
-                          <th className="px-4 py-3 text-left font-semibold">Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 bg-white/80">
-                        {saldosBanco.map((saldo) => (
-                          <tr key={saldo.id}>
-                            <td className="px-4 py-3 font-medium text-gray-700">{saldo.banco}</td>
-                            <td className="px-4 py-3 text-gray-500">{formatarData(saldo.data)}</td>
-                            <td
-                              className={`px-4 py-3 font-semibold ${
-                                saldo.valor >= 0 ? 'text-success-700' : 'text-error-700'
-                              }`}
-                            >
-                              {formatCurrency(saldo.valor)}
-                            </td>
-                            <td className="px-4 py-3">
-                              <Input
-                                type="text"
-                                inputMode="decimal"
-                                value={saldosBancoEdicao[saldo.id] ?? ''}
-                                onChange={(event) =>
-                                  setSaldosBancoEdicao((prev) => ({
-                                    ...prev,
-                                    [saldo.id]: event.target.value,
-                                  }))
-                                }
-                                disabled={!edicaoLiberada || registroEditando.saldo === saldo.id}
-                                helperText={helperValor(saldosBancoEdicao[saldo.id])}
-                                fullWidth
-                              />
-                            </td>
-                            <td className="px-4 py-3">
-                              <Button
-                                type="button"
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => handleAtualizarSaldoBancoExistente(saldo)}
-                                disabled={!edicaoLiberada}
-                                loading={registroEditando.saldo === saldo.id}
-                              >
-                                Salvar
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
             </div>
           </Card>
         </div>
