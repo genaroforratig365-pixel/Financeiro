@@ -6,6 +6,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -178,11 +179,20 @@ export const Sidebar: React.FC = () => {
     <aside className="sidebar">
       {/* Logo */}
       <div className="p-6 border-b border-gray-200">
-        <Link href="/saldo-diario" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-lg">F</span>
+        <Link href="/saldo-diario" className="flex items-center gap-3">
+          <div className="relative h-10 w-28">
+            <Image
+              src="/logo-germani.svg"
+              alt="Germani Financeiro"
+              fill
+              priority
+              sizes="112px"
+              className="object-contain"
+            />
           </div>
-          <span className="text-xl font-bold text-gray-900">Financeiro</span>
+          <span className="text-lg font-semibold text-gray-900 tracking-tight">
+            Financeiro
+          </span>
         </Link>
       </div>
 

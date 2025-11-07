@@ -99,6 +99,32 @@ export function getUserId(): string {
 /**
  * Obtém o identificador salvo sem gerar um novo UUID.
  */
+export function getStoredUserId(): string | null {
+  const stored = safeGetItem(USER_ID_STORAGE_KEY);
+  if (!stored) {
+    return null;
+  }
+
+  const trimmed = stored.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
+ * Define explicitamente o identificador do usuário.
+ */
+export function setUserId(userId: string): void {
+  const trimmed = userId?.trim?.() ?? "";
+  if (trimmed.length === 0) {
+    safeRemoveItem(USER_ID_STORAGE_KEY);
+    return;
+  }
+
+  safeSetItem(USER_ID_STORAGE_KEY, trimmed);
+}
+
+/**
+ * Obtém o nome/apelido do usuário
+ */
 export function getUserName(): string | null {
   const value = safeGetItem(USER_NAME_STORAGE_KEY);
   if (!value) {

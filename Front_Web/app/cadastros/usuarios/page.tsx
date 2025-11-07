@@ -15,8 +15,20 @@ import {
   getOrCreateUser,
   type UsuarioRow,
 } from '@/lib/supabaseClient';
+import { traduzirErroSupabase } from '@/lib/supabaseErrors';
 
 type Usuario = Pick<UsuarioRow, 'usr_id' | 'usr_nome' | 'usr_email' | 'usr_ativo'>;
+type UsuarioAdmin = Pick<
+  UsuarioRow,
+  'usr_id' | 'usr_nome' | 'usr_email' | 'usr_ativo' | 'usr_identificador'
+> & {
+  usr_criado_em: string | null;
+};
+
+type Mensagem = {
+  tipo: 'sucesso' | 'erro' | 'info';
+  texto: string;
+};
 
 export default function CadastroUsuarioPage() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
@@ -132,6 +144,25 @@ export default function CadastroUsuarioPage() {
 
     loadUsuario();
   }, []);
+
+  useEffect(() => {
+    if (!usuario) {
+      setPodeGerenciar(false);
+      return;
+    }
+
+    const session = getUserSession();
+    const candidatos = [
+      normalizarNome(usuario.usr_nome),
+      normalizarNome(session.userName),
+      normalizarNome(session.displayName),
+      normalizarNome(session.userEmail),
+      normalizarNome(session.userId),
+    ];
+
+    const ehGenaro = candidatos.some((valor) => valor.includes('genaro'));
+    setPodeGerenciar(ehGenaro);
+  }, [usuario]);
 
   useEffect(() => {
     if (!podeGerenciar) {

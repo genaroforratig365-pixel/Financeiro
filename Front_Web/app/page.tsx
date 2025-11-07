@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
-import { Header } from '@/components/layout';
 import { Button, Card, Input, Loading } from '@/components/ui';
 import { getOrCreateUser, getSupabaseClient } from '@/lib/supabaseClient';
 import {
@@ -182,27 +182,49 @@ const HomePage: React.FC = () => {
   const identificadorAtual = getStoredUserId();
 
   return (
-    <>
-      <Header
-        title="Bem-vindo ao Financeiro"
-        subtitle="Escolha com qual usuário deseja trabalhar hoje"
-        actions={
-          sessionAtual && (
-            <Button variant="secondary" onClick={() => router.push('/saldo-diario')}>
-              Ir para Saldo Diário
-            </Button>
-          )
-        }
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-gray-50 via-white to-primary-50">
+      <div
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(220,38,38,0.08),_transparent_55%)]"
+        aria-hidden
       />
 
-      <div className="page-content max-w-4xl mx-auto space-y-6">
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <Loading size="lg" text="Carregando usuários cadastrados..." />
+      <div className="relative z-10 flex min-h-screen flex-col">
+        <header className="flex items-center justify-between px-8 py-6">
+          <div className="flex items-center gap-4">
+            <div className="relative h-14 w-40">
+              <Image
+                src="/logo-germani.svg"
+                alt="Germani Financeiro"
+                fill
+                priority
+                sizes="160px"
+                className="object-contain"
+              />
+            </div>
+            <p className="hidden text-sm text-gray-600 sm:block">
+              Escolha o responsável pela movimentação diária
+            </p>
           </div>
-        ) : (
-          <Card>
+
+          {sessionAtual && (
+            <Button variant="outline" onClick={() => router.push('/saldo-diario')}>
+              Ir para Saldo Diário
+            </Button>
+          )}
+        </header>
+
+        <main className="flex flex-1 items-center justify-center px-4 pb-12">
+          <Card className="w-full max-w-xl border-primary-200/70 shadow-xl shadow-primary-200/30 backdrop-blur-sm">
             <div className="space-y-6">
+              <div className="space-y-2 text-center">
+                <h1 className="text-2xl font-semibold text-gray-900">
+                  Selecione quem irá operar hoje
+                </h1>
+                <p className="text-sm text-gray-500">
+                  Todos os usuários ativos estão listados abaixo. Basta escolher para abrir a movimentação do dia.
+                </p>
+              </div>
+
               {mensagem && (
                 <div
                   className={`rounded-md border px-4 py-3 text-sm ${
@@ -217,107 +239,109 @@ const HomePage: React.FC = () => {
                 </div>
               )}
 
-              <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
-                <p className="text-sm text-gray-600">
-                  {usuarioAtualNome ? (
-                    <>
-                      Você está navegando como <strong>{usuarioAtualNome}</strong>.
-                      <br />
-                      Identificador local: <code className="font-mono text-xs">{identificadorAtual}</code>
-                    </>
-                  ) : (
-                    'Nenhum usuário está ativo neste navegador. Selecione um para começar.'
-                  )}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Buscar usuário"
-                  placeholder="Filtrar por nome ou e-mail"
-                  value={filtro}
-                  onChange={(event) => setFiltro(event.target.value)}
-                  fullWidth
-                />
-
-                <div className="w-full">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Usuário selecionado
-                  </label>
-                  <select
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    value={selecionado}
-                    onChange={(event) => setSelecionado(event.target.value)}
-                  >
-                    <option value="">Selecione um usuário ativo...</option>
-                    {usuariosFiltrados.map((usuario) => (
-                      <option key={usuario.usr_id} value={usuario.usr_identificador}>
-                        {formatarNome(usuario)}
-                        {usuario.usr_email ? ` • ${usuario.usr_email}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {usuariosFiltrados.length === 0 && (
-                    <p className="mt-1 text-sm text-gray-500">
-                      Nenhum usuário corresponde ao filtro informado.
-                    </p>
-                  )}
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <Loading size="lg" text="Carregando usuários cadastrados..." />
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-5">
+                  <Input
+                    label="Buscar usuário"
+                    placeholder="Filtrar por nome ou e-mail"
+                    value={filtro}
+                    onChange={(event) => setFiltro(event.target.value)}
+                    fullWidth
+                  />
 
-              <div className="flex flex-col md:flex-row md:items-center gap-3 justify-between">
-                <p className="text-sm text-gray-500">
-                  Precisa criar um novo usuário? Acesse o menu Cadastros &gt; Usuários.
-                </p>
-                <Button
-                  variant="primary"
-                  onClick={selecionarUsuario}
-                  disabled={!selecionado}
-                  loading={aplicando}
-                >
-                  Entrar com este usuário
-                </Button>
-              </div>
-
-              <div className="border-t border-gray-200 pt-4">
-                <h2 className="text-sm font-semibold text-gray-700 mb-2">
-                  Usuários disponíveis ({usuarios.length})
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {usuarios.map((usuario) => (
-                    <div
-                      key={usuario.usr_id}
-                      className={`rounded-lg border p-3 text-sm ${
-                        usuario.usr_identificador === selecionado
-                          ? 'border-primary-400 bg-primary-50'
-                          : 'border-gray-200 bg-white'
-                      }`}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700" htmlFor="usuario-selecionado">
+                      Usuário selecionado
+                    </label>
+                    <select
+                      id="usuario-selecionado"
+                      className="w-full rounded-md border border-gray-200 bg-white/80 px-3 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      value={selecionado}
+                      onChange={(event) => setSelecionado(event.target.value)}
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <strong className="text-gray-900">{formatarNome(usuario)}</strong>
-                        <button
-                          type="button"
-                          className="text-primary-600 text-xs font-medium"
-                          onClick={() => setSelecionado(usuario.usr_identificador)}
-                        >
-                          Usar
-                        </button>
-                      </div>
-                      <p className="text-xs text-gray-500 break-all">
-                        Identificador: {usuario.usr_identificador}
+                      <option value="">Selecione um usuário ativo...</option>
+                      {usuariosFiltrados.map((usuario) => (
+                        <option key={usuario.usr_id} value={usuario.usr_identificador}>
+                          {formatarNome(usuario)}
+                          {usuario.usr_email ? ` • ${usuario.usr_email}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {usuariosFiltrados.length === 0 && (
+                      <p className="text-sm text-gray-500">
+                        Nenhum usuário corresponde ao filtro informado.
                       </p>
-                      {usuario.usr_email && (
-                        <p className="text-xs text-gray-500 mt-1">{usuario.usr_email}</p>
-                      )}
-                    </div>
-                  ))}
+                    )}
+                  </div>
+
+                  <div className="rounded-lg border border-dashed border-primary-200 bg-primary-50/40 px-4 py-3 text-sm text-primary-900">
+                    {usuarioAtualNome ? (
+                      <>
+                        Operando como <strong>{usuarioAtualNome}</strong>.
+                        <br />
+                        Identificador local: <code className="font-mono text-xs">{identificadorAtual}</code>
+                      </>
+                    ) : (
+                      'Nenhum usuário está ativo neste navegador. Selecione um para iniciar.'
+                    )}
+                  </div>
+
+                  <div className="max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-white/70">
+                    <ul className="divide-y divide-gray-100 text-sm">
+                      {usuarios.map((usuario) => {
+                        const ativo = usuario.usr_identificador === selecionado;
+                        return (
+                          <li key={usuario.usr_id} className={ativo ? 'bg-primary-50/70' : ''}>
+                            <button
+                              type="button"
+                              className={`flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition hover:bg-primary-50/80 ${ativo ? 'text-primary-700' : 'text-gray-700'}`}
+                              onClick={() => setSelecionado(usuario.usr_identificador)}
+                            >
+                              <div>
+                                <p className="font-medium">
+                                  {formatarNome(usuario)}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  Identificador: {usuario.usr_identificador}
+                                </p>
+                                {usuario.usr_email && (
+                                  <p className="text-xs text-gray-500">{usuario.usr_email}</p>
+                                )}
+                              </div>
+                              <span className="text-xs uppercase tracking-wide text-gray-400">
+                                {ativo ? 'Selecionado' : 'Escolher'}
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-gray-500">
+                      Precisa cadastrar um novo usuário? Abra Cadastros &gt; Usuários.
+                    </p>
+                    <Button
+                      variant="primary"
+                      onClick={selecionarUsuario}
+                      disabled={!selecionado}
+                      loading={aplicando}
+                    >
+                      Entrar com este usuário
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </Card>
-        )}
+        </main>
       </div>
-    </>
+    </div>
   );
 };
 
