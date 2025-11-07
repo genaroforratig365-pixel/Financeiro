@@ -6,7 +6,6 @@
 'use client';
 
 import React from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -135,6 +134,20 @@ const navigationSections: NavSection[] = [
         ),
       },
       {
+        label: 'Tipos de Receita',
+        href: '/cadastros/tipos-receita',
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 4a1 1 0 011-1h4a1 1 0 011 1v3H3V4zm0 5h6v3H3V9zm0 4h6v3H4a1 1 0 01-1-1v-2zm8-9a1 1 0 011-1h8a1 1 0 011 1v3h-10V4zm0 5h10v3h-10V9zm0 4h10v3h-8v2a1 1 0 01-1 1h-1v-6z"
+            />
+          </svg>
+        ),
+      },
+      {
         label: 'Bancos',
         href: '/cadastros/bancos',
         icon: (
@@ -179,20 +192,9 @@ export const Sidebar: React.FC = () => {
     <aside className="sidebar">
       {/* Logo */}
       <div className="p-6 border-b border-gray-200">
-        <Link href="/saldo-diario" className="flex items-center gap-3">
-          <div className="relative h-10 w-28">
-            <Image
-              src="/logo-germani.svg"
-              alt="Germani Financeiro"
-              fill
-              priority
-              sizes="112px"
-              className="object-contain"
-            />
-          </div>
-          <span className="text-lg font-semibold text-gray-900 tracking-tight">
-            Financeiro
-          </span>
+        <Link href="/saldo-diario" className="flex flex-col gap-1">
+          <span className="text-xs font-semibold uppercase text-primary-600">Germani</span>
+          <span className="text-lg font-semibold text-gray-900 tracking-tight">Financeiro</span>
         </Link>
       </div>
 

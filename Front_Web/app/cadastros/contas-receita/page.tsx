@@ -50,7 +50,6 @@ export default function ContasReceitaPage() {
       const { data, error } = await supabase
         .from('ctr_contas_receita')
         .select('*')
-        .eq('ctr_usr_id', user.usr_id)
         .order('ctr_codigo', { ascending: true });
 
       if (error) throw error;

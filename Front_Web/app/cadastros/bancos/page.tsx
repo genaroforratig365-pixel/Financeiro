@@ -53,7 +53,6 @@ export default function BancosPage() {
       const { data, error } = await supabase
         .from('ban_bancos')
         .select('*')
-        .eq('ban_usr_id', user.usr_id)
         .order('ban_codigo', { ascending: true });
 
       if (error) throw error;

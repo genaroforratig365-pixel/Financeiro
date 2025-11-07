@@ -51,7 +51,6 @@ export default function AreasPage() {
       const { data, error } = await supabase
         .from('are_areas')
         .select('*')
-        .eq('are_usr_id', user.usr_id)
         .order('are_codigo', { ascending: true });
 
       if (error) throw error;

@@ -5,16 +5,14 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+
 import {
+  clearUserSession,
   getUserSession,
-  setUserName as saveUserName,
-  setUserEmail as saveUserEmail,
-  clearUserEmail,
 } from '@/lib/userSession';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
-import { Modal } from '../ui/Modal';
 
 interface UserSessionData {
   userId: string;
@@ -24,39 +22,23 @@ interface UserSessionData {
 }
 
 export const UserIdentifier: React.FC = () => {
+  const router = useRouter();
   const [session, setSession] = useState<UserSessionData>({
     userId: '',
     userName: null,
     userEmail: null,
     displayName: 'Usuário Anônimo',
   });
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newEmail, setNewEmail] = useState('');
 
   useEffect(() => {
     const userSession = getUserSession();
     setSession(userSession);
-    setNewName(userSession.userName || '');
-    setNewEmail(userSession.userEmail || '');
   }, []);
 
-  const handleSaveName = () => {
-    const nameToSave = newName.trim();
-    const emailToSave = newEmail.trim();
-
-    if (nameToSave) {
-      saveUserName(nameToSave);
-    }
-
-    if (emailToSave) {
-      saveUserEmail(emailToSave);
-    } else {
-      clearUserEmail();
-    }
-
+  const handleTrocarUsuario = () => {
+    clearUserSession();
     setSession(getUserSession());
-    setIsModalOpen(false);
+    router.push('/');
   };
 
   return (
@@ -84,88 +66,12 @@ export const UserIdentifier: React.FC = () => {
               </p>
             )}
           </div>
-        </div>
+          </div>
 
-        {/* Botão para editar nome */}
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="text-gray-400 hover:text-gray-600 transition-colors"
-          title="Definir nome"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-            />
-          </svg>
-        </button>
+        <Button variant="ghost" size="sm" onClick={handleTrocarUsuario}>
+          Trocar usuário
+        </Button>
       </div>
-
-      {/* Modal para definir nome */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Identificação do Usuário"
-        footer={
-          <div className="flex gap-3 justify-end">
-            <Button
-              variant="secondary"
-              onClick={() => setIsModalOpen(false)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSaveName}
-              disabled={!newName.trim()}
-            >
-              Salvar
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Defina um nome ou apelido para facilitar a identificação. Isso não
-            afeta seus dados, apenas torna a interface mais pessoal.
-          </p>
-
-          <Input
-            label="Nome ou Apelido"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Digite seu nome"
-            autoFocus
-            fullWidth
-          />
-
-          <Input
-            label="E-mail para contato"
-            type="email"
-            value={newEmail}
-            onChange={(e) => setNewEmail(e.target.value)}
-            placeholder="nome@empresa.com"
-            fullWidth
-            helperText="Este e-mail será usado para notificações e relatórios."
-          />
-
-          <div className="p-3 bg-gray-50 rounded-md">
-            <p className="text-xs text-gray-500">
-              <strong>Seu ID único:</strong> {session.userId}
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              Este ID está salvo no seu navegador e identifica seus registros.
-            </p>
-          </div>
-        </div>
-      </Modal>
     </>
   );
 };

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
 import { Button, Card, Input, Loading } from '@/components/ui';
@@ -190,19 +189,10 @@ const HomePage: React.FC = () => {
 
       <div className="relative z-10 flex min-h-screen flex-col">
         <header className="flex items-center justify-between px-8 py-6">
-          <div className="flex items-center gap-4">
-            <div className="relative h-14 w-40">
-              <Image
-                src="/logo-germani.svg"
-                alt="Germani Financeiro"
-                fill
-                priority
-                sizes="160px"
-                className="object-contain"
-              />
-            </div>
-            <p className="hidden text-sm text-gray-600 sm:block">
-              Escolha o responsável pela movimentação diária
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">Seleção de Operador</h1>
+            <p className="mt-1 text-sm text-gray-600">
+              Escolha quem irá registrar os dados do último dia útil. Todos os cadastros ficam disponíveis para qualquer operador.
             </p>
           </div>
 
