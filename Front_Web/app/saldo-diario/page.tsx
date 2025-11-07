@@ -14,7 +14,7 @@ import { getUserSession } from '@/lib/userSession';
 import { evaluateMath, formatCurrency } from '@/lib/mathParser';
 import { traduzirErroSupabase } from '@/lib/supabaseErrors';
 
-type Mensagem = { tipo: 'sucesso' | 'erro'; texto: string };
+type Mensagem = { tipo: 'sucesso' | 'erro' | 'info'; texto: string };
 type Processo = 'area' | 'receita' | 'banco' | 'saldo';
 
 type AreaOption = { id: number; nome: string };
@@ -207,6 +207,19 @@ const avaliarEntrada = (valor: string | undefined): number | null => {
   return null;
 };
 
+const formatarValorParaInput = (valor: number | null | undefined): string => {
+  if (valor === null || valor === undefined) {
+    return '';
+  }
+
+  const numero = Number(valor);
+  if (!Number.isFinite(numero)) {
+    return '';
+  }
+
+  return numero.toFixed(2).replace('.', ',');
+};
+
 const SaldoDiarioPage: React.FC = () => {
   const ultimoDiaUtil = useMemo(() => calcularUltimoDiaUtilAnterior(), []);
   const [dataReferencia, setDataReferencia] = useState(ultimoDiaUtil);
@@ -229,6 +242,10 @@ const SaldoDiarioPage: React.FC = () => {
   const [receitasForm, setReceitasForm] = useState<FormMapa>({});
   const [pagamentosBancoForm, setPagamentosBancoForm] = useState<FormMapa>({});
   const [saldosBancoForm, setSaldosBancoForm] = useState<FormMapa>({});
+  const [pagamentosAreaEdicao, setPagamentosAreaEdicao] = useState<FormMapa>({});
+  const [receitasEdicao, setReceitasEdicao] = useState<FormMapa>({});
+  const [pagamentosBancoEdicao, setPagamentosBancoEdicao] = useState<FormMapa>({});
+  const [saldosBancoEdicao, setSaldosBancoEdicao] = useState<FormMapa>({});
 
   const [processando, setProcessando] = useState<RegistroProcesso>({
     area: false,
@@ -237,6 +254,12 @@ const SaldoDiarioPage: React.FC = () => {
     saldo: false,
   });
   const [mensagens, setMensagens] = useState<RegistroMensagem>({
+    area: null,
+    receita: null,
+    banco: null,
+    saldo: null,
+  });
+  const [registroEditando, setRegistroEditando] = useState<Record<Processo, number | null>>({
     area: null,
     receita: null,
     banco: null,
@@ -257,6 +280,46 @@ const SaldoDiarioPage: React.FC = () => {
     setPagamentosBancoForm((prev) => sincronizarMapa(bancoOptions, prev));
     setSaldosBancoForm((prev) => sincronizarMapa(bancoOptions, prev));
   }, [bancoOptions]);
+
+  useEffect(() => {
+    setPagamentosAreaEdicao(() => {
+      const mapa: FormMapa = {};
+      pagamentosArea.forEach((registro) => {
+        mapa[registro.id] = formatarValorParaInput(registro.valor);
+      });
+      return mapa;
+    });
+  }, [pagamentosArea]);
+
+  useEffect(() => {
+    setReceitasEdicao(() => {
+      const mapa: FormMapa = {};
+      receitas.forEach((registro) => {
+        mapa[registro.id] = formatarValorParaInput(registro.valor);
+      });
+      return mapa;
+    });
+  }, [receitas]);
+
+  useEffect(() => {
+    setPagamentosBancoEdicao(() => {
+      const mapa: FormMapa = {};
+      pagamentosBanco.forEach((registro) => {
+        mapa[registro.id] = formatarValorParaInput(registro.valor);
+      });
+      return mapa;
+    });
+  }, [pagamentosBanco]);
+
+  useEffect(() => {
+    setSaldosBancoEdicao(() => {
+      const mapa: FormMapa = {};
+      saldosBanco.forEach((registro) => {
+        mapa[registro.id] = formatarValorParaInput(registro.valor);
+      });
+      return mapa;
+    });
+  }, [saldosBanco]);
 
   const atualizarMensagem = useCallback(
     (processo: Processo, mensagem: Mensagem | null) => {
@@ -750,6 +813,242 @@ const SaldoDiarioPage: React.FC = () => {
     }
   };
 
+  const handleAtualizarPagamentoAreaExistente = async (registro: PagamentoArea) => {
+    if (!usuario) return;
+    if (!edicaoLiberada) {
+      atualizarMensagem('area', {
+        tipo: 'erro',
+        texto: `As edições só podem ser realizadas para o último dia útil (${formatarData(ultimoDiaUtil)}).`,
+      });
+      return;
+    }
+
+    const entrada = pagamentosAreaEdicao[registro.id] ?? '';
+    const valorCalculado = avaliarEntrada(entrada);
+    if (valorCalculado === null || valorCalculado <= 0) {
+      atualizarMensagem('area', {
+        tipo: 'erro',
+        texto: 'Informe um valor positivo para atualizar o pagamento.',
+      });
+      return;
+    }
+
+    if (Math.abs(valorCalculado - registro.valor) < 0.01) {
+      atualizarMensagem('area', {
+        tipo: 'info',
+        texto: 'O valor informado é igual ao já registrado.',
+      });
+      return;
+    }
+
+    try {
+      setRegistroEditando((prev) => ({ ...prev, area: registro.id }));
+      atualizarMensagem('area', null);
+
+      const supabase = getSupabaseClient();
+      const { error } = await supabase
+        .from('pag_pagamentos_area')
+        .update({ pag_valor: valorCalculado })
+        .eq('pag_id', registro.id);
+
+      if (error) throw error;
+
+      atualizarMensagem('area', {
+        tipo: 'sucesso',
+        texto: 'Pagamento por área atualizado com sucesso.',
+      });
+      await carregarMovimentacoes(dataReferencia);
+    } catch (error) {
+      console.error('Erro ao atualizar pagamento por área:', error);
+      atualizarMensagem('area', {
+        tipo: 'erro',
+        texto: traduzirErroSupabase(
+          error,
+          'Não foi possível atualizar o pagamento selecionado. Tente novamente.',
+        ),
+      });
+    } finally {
+      setRegistroEditando((prev) => ({ ...prev, area: null }));
+    }
+  };
+
+  const handleAtualizarReceitaExistente = async (registro: Receita) => {
+    if (!usuario) return;
+    if (!edicaoLiberada) {
+      atualizarMensagem('receita', {
+        tipo: 'erro',
+        texto: `As edições só podem ser realizadas para o último dia útil (${formatarData(ultimoDiaUtil)}).`,
+      });
+      return;
+    }
+
+    const entrada = receitasEdicao[registro.id] ?? '';
+    const valorCalculado = avaliarEntrada(entrada);
+    if (valorCalculado === null || valorCalculado <= 0) {
+      atualizarMensagem('receita', {
+        tipo: 'erro',
+        texto: 'Informe um valor positivo para atualizar a receita.',
+      });
+      return;
+    }
+
+    if (Math.abs(valorCalculado - registro.valor) < 0.01) {
+      atualizarMensagem('receita', {
+        tipo: 'info',
+        texto: 'O valor informado é igual ao já registrado.',
+      });
+      return;
+    }
+
+    try {
+      setRegistroEditando((prev) => ({ ...prev, receita: registro.id }));
+      atualizarMensagem('receita', null);
+
+      const supabase = getSupabaseClient();
+      const { error } = await supabase
+        .from('rec_receitas')
+        .update({ rec_valor: valorCalculado })
+        .eq('rec_id', registro.id);
+
+      if (error) throw error;
+
+      atualizarMensagem('receita', {
+        tipo: 'sucesso',
+        texto: 'Receita atualizada com sucesso.',
+      });
+      await carregarMovimentacoes(dataReferencia);
+    } catch (error) {
+      console.error('Erro ao atualizar receita:', error);
+      atualizarMensagem('receita', {
+        tipo: 'erro',
+        texto: traduzirErroSupabase(
+          error,
+          'Não foi possível atualizar a receita selecionada. Tente novamente.',
+        ),
+      });
+    } finally {
+      setRegistroEditando((prev) => ({ ...prev, receita: null }));
+    }
+  };
+
+  const handleAtualizarPagamentoBancoExistente = async (registro: PagamentoBanco) => {
+    if (!usuario) return;
+    if (!edicaoLiberada) {
+      atualizarMensagem('banco', {
+        tipo: 'erro',
+        texto: `As edições só podem ser realizadas para o último dia útil (${formatarData(ultimoDiaUtil)}).`,
+      });
+      return;
+    }
+
+    const entrada = pagamentosBancoEdicao[registro.id] ?? '';
+    const valorCalculado = avaliarEntrada(entrada);
+    if (valorCalculado === null || valorCalculado <= 0) {
+      atualizarMensagem('banco', {
+        tipo: 'erro',
+        texto: 'Informe um valor positivo para atualizar o pagamento.',
+      });
+      return;
+    }
+
+    if (Math.abs(valorCalculado - registro.valor) < 0.01) {
+      atualizarMensagem('banco', {
+        tipo: 'info',
+        texto: 'O valor informado é igual ao já registrado.',
+      });
+      return;
+    }
+
+    try {
+      setRegistroEditando((prev) => ({ ...prev, banco: registro.id }));
+      atualizarMensagem('banco', null);
+
+      const supabase = getSupabaseClient();
+      const { error } = await supabase
+        .from('pbk_pagamentos_banco')
+        .update({ pbk_valor: valorCalculado })
+        .eq('pbk_id', registro.id);
+
+      if (error) throw error;
+
+      atualizarMensagem('banco', {
+        tipo: 'sucesso',
+        texto: 'Pagamento por banco atualizado com sucesso.',
+      });
+      await carregarMovimentacoes(dataReferencia);
+    } catch (error) {
+      console.error('Erro ao atualizar pagamento por banco:', error);
+      atualizarMensagem('banco', {
+        tipo: 'erro',
+        texto: traduzirErroSupabase(
+          error,
+          'Não foi possível atualizar o pagamento selecionado. Tente novamente.',
+        ),
+      });
+    } finally {
+      setRegistroEditando((prev) => ({ ...prev, banco: null }));
+    }
+  };
+
+  const handleAtualizarSaldoBancoExistente = async (registro: SaldoBanco) => {
+    if (!usuario) return;
+    if (!edicaoLiberada) {
+      atualizarMensagem('saldo', {
+        tipo: 'erro',
+        texto: `As edições só podem ser realizadas para o último dia útil (${formatarData(ultimoDiaUtil)}).`,
+      });
+      return;
+    }
+
+    const entrada = saldosBancoEdicao[registro.id] ?? '';
+    const valorCalculado = avaliarEntrada(entrada);
+    if (valorCalculado === null) {
+      atualizarMensagem('saldo', {
+        tipo: 'erro',
+        texto: 'Informe um saldo numérico para atualizar o banco selecionado.',
+      });
+      return;
+    }
+
+    if (Math.abs(valorCalculado - registro.valor) < 0.01) {
+      atualizarMensagem('saldo', {
+        tipo: 'info',
+        texto: 'O valor informado é igual ao já registrado.',
+      });
+      return;
+    }
+
+    try {
+      setRegistroEditando((prev) => ({ ...prev, saldo: registro.id }));
+      atualizarMensagem('saldo', null);
+
+      const supabase = getSupabaseClient();
+      const { error } = await supabase
+        .from('sdb_saldo_banco')
+        .update({ sdb_saldo: valorCalculado })
+        .eq('sdb_id', registro.id);
+
+      if (error) throw error;
+
+      atualizarMensagem('saldo', {
+        tipo: 'sucesso',
+        texto: 'Saldo bancário atualizado com sucesso.',
+      });
+      await carregarMovimentacoes(dataReferencia);
+    } catch (error) {
+      console.error('Erro ao atualizar saldo bancário:', error);
+      atualizarMensagem('saldo', {
+        tipo: 'erro',
+        texto: traduzirErroSupabase(
+          error,
+          'Não foi possível atualizar o saldo selecionado. Tente novamente.',
+        ),
+      });
+    } finally {
+      setRegistroEditando((prev) => ({ ...prev, saldo: null }));
+    }
+  };
+
   const totalPagamentosArea = useMemo(
     () => pagamentosArea.reduce((sum, p) => sum + Number(p.valor), 0),
     [pagamentosArea]
@@ -855,25 +1154,25 @@ const SaldoDiarioPage: React.FC = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-lg border border-gray-200 bg-white/80 p-4 shadow-sm">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg border border-gray-200 bg-white/80 p-3 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Pagamentos por Área</p>
-            <p className="mt-2 text-2xl font-semibold text-gray-900">{formatCurrency(totalPagamentosArea)}</p>
+            <p className="mt-2 text-xl font-semibold text-gray-900">{formatCurrency(totalPagamentosArea)}</p>
             <p className="mt-1 text-xs text-gray-400">Valores já registrados</p>
           </div>
-          <div className="rounded-lg border border-gray-200 bg-white/80 p-4 shadow-sm">
+          <div className="rounded-lg border border-gray-200 bg-white/80 p-3 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Receitas por Conta</p>
-            <p className="mt-2 text-2xl font-semibold text-gray-900">{formatCurrency(totalReceitas)}</p>
+            <p className="mt-2 text-xl font-semibold text-gray-900">{formatCurrency(totalReceitas)}</p>
             <p className="mt-1 text-xs text-gray-400">Receitas consolidadas</p>
           </div>
-          <div className="rounded-lg border border-gray-200 bg-white/80 p-4 shadow-sm">
+          <div className="rounded-lg border border-gray-200 bg-white/80 p-3 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Pagamentos por Banco</p>
-            <p className="mt-2 text-2xl font-semibold text-gray-900">{formatCurrency(totalPagamentosBanco)}</p>
+            <p className="mt-2 text-xl font-semibold text-gray-900">{formatCurrency(totalPagamentosBanco)}</p>
             <p className="mt-1 text-xs text-gray-400">Saídas bancárias do dia</p>
           </div>
-          <div className="rounded-lg border border-gray-200 bg-white/80 p-4 shadow-sm">
+          <div className="rounded-lg border border-gray-200 bg-white/80 p-3 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Saldo por Banco</p>
-            <p className="mt-2 text-2xl font-semibold text-gray-900">{formatCurrency(totalSaldos)}</p>
+            <p className="mt-2 text-xl font-semibold text-gray-900">{formatCurrency(totalSaldos)}</p>
             <p className="mt-1 text-xs text-gray-400">Saldos registrados</p>
           </div>
         </div>
@@ -964,7 +1263,9 @@ const SaldoDiarioPage: React.FC = () => {
                     className={`rounded-md border px-4 py-2 text-sm ${
                       mensagens.area.tipo === 'sucesso'
                         ? 'border-success-200 bg-success-50 text-success-700'
-                        : 'border-error-200 bg-error-50 text-error-700'
+                        : mensagens.area.tipo === 'erro'
+                        ? 'border-error-200 bg-error-50 text-error-700'
+                        : 'border-primary-200 bg-primary-50 text-primary-800'
                     }`}
                   >
                     {mensagens.area.texto}
@@ -972,23 +1273,70 @@ const SaldoDiarioPage: React.FC = () => {
                 )}
               </form>
 
-              <div className="border-t border-gray-200 pt-3">
+              <div className="border-t border-gray-200 pt-4">
+                <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <h3 className="text-sm font-semibold text-gray-700">Pagamentos registrados</h3>
+                  {!edicaoLiberada && (
+                    <span className="text-xs text-gray-500">
+                      Edição disponível apenas para o último dia útil ({formatarData(ultimoDiaUtil)}).
+                    </span>
+                  )}
+                </div>
                 {pagamentosArea.length === 0 ? (
                   <p className="text-sm text-gray-500 text-center py-4">
                     Nenhum pagamento registrado na data selecionada.
                   </p>
                 ) : (
-                  <ul className="space-y-2">
-                    {pagamentosArea.map((pag) => (
-                      <li key={pag.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-md">
-                        <div className="flex flex-col">
-                          <span className="font-medium text-gray-900">{pag.area}</span>
-                          <span className="text-xs text-gray-500">{formatarData(pag.data)}</span>
-                        </div>
-                        <span className="font-semibold text-gray-900">{formatCurrency(pag.valor)}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="overflow-x-auto rounded-lg border border-gray-200">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-semibold">Área</th>
+                          <th className="px-4 py-3 text-left font-semibold">Data</th>
+                          <th className="px-4 py-3 text-left font-semibold">Valor registrado</th>
+                          <th className="px-4 py-3 text-left font-semibold w-48">Novo valor</th>
+                          <th className="px-4 py-3 text-left font-semibold">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white/80">
+                        {pagamentosArea.map((pag) => (
+                          <tr key={pag.id}>
+                            <td className="px-4 py-3 font-medium text-gray-700">{pag.area}</td>
+                            <td className="px-4 py-3 text-gray-500">{formatarData(pag.data)}</td>
+                            <td className="px-4 py-3 font-semibold text-gray-900">{formatCurrency(pag.valor)}</td>
+                            <td className="px-4 py-3">
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                value={pagamentosAreaEdicao[pag.id] ?? ''}
+                                onChange={(event) =>
+                                  setPagamentosAreaEdicao((prev) => ({
+                                    ...prev,
+                                    [pag.id]: event.target.value,
+                                  }))
+                                }
+                                disabled={!edicaoLiberada || registroEditando.area === pag.id}
+                                helperText={helperValor(pagamentosAreaEdicao[pag.id])}
+                                fullWidth
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handleAtualizarPagamentoAreaExistente(pag)}
+                                disabled={!edicaoLiberada}
+                                loading={registroEditando.area === pag.id}
+                              >
+                                Salvar
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>
@@ -1078,7 +1426,9 @@ const SaldoDiarioPage: React.FC = () => {
                     className={`rounded-md border px-4 py-2 text-sm ${
                       mensagens.receita.tipo === 'sucesso'
                         ? 'border-success-200 bg-success-50 text-success-700'
-                        : 'border-error-200 bg-error-50 text-error-700'
+                        : mensagens.receita.tipo === 'erro'
+                        ? 'border-error-200 bg-error-50 text-error-700'
+                        : 'border-primary-200 bg-primary-50 text-primary-800'
                     }`}
                   >
                     {mensagens.receita.texto}
@@ -1086,23 +1436,70 @@ const SaldoDiarioPage: React.FC = () => {
                 )}
               </form>
 
-              <div className="border-t border-gray-200 pt-3">
+              <div className="border-t border-gray-200 pt-4">
+                <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <h3 className="text-sm font-semibold text-gray-700">Receitas registradas</h3>
+                  {!edicaoLiberada && (
+                    <span className="text-xs text-gray-500">
+                      Edição disponível apenas para o último dia útil ({formatarData(ultimoDiaUtil)}).
+                    </span>
+                  )}
+                </div>
                 {receitas.length === 0 ? (
                   <p className="text-sm text-gray-500 text-center py-4">
                     Nenhuma receita registrada na data selecionada.
                   </p>
                 ) : (
-                  <ul className="space-y-2">
-                    {receitas.map((rec) => (
-                      <li key={rec.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-md">
-                        <div className="flex flex-col">
-                          <span className="font-medium text-gray-900">{rec.conta}</span>
-                          <span className="text-xs text-gray-500">{formatarData(rec.data)}</span>
-                        </div>
-                        <span className="font-semibold text-success-700">{formatCurrency(rec.valor)}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="overflow-x-auto rounded-lg border border-gray-200">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-semibold">Conta de receita</th>
+                          <th className="px-4 py-3 text-left font-semibold">Data</th>
+                          <th className="px-4 py-3 text-left font-semibold">Valor registrado</th>
+                          <th className="px-4 py-3 text-left font-semibold w-48">Novo valor</th>
+                          <th className="px-4 py-3 text-left font-semibold">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white/80">
+                        {receitas.map((rec) => (
+                          <tr key={rec.id}>
+                            <td className="px-4 py-3 font-medium text-gray-700">{rec.conta}</td>
+                            <td className="px-4 py-3 text-gray-500">{formatarData(rec.data)}</td>
+                            <td className="px-4 py-3 font-semibold text-success-700">{formatCurrency(rec.valor)}</td>
+                            <td className="px-4 py-3">
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                value={receitasEdicao[rec.id] ?? ''}
+                                onChange={(event) =>
+                                  setReceitasEdicao((prev) => ({
+                                    ...prev,
+                                    [rec.id]: event.target.value,
+                                  }))
+                                }
+                                disabled={!edicaoLiberada || registroEditando.receita === rec.id}
+                                helperText={helperValor(receitasEdicao[rec.id])}
+                                fullWidth
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handleAtualizarReceitaExistente(rec)}
+                                disabled={!edicaoLiberada}
+                                loading={registroEditando.receita === rec.id}
+                              >
+                                Salvar
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>
@@ -1192,7 +1589,9 @@ const SaldoDiarioPage: React.FC = () => {
                     className={`rounded-md border px-4 py-2 text-sm ${
                       mensagens.banco.tipo === 'sucesso'
                         ? 'border-success-200 bg-success-50 text-success-700'
-                        : 'border-error-200 bg-error-50 text-error-700'
+                        : mensagens.banco.tipo === 'erro'
+                        ? 'border-error-200 bg-error-50 text-error-700'
+                        : 'border-primary-200 bg-primary-50 text-primary-800'
                     }`}
                   >
                     {mensagens.banco.texto}
@@ -1200,23 +1599,70 @@ const SaldoDiarioPage: React.FC = () => {
                 )}
               </form>
 
-              <div className="border-t border-gray-200 pt-3">
+              <div className="border-t border-gray-200 pt-4">
+                <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <h3 className="text-sm font-semibold text-gray-700">Pagamentos bancários registrados</h3>
+                  {!edicaoLiberada && (
+                    <span className="text-xs text-gray-500">
+                      Edição disponível apenas para o último dia útil ({formatarData(ultimoDiaUtil)}).
+                    </span>
+                  )}
+                </div>
                 {pagamentosBanco.length === 0 ? (
                   <p className="text-sm text-gray-500 text-center py-4">
                     Nenhum pagamento bancário registrado na data selecionada.
                   </p>
                 ) : (
-                  <ul className="space-y-2">
-                    {pagamentosBanco.map((pag) => (
-                      <li key={pag.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-md">
-                        <div className="flex flex-col">
-                          <span className="font-medium text-gray-900">{pag.banco}</span>
-                          <span className="text-xs text-gray-500">{formatarData(pag.data)}</span>
-                        </div>
-                        <span className="font-semibold text-error-700">{formatCurrency(pag.valor)}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="overflow-x-auto rounded-lg border border-gray-200">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-semibold">Banco</th>
+                          <th className="px-4 py-3 text-left font-semibold">Data</th>
+                          <th className="px-4 py-3 text-left font-semibold">Valor registrado</th>
+                          <th className="px-4 py-3 text-left font-semibold w-48">Novo valor</th>
+                          <th className="px-4 py-3 text-left font-semibold">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white/80">
+                        {pagamentosBanco.map((pag) => (
+                          <tr key={pag.id}>
+                            <td className="px-4 py-3 font-medium text-gray-700">{pag.banco}</td>
+                            <td className="px-4 py-3 text-gray-500">{formatarData(pag.data)}</td>
+                            <td className="px-4 py-3 font-semibold text-error-700">{formatCurrency(pag.valor)}</td>
+                            <td className="px-4 py-3">
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                value={pagamentosBancoEdicao[pag.id] ?? ''}
+                                onChange={(event) =>
+                                  setPagamentosBancoEdicao((prev) => ({
+                                    ...prev,
+                                    [pag.id]: event.target.value,
+                                  }))
+                                }
+                                disabled={!edicaoLiberada || registroEditando.banco === pag.id}
+                                helperText={helperValor(pagamentosBancoEdicao[pag.id])}
+                                fullWidth
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handleAtualizarPagamentoBancoExistente(pag)}
+                                disabled={!edicaoLiberada}
+                                loading={registroEditando.banco === pag.id}
+                              >
+                                Salvar
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>
@@ -1307,7 +1753,9 @@ const SaldoDiarioPage: React.FC = () => {
                     className={`rounded-md border px-4 py-2 text-sm ${
                       mensagens.saldo.tipo === 'sucesso'
                         ? 'border-success-200 bg-success-50 text-success-700'
-                        : 'border-error-200 bg-error-50 text-error-700'
+                        : mensagens.saldo.tipo === 'erro'
+                        ? 'border-error-200 bg-error-50 text-error-700'
+                        : 'border-primary-200 bg-primary-50 text-primary-800'
                     }`}
                   >
                     {mensagens.saldo.texto}
@@ -1315,25 +1763,76 @@ const SaldoDiarioPage: React.FC = () => {
                 )}
               </form>
 
-              <div className="border-t border-gray-200 pt-3">
+              <div className="border-t border-gray-200 pt-4">
+                <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <h3 className="text-sm font-semibold text-gray-700">Saldos bancários registrados</h3>
+                  {!edicaoLiberada && (
+                    <span className="text-xs text-gray-500">
+                      Edição disponível apenas para o último dia útil ({formatarData(ultimoDiaUtil)}).
+                    </span>
+                  )}
+                </div>
                 {saldosBanco.length === 0 ? (
                   <p className="text-sm text-gray-500 text-center py-4">
                     Nenhum saldo registrado na data selecionada.
                   </p>
                 ) : (
-                  <ul className="space-y-2">
-                    {saldosBanco.map((saldo) => (
-                      <li key={saldo.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-md">
-                        <div className="flex flex-col">
-                          <span className="font-medium text-gray-900">{saldo.banco}</span>
-                          <span className="text-xs text-gray-500">{formatarData(saldo.data)}</span>
-                        </div>
-                        <span className={`font-semibold ${saldo.valor >= 0 ? 'text-success-700' : 'text-error-700'}`}>
-                          {formatCurrency(saldo.valor)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="overflow-x-auto rounded-lg border border-gray-200">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-semibold">Banco</th>
+                          <th className="px-4 py-3 text-left font-semibold">Data</th>
+                          <th className="px-4 py-3 text-left font-semibold">Saldo registrado</th>
+                          <th className="px-4 py-3 text-left font-semibold w-48">Novo saldo</th>
+                          <th className="px-4 py-3 text-left font-semibold">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white/80">
+                        {saldosBanco.map((saldo) => (
+                          <tr key={saldo.id}>
+                            <td className="px-4 py-3 font-medium text-gray-700">{saldo.banco}</td>
+                            <td className="px-4 py-3 text-gray-500">{formatarData(saldo.data)}</td>
+                            <td
+                              className={`px-4 py-3 font-semibold ${
+                                saldo.valor >= 0 ? 'text-success-700' : 'text-error-700'
+                              }`}
+                            >
+                              {formatCurrency(saldo.valor)}
+                            </td>
+                            <td className="px-4 py-3">
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                value={saldosBancoEdicao[saldo.id] ?? ''}
+                                onChange={(event) =>
+                                  setSaldosBancoEdicao((prev) => ({
+                                    ...prev,
+                                    [saldo.id]: event.target.value,
+                                  }))
+                                }
+                                disabled={!edicaoLiberada || registroEditando.saldo === saldo.id}
+                                helperText={helperValor(saldosBancoEdicao[saldo.id])}
+                                fullWidth
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handleAtualizarSaldoBancoExistente(saldo)}
+                                disabled={!edicaoLiberada}
+                                loading={registroEditando.saldo === saldo.id}
+                              >
+                                Salvar
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>

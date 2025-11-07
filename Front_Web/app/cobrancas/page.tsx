@@ -15,7 +15,14 @@ import { traduzirErroSupabase } from '@/lib/supabaseErrors';
 
 type Mensagem = { tipo: 'sucesso' | 'erro' | 'info'; texto: string };
 
-type TipoOption = { id: number; nome: string };
+type CategoriaReceita = 'depositos' | 'titulos' | 'outras';
+
+type TipoOption = {
+  id: number;
+  nome: string;
+  codigo: string;
+  categoria: CategoriaReceita;
+};
 
 type ContaOption = {
   id: number;
@@ -30,13 +37,15 @@ type BancoAgrupado = {
   contas: ContaOption[];
 };
 
-type FormEntry = {
-  tipoId: number | '';
-  data: string;
-  valor: string;
-};
+type FormularioValores = Record<number, Record<number, string>>;
 
-type FormState = Record<number, FormEntry>;
+type LancamentoExistente = {
+  id: number;
+  contaId: number;
+  tipoId: number;
+  valor: number;
+  bancoId: number | null;
+};
 
 type CobrancaHistorico = {
   id: number;
@@ -47,40 +56,118 @@ type CobrancaHistorico = {
   valor: number;
 };
 
-type ResumoBanco = {
-  bancoId: number | null;
-  bancoNome: string;
-  total: number;
+type ResumoBanco = { bancoId: number | null; bancoNome: string; total: number };
+
+type CategoriaConfig = {
+  chave: CategoriaReceita;
+  titulo: string;
+  descricao: string;
 };
 
-const dataPadrao = new Date().toISOString().split('T')[0];
+const toISODate = (date: Date): string => date.toISOString().split('T')[0];
+
+const calcularRetroativo = (dias: number): string => {
+  const data = new Date();
+  data.setHours(0, 0, 0, 0);
+  data.setDate(data.getDate() - dias);
+  return toISODate(data);
+};
+
+const normalizarEntradaNumerica = (valor: string): string =>
+  valor.replace(/\./g, '').replace(/\s+/g, '').replace(/,/g, '.');
 
 const avaliarValor = (entrada: string): number | null => {
   if (!entrada) {
     return null;
   }
 
-  return evaluateMath(entrada);
+  const texto = normalizarEntradaNumerica(entrada);
+  if (!texto) {
+    return null;
+  }
+
+  const resultado = evaluateMath(texto);
+  if (resultado !== null) {
+    return Math.round(resultado * 100) / 100;
+  }
+
+  const parsed = Number(texto);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return Math.round(parsed * 100) / 100;
 };
 
-const toNumero = (valor: unknown): number => {
-  const parsed = Number(valor);
-  return Number.isFinite(parsed) ? parsed : 0;
+const formatarValorParaInput = (valor: number): string => valor.toFixed(2).replace('.', ',');
+
+const gerarChaveLancamento = (contaId: number, tipoId: number) => `${contaId}-${tipoId}`;
+
+const CATEGORIAS_CONFIG: CategoriaConfig[] = [
+  {
+    chave: 'depositos',
+    titulo: 'Depósitos e PIX',
+    descricao: 'Registre depósitos bancários, PIX e valores antecipados por conta.',
+  },
+  {
+    chave: 'titulos',
+    titulo: 'Títulos (Boletos)',
+    descricao: 'Informe os recebimentos oriundos de boletos emitidos.',
+  },
+  {
+    chave: 'outras',
+    titulo: 'Outras Receitas',
+    descricao: 'Cartões, vendas à vista e demais recebimentos.',
+  },
+];
+
+const categoriaVariant: Record<CategoriaReceita, 'default' | 'primary' | 'danger' | 'success'> = {
+  depositos: 'success',
+  titulos: 'danger',
+  outras: 'primary',
+};
+
+const obterCategoriaPorCodigo = (codigo: string | null): CategoriaReceita => {
+  const referencia = (codigo ?? '').trim();
+  if (referencia.startsWith('200')) return 'titulos';
+  if (referencia.startsWith('201')) return 'depositos';
+  if (referencia.startsWith('202')) return 'outras';
+  return 'outras';
+};
+
+const formatarDataPt = (iso: string): string => {
+  if (!iso) return '';
+  const [year, month, day] = iso.split('-');
+  return `${day}/${month}/${year}`;
 };
 
 export default function LancamentoCobrancaPage() {
+  const [hojeIso] = useState(() => toISODate(new Date()));
+  const limiteRetroativo = useMemo(() => calcularRetroativo(7), []);
+
   const [usuario, setUsuario] = useState<UsuarioRow | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const [carregandoLancamentos, setCarregandoLancamentos] = useState(false);
   const [registrando, setRegistrando] = useState(false);
   const [mensagem, setMensagem] = useState<Mensagem | null>(null);
 
   const [tipos, setTipos] = useState<TipoOption[]>([]);
   const [contas, setContas] = useState<ContaOption[]>([]);
-  const [bancoSelecionadoId, setBancoSelecionadoId] = useState<number | null>(null);
-  const [formulario, setFormulario] = useState<FormState>({});
+  const [formulario, setFormulario] = useState<FormularioValores>({});
+  const [lancamentosExistentes, setLancamentosExistentes] = useState<Record<string, LancamentoExistente>>({});
 
   const [historico, setHistorico] = useState<CobrancaHistorico[]>([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
+
+  const [dataReferencia, setDataReferencia] = useState(() => toISODate(new Date()));
+
+  const podeEditar = dataReferencia >= limiteRetroativo && dataReferencia <= hojeIso;
+
+  const contasMap = useMemo(() => {
+    const mapa = new Map<number, ContaOption>();
+    contas.forEach((conta) => mapa.set(conta.id, conta));
+    return mapa;
+  }, [contas]);
 
   const bancosAgrupados = useMemo(() => {
     const agrupados = new Map<number | null, BancoAgrupado>();
@@ -99,56 +186,97 @@ export default function LancamentoCobrancaPage() {
       }
     });
 
-    const lista = Array.from(agrupados.values()).sort((a, b) =>
-      a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })
+    return Array.from(agrupados.values()).sort((a, b) =>
+      a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }),
     );
-    return lista;
   }, [contas]);
 
-  const contasDoBancoSelecionado = useMemo(() => {
-    if (bancoSelecionadoId === null) {
-      return bancosAgrupados.length > 0 ? bancosAgrupados[0]?.contas ?? [] : [];
-    }
+  const tiposPorCategoria = useMemo(() => {
+    const mapa: Record<CategoriaReceita, TipoOption[]> = {
+      depositos: [],
+      titulos: [],
+      outras: [],
+    };
 
-    const bancoEncontrado = bancosAgrupados.find((banco) => banco.id === bancoSelecionadoId);
-    return bancoEncontrado?.contas ?? [];
-  }, [bancoSelecionadoId, bancosAgrupados]);
-
-  const totalCalculado = useMemo(() => {
-    return contas.reduce((acc, conta) => {
-      const valor = avaliarValor(formulario[conta.id]?.valor ?? '');
-      if (valor && valor > 0) {
-        return acc + valor;
-      }
-      return acc;
-    }, 0);
-  }, [contas, formulario]);
-
-  const resumoPorBanco = useMemo<ResumoBanco[]>(() => {
-    const mapa = new Map<number | null, ResumoBanco>();
-
-    bancosAgrupados.forEach((banco) => {
-      const totalBanco = banco.contas.reduce((acc, conta) => {
-        const valor = avaliarValor(formulario[conta.id]?.valor ?? '');
-        if (valor && valor > 0) {
-          return acc + valor;
-        }
-        return acc;
-      }, 0);
-
-      if (totalBanco > 0) {
-        mapa.set(banco.id ?? null, {
-          bancoId: banco.id ?? null,
-          bancoNome: banco.nome,
-          total: totalBanco,
-        });
-      }
+    tipos.forEach((tipo) => {
+      mapa[tipo.categoria].push(tipo);
     });
 
-    return Array.from(mapa.values()).sort((a, b) =>
-      a.bancoNome.localeCompare(b.bancoNome, 'pt-BR', { sensitivity: 'base' })
-    );
-  }, [bancosAgrupados, formulario]);
+    return mapa;
+  }, [tipos]);
+
+  const totaisPorCategoria = useMemo(() => {
+    const totais: Record<CategoriaReceita, number> = {
+      depositos: 0,
+      titulos: 0,
+      outras: 0,
+    };
+
+    contas.forEach((conta) => {
+      const valoresConta = formulario[conta.id] ?? {};
+      tipos.forEach((tipo) => {
+        const valorCalculado = avaliarValor(valoresConta[tipo.id] ?? '');
+        if (valorCalculado && valorCalculado > 0) {
+          totais[tipo.categoria] += valorCalculado;
+        }
+      });
+    });
+
+    return totais;
+  }, [contas, tipos, formulario]);
+
+  const totalFormulario = useMemo(() => {
+    return Object.values(totaisPorCategoria).reduce((acc, valor) => acc + valor, 0);
+  }, [totaisPorCategoria]);
+
+  const resumoFormularioPorBanco = useMemo<ResumoBanco[]>(() => {
+    const mapa = new Map<number | null, number>();
+
+    contas.forEach((conta) => {
+      const valoresConta = formulario[conta.id] ?? {};
+      const bancoId = conta.bancoId ?? null;
+      tipos.forEach((tipo) => {
+        const valorCalculado = avaliarValor(valoresConta[tipo.id] ?? '');
+        if (valorCalculado && valorCalculado > 0) {
+          mapa.set(bancoId, (mapa.get(bancoId) ?? 0) + valorCalculado);
+        }
+      });
+    });
+
+    return Array.from(mapa.entries())
+      .filter(([, total]) => total > 0)
+      .map(([bancoId, total]) => {
+        const contaExemplo = contas.find((conta) => (conta.bancoId ?? null) === bancoId);
+        return {
+          bancoId,
+          bancoNome: contaExemplo?.bancoNome ?? 'Sem banco vinculado',
+          total,
+        } satisfies ResumoBanco;
+      })
+      .sort((a, b) => a.bancoNome.localeCompare(b.bancoNome, 'pt-BR', { sensitivity: 'base' }));
+  }, [contas, formulario, tipos]);
+
+  const resumoSalvoPorBanco = useMemo<ResumoBanco[]>(() => {
+    const mapa = new Map<number | null, number>();
+
+    Object.values(lancamentosExistentes).forEach((registro) => {
+      const conta = contasMap.get(registro.contaId);
+      const bancoId = conta?.bancoId ?? registro.bancoId ?? null;
+      mapa.set(bancoId, (mapa.get(bancoId) ?? 0) + registro.valor);
+    });
+
+    return Array.from(mapa.entries())
+      .filter(([, total]) => Math.abs(total) > 0)
+      .map(([bancoId, total]) => {
+        const contaExemplo = contas.find((conta) => (conta.bancoId ?? null) === bancoId);
+        return {
+          bancoId,
+          bancoNome: contaExemplo?.bancoNome ?? 'Sem banco vinculado',
+          total,
+        } satisfies ResumoBanco;
+      })
+      .sort((a, b) => a.bancoNome.localeCompare(b.bancoNome, 'pt-BR', { sensitivity: 'base' }));
+  }, [contas, contasMap, lancamentosExistentes]);
 
   const carregarHistorico = useCallback(
     async (usuarioAtual: UsuarioRow) => {
@@ -159,13 +287,14 @@ export default function LancamentoCobrancaPage() {
           .from('cob_cobrancas')
           .select(
             `cob_id, cob_data, cob_valor,
-             ctr_contas_receita(ctr_nome, ban_bancos(ban_nome)),
+             ctr_contas_receita(ctr_nome, ctr_ban_id, ban_bancos(ban_nome)),
              tpr_tipos_receita(tpr_nome)`
           )
           .eq('cob_usr_id', usuarioAtual.usr_id)
+          .gte('cob_data', limiteRetroativo)
           .order('cob_data', { ascending: false })
           .order('cob_criado_em', { ascending: false })
-          .limit(20);
+          .limit(50);
 
         if (error) throw error;
 
@@ -185,7 +314,7 @@ export default function LancamentoCobrancaPage() {
           return {
             id: Number(item.cob_id),
             data: String(item.cob_data ?? ''),
-            valor: toNumero(item.cob_valor),
+            valor: Number(item.cob_valor ?? 0),
             conta: contaRelacionada?.ctr_nome ?? 'Conta não informada',
             tipo: tipoRelacionado?.tpr_nome ?? 'Tipo não informado',
             banco: bancoRelacionado?.ban_nome ?? 'Banco não informado',
@@ -200,7 +329,46 @@ export default function LancamentoCobrancaPage() {
         setCarregandoHistorico(false);
       }
     },
-    []
+    [limiteRetroativo],
+  );
+
+  const carregarLancamentosDia = useCallback(
+    async (usuarioAtual: UsuarioRow, data: string, contasBase: ContaOption[] = contas) => {
+      try {
+        setCarregandoLancamentos(true);
+        const supabase = getSupabaseClient();
+        const { data: registros, error } = await supabase
+          .from('cob_cobrancas')
+          .select('cob_id, cob_ctr_id, cob_tpr_id, cob_valor')
+          .eq('cob_usr_id', usuarioAtual.usr_id)
+          .eq('cob_data', data);
+
+        if (error) throw error;
+
+        const mapa: Record<string, LancamentoExistente> = {};
+        (registros ?? []).forEach((registro) => {
+          const contaId = Number(registro.cob_ctr_id);
+          const tipoId = Number(registro.cob_tpr_id);
+          const conta = contasBase.find((item) => item.id === contaId);
+          const chave = gerarChaveLancamento(contaId, tipoId);
+          mapa[chave] = {
+            id: Number(registro.cob_id),
+            contaId,
+            tipoId,
+            valor: Number(registro.cob_valor ?? 0),
+            bancoId: conta?.bancoId ?? null,
+          };
+        });
+
+        setLancamentosExistentes(mapa);
+      } catch (error) {
+        console.error('Erro ao carregar lançamentos de cobrança do dia:', error);
+        setLancamentosExistentes({});
+      } finally {
+        setCarregandoLancamentos(false);
+      }
+    },
+    [contas],
   );
 
   useEffect(() => {
@@ -213,7 +381,7 @@ export default function LancamentoCobrancaPage() {
           supabase,
           userId,
           userName ?? undefined,
-          userEmail ?? undefined
+          userEmail ?? undefined,
         );
 
         if (usuarioErro) throw usuarioErro;
@@ -228,67 +396,47 @@ export default function LancamentoCobrancaPage() {
 
         setUsuario(usuarioEncontrado);
 
-        const [tiposRes, bancosRes, contasRes] = await Promise.all([
+        const [tiposRes, contasRes] = await Promise.all([
           supabase
             .from('tpr_tipos_receita')
-            .select('tpr_id, tpr_nome')
+            .select('tpr_id, tpr_nome, tpr_codigo')
             .eq('tpr_ativo', true)
             .order('tpr_nome', { ascending: true }),
           supabase
-            .from('ban_bancos')
-            .select('ban_id, ban_nome')
-            .eq('ban_ativo', true)
-            .order('ban_nome', { ascending: true }),
-          supabase
             .from('ctr_contas_receita')
-            .select('ctr_id, ctr_nome, ctr_ban_id')
+            .select('ctr_id, ctr_nome, ctr_ban_id, ban_bancos(ban_nome)')
             .eq('ctr_ativo', true)
             .order('ctr_nome', { ascending: true }),
         ]);
 
         if (tiposRes.error) throw tiposRes.error;
-        if (bancosRes.error) throw bancosRes.error;
         if (contasRes.error) throw contasRes.error;
 
-        const bancosMap = new Map<number, string>();
-        (bancosRes.data ?? []).forEach((banco) => {
-          bancosMap.set(Number(banco.ban_id), banco.ban_nome ?? 'Banco sem nome');
-        });
+        const tiposFormatados: TipoOption[] = (tiposRes.data ?? []).map((tipo) => ({
+          id: Number(tipo.tpr_id),
+          nome: tipo.tpr_nome ?? 'Tipo sem nome',
+          codigo: tipo.tpr_codigo ?? '',
+          categoria: obterCategoriaPorCodigo(tipo.tpr_codigo ?? ''),
+        }));
 
-        const contasFormatadas = (contasRes.data ?? []).map((conta) => {
-          const bancoId = conta.ctr_ban_id !== null && conta.ctr_ban_id !== undefined
-            ? Number(conta.ctr_ban_id)
-            : null;
+        const contasFormatadas: ContaOption[] = (contasRes.data ?? []).map((conta) => {
+          const bancoRelacionado = Array.isArray(conta.ban_bancos)
+            ? conta.ban_bancos[0]
+            : (conta.ban_bancos as { ban_nome?: string | null } | null);
           return {
             id: Number(conta.ctr_id),
             nome: conta.ctr_nome ?? 'Conta sem nome',
-            bancoId,
-            bancoNome: bancoId !== null ? bancosMap.get(bancoId) ?? 'Banco não informado' : 'Sem banco vinculado',
+            bancoId: conta.ctr_ban_id !== null ? Number(conta.ctr_ban_id) : null,
+            bancoNome: bancoRelacionado?.ban_nome ?? 'Sem banco vinculado',
           } satisfies ContaOption;
         });
 
+        setTipos(tiposFormatados);
         setContas(contasFormatadas);
-        setTipos(
-          (tiposRes.data ?? []).map((tipo) => ({
-            id: Number(tipo.tpr_id),
-            nome: tipo.tpr_nome ?? 'Tipo sem nome',
-          }))
-        );
-
-        setFormulario(() => {
-          const inicial: FormState = {};
-          contasFormatadas.forEach((conta) => {
-            inicial[conta.id] = {
-              tipoId: '',
-              data: dataPadrao,
-              valor: '',
-            };
-          });
-          return inicial;
-        });
-
         setMensagem(null);
+
         await carregarHistorico(usuarioEncontrado);
+        await carregarLancamentosDia(usuarioEncontrado, dataReferencia, contasFormatadas);
       } catch (error) {
         console.error('Erro ao carregar tela de cobranças:', error);
         setMensagem({
@@ -301,25 +449,48 @@ export default function LancamentoCobrancaPage() {
     };
 
     carregarDados();
-  }, [carregarHistorico]);
+  }, [carregarHistorico, carregarLancamentosDia, dataReferencia]);
 
   useEffect(() => {
-    if (bancosAgrupados.length > 0 && bancoSelecionadoId === null) {
-      setBancoSelecionadoId(bancosAgrupados[0]?.id ?? null);
+    if (!usuario) {
+      return;
     }
-  }, [bancosAgrupados, bancoSelecionadoId]);
+    if (contas.length === 0 || tipos.length === 0) {
+      return;
+    }
+    carregarLancamentosDia(usuario, dataReferencia);
+  }, [usuario, contas, tipos, dataReferencia, carregarLancamentosDia]);
 
-  const atualizarFormulario = (contaId: number, dados: Partial<FormEntry>) => {
+  useEffect(() => {
+    if (contas.length === 0 || tipos.length === 0) {
+      return;
+    }
+
+    setFormulario(() => {
+      const mapa: FormularioValores = {};
+      contas.forEach((conta) => {
+        mapa[conta.id] = {};
+        tipos.forEach((tipo) => {
+          const chave = gerarChaveLancamento(conta.id, tipo.id);
+          const existente = lancamentosExistentes[chave];
+          mapa[conta.id][tipo.id] = existente ? formatarValorParaInput(existente.valor) : '';
+        });
+      });
+      return mapa;
+    });
+  }, [contas, tipos, lancamentosExistentes]);
+
+  const handleValorChange = (contaId: number, tipoId: number, valor: string) => {
     setFormulario((prev) => ({
       ...prev,
       [contaId]: {
-        ...prev[contaId],
-        ...dados,
+        ...(prev[contaId] ?? {}),
+        [tipoId]: valor,
       },
     }));
   };
 
-  const handleRegistrar = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSalvarLancamentos = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!usuario) {
       setMensagem({
@@ -329,44 +500,46 @@ export default function LancamentoCobrancaPage() {
       return;
     }
 
-    const registros = contas
-      .map((conta) => {
-        const entrada = formulario[conta.id];
-        if (!entrada) return null;
+    if (!podeEditar) {
+      setMensagem({
+        tipo: 'erro',
+        texto: 'A edição está liberada apenas para lançamentos de até 7 dias anteriores ao dia atual.',
+      });
+      return;
+    }
 
-        const valorCalculado = avaliarValor(entrada.valor ?? '');
-        if (!valorCalculado || valorCalculado <= 0) {
-          return null;
+    const registrosParaUpsert: any[] = [];
+    const idsParaExcluir: number[] = [];
+
+    contas.forEach((conta) => {
+      const valoresConta = formulario[conta.id] ?? {};
+      tipos.forEach((tipo) => {
+        const chave = gerarChaveLancamento(conta.id, tipo.id);
+        const existente = lancamentosExistentes[chave];
+        const valorEntrada = valoresConta[tipo.id] ?? '';
+        const valorCalculado = avaliarValor(valorEntrada);
+
+        if (valorCalculado && valorCalculado > 0) {
+          if (!existente || Math.abs(valorCalculado - existente.valor) > 0.009) {
+            registrosParaUpsert.push({
+              cob_id: existente?.id,
+              cob_ctr_id: conta.id,
+              cob_tpr_id: tipo.id,
+              cob_usr_id: usuario.usr_id,
+              cob_data: dataReferencia,
+              cob_valor: valorCalculado,
+            });
+          }
+        } else if (existente) {
+          idsParaExcluir.push(existente.id);
         }
+      });
+    });
 
-        if (!entrada.tipoId) {
-          return null;
-        }
-
-        const dataRegistro = entrada.data || dataPadrao;
-
-        return {
-          contaId: conta.id,
-          cob_ctr_id: conta.id,
-          cob_tpr_id: Number(entrada.tipoId),
-          cob_usr_id: usuario.usr_id,
-          cob_data: dataRegistro,
-          cob_valor: valorCalculado,
-        };
-      })
-      .filter(Boolean) as {
-        contaId: number;
-        cob_ctr_id: number;
-        cob_tpr_id: number;
-        cob_usr_id: string;
-        cob_data: string;
-        cob_valor: number;
-      }[];
-
-    if (registros.length === 0) {
+    if (registrosParaUpsert.length === 0 && idsParaExcluir.length === 0) {
       setMensagem({
         tipo: 'info',
-        texto: 'Informe valor, data e tipo de receita para pelo menos uma conta antes de salvar.',
+        texto: 'Nenhuma alteração foi identificada para salvar.',
       });
       return;
     }
@@ -375,31 +548,32 @@ export default function LancamentoCobrancaPage() {
       setRegistrando(true);
       setMensagem(null);
       const supabase = getSupabaseClient();
-      const { error } = await supabase.from('cob_cobrancas').insert(
-        registros.map(({ contaId, ...resto }) => resto)
-      );
 
-      if (error) throw error;
-
-      setFormulario((prev) => {
-        const next = { ...prev };
-        registros.forEach((registro) => {
-          next[registro.contaId] = {
-            ...next[registro.contaId],
-            valor: '',
-          };
+      if (registrosParaUpsert.length > 0) {
+        const payload = registrosParaUpsert.map((registro) => {
+          const { cob_id, ...restante } = registro;
+          return cob_id ? { cob_id, ...restante } : restante;
         });
-        return next;
-      });
+        const { error } = await supabase
+          .from('cob_cobrancas')
+          .upsert(payload, { onConflict: 'cob_id' });
+        if (error) throw error;
+      }
+
+      if (idsParaExcluir.length > 0) {
+        const { error } = await supabase
+          .from('cob_cobrancas')
+          .delete()
+          .in('cob_id', idsParaExcluir);
+        if (error) throw error;
+      }
 
       setMensagem({
         tipo: 'sucesso',
-        texto:
-          registros.length === 1
-            ? 'Cobrança registrada com sucesso.'
-            : `${registros.length} cobranças registradas com sucesso.`,
+        texto: 'Lançamentos de cobrança atualizados com sucesso.',
       });
 
+      await carregarLancamentosDia(usuario, dataReferencia);
       await carregarHistorico(usuario);
     } catch (error) {
       console.error('Erro ao registrar cobranças:', error);
@@ -407,13 +581,27 @@ export default function LancamentoCobrancaPage() {
         tipo: 'erro',
         texto: traduzirErroSupabase(
           error,
-          'Não foi possível registrar as cobranças. Verifique os dados e tente novamente.'
+          'Não foi possível salvar os lançamentos de cobrança. Verifique os dados e tente novamente.',
         ),
       });
     } finally {
       setRegistrando(false);
     }
   };
+
+  if (carregando) {
+    return (
+      <>
+        <Header
+          title="Lançamento de Cobrança"
+          subtitle="Registre cobranças agrupando por banco, conta de receita e tipo associado"
+        />
+        <div className="page-content flex items-center justify-center h-96">
+          <Loading text="Carregando contas, bancos e tipos de receita..." />
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -425,186 +613,245 @@ export default function LancamentoCobrancaPage() {
       <div className="page-content space-y-6">
         <Card>
           <div className="space-y-6">
-            {carregando ? (
-              <div className="py-12">
-                <Loading text="Carregando contas, bancos e tipos de receita..." />
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Registrar cobranças</h2>
+                <p className="text-sm text-gray-600">
+                  Utilize os cards por categoria para informar os valores recebidos por banco e conta.
+                </p>
               </div>
-            ) : (
-              <>
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900">Registrar cobranças</h2>
-                    <p className="text-sm text-gray-600">
-                      Utilize o agrupamento por banco para distribuir os valores de cada conta e tipo de receita.
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-primary-100 bg-primary-50/50 px-4 py-2 text-sm text-primary-700">
-                    Total selecionado: <strong>{formatCurrency(totalCalculado)}</strong>
-                  </div>
-                </div>
+              <div className="rounded-lg border border-primary-100 bg-primary-50/50 px-4 py-2 text-sm text-primary-700">
+                Total informado: <strong>{formatCurrency(totalFormulario)}</strong>
+              </div>
+            </div>
 
-                {mensagem && (
-                  <div
-                    className={`rounded-md border px-4 py-3 text-sm ${
-                      mensagem.tipo === 'sucesso'
-                        ? 'border-success-200 bg-success-50 text-success-700'
-                        : mensagem.tipo === 'erro'
-                        ? 'border-error-200 bg-error-50 text-error-700'
-                        : 'border-primary-200 bg-primary-50 text-primary-800'
-                    }`}
-                  >
-                    {mensagem.texto}
+            {mensagem && (
+              <div
+                className={`rounded-md border px-4 py-3 text-sm ${
+                  mensagem.tipo === 'sucesso'
+                    ? 'border-success-200 bg-success-50 text-success-700'
+                    : mensagem.tipo === 'erro'
+                    ? 'border-error-200 bg-error-50 text-error-700'
+                    : 'border-primary-200 bg-primary-50 text-primary-800'
+                }`}
+              >
+                {mensagem.texto}
+              </div>
+            )}
+
+            <form className="space-y-6" onSubmit={handleSalvarLancamentos}>
+              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(220px,240px)] md:items-end">
+                <label className="text-sm font-medium text-gray-700">
+                  Data dos lançamentos
+                  <input
+                    type="date"
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    min={limiteRetroativo}
+                    max={hojeIso}
+                    value={dataReferencia}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (!value) return;
+                      setDataReferencia(value);
+                      setMensagem(null);
+                    }}
+                  />
+                </label>
+
+                {!podeEditar && (
+                  <div className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-xs text-warning-800">
+                    Edição disponível apenas para os últimos 7 dias úteis. Ajuste a data para atualizar os valores.
                   </div>
                 )}
+              </div>
 
-                <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-                  <form className="space-y-6" onSubmit={handleRegistrar}>
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                      <label className="text-sm font-medium text-gray-700">
-                        Banco para lançar
-                        <select
-                          className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                          value={
-                            bancosAgrupados.length === 0
-                              ? ''
-                              : bancoSelecionadoId === null
-                              ? 'null'
-                              : String(bancoSelecionadoId)
-                          }
-                          onChange={(event) => {
-                            const value = event.target.value;
-                            if (value === '' && bancosAgrupados.length > 0) {
-                              setBancoSelecionadoId(bancosAgrupados[0]?.id ?? null);
-                              return;
-                            }
-                            setBancoSelecionadoId(value === 'null' ? null : Number(value));
-                          }}
-                        >
-                          {bancosAgrupados.length === 0 && <option value="">Nenhum banco com contas cadastradas</option>}
-                          {bancosAgrupados.map((banco) => (
-                            <option key={banco.id ?? 'null'} value={banco.id ?? 'null'}>
-                              {banco.nome} ({banco.contas.length})
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-
-                      <Button type="submit" variant="primary" loading={registrando} disabled={contas.length === 0}>
-                        Registrar cobranças selecionadas
-                      </Button>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                      {contasDoBancoSelecionado.length === 0 ? (
-                        <div className="rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
-                          Cadastre contas de receita vinculadas a bancos para habilitar esta etapa.
-                        </div>
-                      ) : (
-                        contasDoBancoSelecionado.map((conta) => {
-                          const entrada = formulario[conta.id];
-                          const valorCalculado = avaliarValor(entrada?.valor ?? '');
-                          return (
-                            <div key={conta.id} className="rounded-lg border border-gray-200 bg-white/70 p-4 shadow-sm">
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <h3 className="text-base font-semibold text-gray-900">{conta.nome}</h3>
-                                  <p className="text-xs text-gray-500">Conta #{conta.id}</p>
-                                </div>
-                                {valorCalculado !== null && valorCalculado > 0 && (
-                                  <span className="text-sm font-medium text-primary-600">
-                                    {formatCurrency(valorCalculado)}
-                                  </span>
-                                )}
-                              </div>
-
-                              <div className="mt-4 space-y-3">
-                                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                  Tipo de receita
-                                  <select
-                                    className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    value={entrada?.tipoId ?? ''}
-                                    onChange={(event) =>
-                                      atualizarFormulario(conta.id, {
-                                        tipoId: event.target.value ? Number(event.target.value) : '',
-                                      })
-                                    }
-                                  >
-                                    <option value="">Selecione um tipo...</option>
-                                    {tipos.map((tipo) => (
-                                      <option key={tipo.id} value={tipo.id}>
-                                        {tipo.nome}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                  <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                    Data da cobrança
-                                    <input
-                                      type="date"
-                                      className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                      value={entrada?.data ?? dataPadrao}
-                                      onChange={(event) => atualizarFormulario(conta.id, { data: event.target.value })}
-                                    />
-                                  </label>
-
-                                  <Input
-                                    label="Valor"
-                                    placeholder="Ex.: 1500"
-                                    value={entrada?.valor ?? ''}
-                                    onChange={(event) => atualizarFormulario(conta.id, { valor: event.target.value })}
-                                    helperText={
-                                      valorCalculado !== null
-                                        ? `Resultado: ${formatCurrency(valorCalculado)}`
-                                        : 'Informe um valor positivo.'
-                                    }
-                                    fullWidth
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </form>
-
-                  <aside className="space-y-4">
-                    <Card title="Resumo por banco" padding="sm">
-                      {resumoPorBanco.length === 0 ? (
-                        <p className="text-sm text-gray-500">Nenhum valor informado até o momento.</p>
-                      ) : (
-                        <ul className="space-y-2">
-                          {resumoPorBanco.map((resumo) => (
-                            <li key={resumo.bancoId ?? 'null'} className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-2">
-                              <span className="text-sm font-medium text-gray-700">{resumo.bancoNome}</span>
-                              <span className="text-sm font-semibold text-primary-700">{formatCurrency(resumo.total)}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </Card>
-                    <Card title="Bancos disponíveis" padding="sm">
-                      {bancosAgrupados.length === 0 ? (
-                        <p className="text-sm text-gray-500">Cadastre bancos e vincule contas para começar.</p>
-                      ) : (
-                        <ul className="space-y-1 text-sm text-gray-600">
-                          {bancosAgrupados.map((banco) => (
-                            <li key={banco.id ?? 'null'} className="flex items-center justify-between">
-                              <span>{banco.nome}</span>
-                              <span className="text-xs text-gray-400">{banco.contas.length} conta(s)</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </Card>
-                  </aside>
+              {carregandoLancamentos ? (
+                <div className="py-12">
+                  <Loading text="Carregando lançamentos para a data selecionada..." />
                 </div>
-              </>
-            )}
+              ) : contas.length === 0 || tipos.length === 0 ? (
+                <div className="rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+                  Cadastre contas de receita e tipos de receita para habilitar os lançamentos de cobrança.
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {CATEGORIAS_CONFIG.map((categoria) => {
+                    const tiposCategoria = tiposPorCategoria[categoria.chave];
+                    const totalCategoria = totaisPorCategoria[categoria.chave];
+
+                    return (
+                      <Card
+                        key={categoria.chave}
+                        title={categoria.titulo}
+                        subtitle={`Total informado: ${formatCurrency(totalCategoria)}`}
+                        variant={categoriaVariant[categoria.chave]}
+                        padding="sm"
+                      >
+                        <div className="space-y-4">
+                          <p className="text-sm text-gray-600">{categoria.descricao}</p>
+
+                          {tiposCategoria.length === 0 ? (
+                            <p className="text-sm text-gray-500">
+                              Cadastre tipos de receita com o código correspondente para habilitar este card.
+                            </p>
+                          ) : bancosAgrupados.length === 0 ? (
+                            <p className="text-sm text-gray-500">
+                              Cadastre contas de receita vinculadas a bancos para lançar esta categoria.
+                            </p>
+                          ) : (
+                            <div className="space-y-4">
+                              {bancosAgrupados.map((banco) => (
+                                <div
+                                  key={banco.id ?? 'null'}
+                                  className="space-y-3 rounded-lg border border-gray-200 bg-white/80 p-3 shadow-sm"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-semibold text-gray-800">{banco.nome}</h4>
+                                    <span className="text-xs text-gray-400">{banco.contas.length} conta(s)</span>
+                                  </div>
+
+                                  <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                                      <thead className="bg-gray-50">
+                                        <tr>
+                                          <th className="px-3 py-2 text-left font-semibold text-gray-600">Conta</th>
+                                          {tiposCategoria.map((tipo) => (
+                                            <th key={tipo.id} className="px-3 py-2 text-left font-semibold text-gray-600">
+                                              {tipo.nome}
+                                            </th>
+                                          ))}
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-100 bg-white/80">
+                                        {banco.contas.map((conta) => {
+                                          const valoresConta = formulario[conta.id] ?? {};
+                                          return (
+                                            <tr key={conta.id}>
+                                              <td className="px-3 py-2 font-medium text-gray-700">{conta.nome}</td>
+                                              {tiposCategoria.map((tipo) => {
+                                                const chave = gerarChaveLancamento(conta.id, tipo.id);
+                                                const valorCampo = valoresConta[tipo.id] ?? '';
+                                                const resultado = avaliarValor(valorCampo ?? '');
+                                                const valorSalvo = lancamentosExistentes[chave]?.valor ?? null;
+                                                return (
+                                                  <td key={tipo.id} className="px-3 py-2 align-top">
+                                                    <div className="space-y-1">
+                                                      <Input
+                                                        type="text"
+                                                        inputMode="decimal"
+                                                        value={valorCampo}
+                                                        onChange={(event) =>
+                                                          handleValorChange(conta.id, tipo.id, event.target.value)
+                                                        }
+                                                        helperText={
+                                                          resultado !== null
+                                                            ? `Resultado: ${formatCurrency(resultado)}`
+                                                            : undefined
+                                                        }
+                                                        disabled={!podeEditar}
+                                                        fullWidth
+                                                      />
+                                                      {valorSalvo !== null && (
+                                                        <p className="text-xs text-gray-400">
+                                                          Salvo: {formatCurrency(valorSalvo)}
+                                                        </p>
+                                                      )}
+                                                    </div>
+                                                  </td>
+                                                );
+                                              })}
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <Button
+                  type="submit"
+                  variant="primary"
+                  loading={registrando}
+                  disabled={!podeEditar || contas.length === 0 || tipos.length === 0}
+                >
+                  Salvar lançamentos do dia
+                </Button>
+              </div>
+            </form>
           </div>
         </Card>
+
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,2.5fr)_minmax(280px,1fr)]">
+          <Card title="Resumo de lançamentos">
+            {resumoSalvoPorBanco.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                Nenhum lançamento salvo para a data selecionada.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left font-semibold text-gray-600">Banco</th>
+                      <th className="px-4 py-2 text-right font-semibold text-gray-600">Total salvo</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white/80">
+                    {resumoSalvoPorBanco.map((resumo) => (
+                      <tr key={resumo.bancoId ?? 'null-salvo'}>
+                        <td className="px-4 py-2 text-gray-700">{resumo.bancoNome}</td>
+                        <td className="px-4 py-2 text-right font-medium text-gray-900">
+                          {formatCurrency(resumo.total)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+
+          <div className="space-y-4">
+            <Card title="Totais informados" padding="sm">
+              {resumoFormularioPorBanco.length === 0 ? (
+                <p className="text-sm text-gray-500">Nenhum valor informado no formulário.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {resumoFormularioPorBanco.map((resumo) => (
+                    <li
+                      key={resumo.bancoId ?? 'null-form'}
+                      className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-2"
+                    >
+                      <span className="text-sm font-medium text-gray-700">{resumo.bancoNome}</span>
+                      <span className="text-sm font-semibold text-primary-700">
+                        {formatCurrency(resumo.total)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+
+            <Card title="Limite de edição" padding="sm">
+              <p className="text-sm text-gray-600">
+                Os lançamentos podem ser criados ou ajustados até 7 dias retroativos em relação a {formatarDataPt(hojeIso)}.
+              </p>
+              <p className="mt-2 text-xs text-gray-500">
+                Intervalo permitido: {formatarDataPt(limiteRetroativo)} até {formatarDataPt(hojeIso)}.
+              </p>
+            </Card>
+          </div>
+        </div>
 
         <Card title="Histórico recente">
           {carregandoHistorico ? (
@@ -613,7 +860,7 @@ export default function LancamentoCobrancaPage() {
             </div>
           ) : historico.length === 0 ? (
             <p className="text-sm text-gray-600">
-              Nenhuma cobrança foi registrada ainda para este usuário.
+              Nenhuma cobrança foi registrada recentemente para este usuário.
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -630,7 +877,7 @@ export default function LancamentoCobrancaPage() {
                 <tbody className="divide-y divide-gray-100 bg-white/80">
                   {historico.map((item) => (
                     <tr key={item.id}>
-                      <td className="px-4 py-2 text-gray-700">{item.data}</td>
+                      <td className="px-4 py-2 text-gray-700">{formatarDataPt(item.data)}</td>
                       <td className="px-4 py-2 text-gray-700">{item.banco}</td>
                       <td className="px-4 py-2 text-gray-700">{item.conta}</td>
                       <td className="px-4 py-2 text-gray-700">{item.tipo}</td>

@@ -26,6 +26,15 @@ const RECEITA_CODIGOS: Record<string, string> = {
   'à vista': '202',
 };
 
+const RECEITA_PADROES: { padrao: RegExp; codigo: string }[] = [
+  { padrao: /(deposito|depósito)/, codigo: '201' },
+  { padrao: /pix/, codigo: '201' },
+  { padrao: /antecipad/, codigo: '201' },
+  { padrao: /boleto/, codigo: '200' },
+  { padrao: /cartao|cartão|debito|débito/, codigo: '202' },
+  { padrao: /\bvista\b/, codigo: '202' },
+];
+
 type AreaOption = { id: number; nome: string; normalizado: string };
 type ContaOption = {
   id: number;
@@ -39,6 +48,8 @@ type TipoReceitaOption = { id: number; nome: string; normalizado: string };
 type BancoOption = { id: number; nome: string };
 
 type DiaValor = { data: string; valor: number };
+
+type CabecalhoData = { coluna: number; data: string };
 
 type LinhaImportada = {
   id: string;
@@ -116,6 +127,21 @@ const formatarIntervaloSemana = (inicioIso: string): string => {
   const inicio = new Date(`${inicioIso}T00:00:00`);
   const fim = addDays(inicio, 4);
   return `${formatarDataPt(toISODate(inicio))} a ${formatarDataPt(toISODate(fim))}`;
+};
+
+const identificarCodigoReceita = (tituloNormalizado: string): string | null => {
+  const codigoDireto = RECEITA_CODIGOS[tituloNormalizado];
+  if (codigoDireto) {
+    return codigoDireto;
+  }
+
+  for (const item of RECEITA_PADROES) {
+    if (item.padrao.test(tituloNormalizado)) {
+      return item.codigo;
+    }
+  }
+
+  return null;
 };
 
 const parseNumero = (valor: unknown): number => {
@@ -310,7 +336,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
           return {
             id: Number(conta.ctr_id),
             nome: conta.ctr_nome ?? 'Conta sem nome',
-            codigo: conta.ctr_codigo ?? '',
+            codigo: (conta.ctr_codigo ?? '').trim(),
             bancoId: conta.ctr_ban_id !== null ? Number(conta.ctr_ban_id) : null,
             bancoNome,
             normalizado: normalizarTexto(conta.ctr_nome ?? ''),
@@ -479,6 +505,33 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
           if (typeof valor === 'string') {
             const texto = valor.replace(/\s+/g, ' ').trim();
             if (!texto) return null;
+            const completo = texto.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
+            if (completo) {
+              const dia = Number(completo[1]);
+              const mes = Number(completo[2]);
+              let ano = Number(completo[3]);
+              if (ano < 100) {
+                ano += ano < 50 ? 2000 : 1900;
+              }
+              if (mes < 1 || mes > 12 || dia < 1 || dia > 31) {
+                return null;
+              }
+              const data = new Date(Date.UTC(ano, mes - 1, dia));
+              return toISODate(data);
+            }
+
+            const semAno = texto.match(/^(\d{1,2})[\/-](\d{1,2})$/);
+            if (semAno) {
+              const dia = Number(semAno[1]);
+              const mes = Number(semAno[2]);
+              if (mes < 1 || mes > 12 || dia < 1 || dia > 31) {
+                return null;
+              }
+              const anoAtual = new Date().getFullYear();
+              const data = new Date(Date.UTC(anoAtual, mes - 1, dia));
+              return toISODate(data);
+            }
+
             const parsed = new Date(texto);
             if (Number.isNaN(parsed.valueOf())) {
               return null;
@@ -489,15 +542,18 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
         };
 
         let headerIndex = -1;
-        let datasDetectadas: string[] = [];
+        let datasDetectadas: CabecalhoData[] = [];
 
         for (let index = 0; index < rows.length; index += 1) {
           const row = rows[index];
           if (!row || row.length < 2) continue;
           const datas = row
             .slice(1)
-            .map((cell: unknown) => parseData(cell))
-            .filter((data: string | null): data is string => Boolean(data));
+            .map((cell: unknown, idx: number) => {
+              const data = parseData(cell);
+              return data ? { coluna: idx + 1, data } : null;
+            })
+            .filter((item): item is CabecalhoData => item !== null);
           if (datas.length >= 2) {
             headerIndex = index;
             datasDetectadas = datas;
@@ -513,8 +569,8 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
           throw new Error('Nenhuma data válida foi encontrada na planilha.');
         }
 
-        if (datasDetectadas[0] && datasDetectadas[0] !== semanaSelecionada) {
-          setSemanaSelecionada(datasDetectadas[0]);
+        if (datasDetectadas[0]?.data && datasDetectadas[0].data !== semanaSelecionada) {
+          setSemanaSelecionada(datasDetectadas[0].data);
         }
 
         const mapaAreas = new Map(areas.map((area) => [area.normalizado, area]));
@@ -544,9 +600,9 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
             continue;
           }
 
-          const valores = datasDetectadas.map((data, colunaIndex) => ({
-            data,
-            valor: parseNumero(row[colunaIndex + 1]),
+          const valores = datasDetectadas.map((cabecalho) => ({
+            data: cabecalho.data,
+            valor: parseNumero(row[cabecalho.coluna]),
           }));
 
           if (tituloNormalizado.startsWith('saldo inicial')) {
@@ -569,7 +625,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
           }
 
           if (tituloNormalizado.startsWith('gasto')) {
-            const nomeArea = tituloOriginal.replace(/^gasto\s*/i, '').trim();
+            const nomeArea = tituloOriginal.replace(/^gastos?\s*[:\-]?/i, '').trim();
             const area = mapaAreas.get(normalizarTexto(nomeArea));
             const linha: LinhaImportada = {
               id: gerarUUID(),
@@ -587,7 +643,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
             continue;
           }
 
-          const contaCodigo = RECEITA_CODIGOS[tituloNormalizado] ?? null;
+          const contaCodigo = identificarCodigoReceita(tituloNormalizado);
           let conta = contaCodigo ? mapaContasCodigo.get(contaCodigo) : undefined;
           if (!conta) {
             conta = mapaContasNome.get(tituloNormalizado);
