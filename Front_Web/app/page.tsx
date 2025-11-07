@@ -181,13 +181,8 @@ const HomePage: React.FC = () => {
   const identificadorAtual = getStoredUserId();
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-gray-50 via-white to-primary-50">
-      <div
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(220,38,38,0.08),_transparent_55%)]"
-        aria-hidden
-      />
-
-      <div className="relative z-10 flex min-h-screen flex-col">
+    <div className="min-h-screen bg-gray-50">
+      <div className="flex min-h-screen flex-col">
         <header className="flex items-center justify-between px-8 py-6">
           <div>
             <h1 className="text-xl font-semibold text-gray-900">Seleção de Operador</h1>
