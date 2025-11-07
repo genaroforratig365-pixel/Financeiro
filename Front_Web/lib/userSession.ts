@@ -97,7 +97,7 @@ export function getUserId(): string {
 }
 
 /**
- * Obtém o nome/apelido do usuário (se definido)
+ * Obtém o identificador salvo sem gerar um novo UUID.
  */
 export function getUserName(): string | null {
   const value = safeGetItem(USER_NAME_STORAGE_KEY);
