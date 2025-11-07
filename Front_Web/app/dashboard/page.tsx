@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { Header } from '@/components/layout';
 import { Card, Loading } from '@/components/ui';
 import { formatCurrency } from '@/lib/mathParser';
@@ -21,9 +22,54 @@ const initialResumo: IndicadoresResumo = {
   saldo_realizado: 0,
 };
 
+type ModuloNavegacao = {
+  titulo: string;
+  descricao: string;
+  href: string;
+  destaque?: string;
+};
+
 export default function DashboardPage() {
   const [resumo, setResumo] = useState<IndicadoresResumo>(initialResumo);
   const [loading, setLoading] = useState(true);
+  const session = useMemo(() => getUserSession(), []);
+
+  const modulos = useMemo<ModuloNavegacao[]>(
+    () => [
+      {
+        titulo: 'Saldo Diário',
+        descricao: 'Registre pagamentos, recebimentos e saldos do último dia útil.',
+        href: '/saldo-diario',
+      },
+      {
+        titulo: 'Pagamentos',
+        descricao: 'Consolide desembolsos por área e acompanhe totais lançados.',
+        href: '/pagamentos',
+      },
+      {
+        titulo: 'Recebimentos',
+        descricao: 'Confira entradas confirmadas e previsões por conta de receita.',
+        href: '/recebimentos',
+      },
+      {
+        titulo: 'Lançamento de Cobrança',
+        descricao: 'Informe cobranças por conta de receita e tipo de receita.',
+        href: '/cobrancas',
+        destaque: 'Novo',
+      },
+      {
+        titulo: 'Previsto x Realizado',
+        descricao: 'Compare planejado e executado para identificar desvios.',
+        href: '/previsto-realizado',
+      },
+      {
+        titulo: 'Cadastros',
+        descricao: 'Gerencie usuários, áreas, contas de receita e bancos.',
+        href: '/cadastros/areas',
+      },
+    ],
+    [],
+  );
 
   useEffect(() => {
     const loadResumo = async () => {
@@ -88,10 +134,63 @@ export default function DashboardPage() {
     <>
       <Header
         title="Dashboard"
-        subtitle="Acompanhe o panorama financeiro diário e os principais indicadores"
+        subtitle="Bem-vindo ao painel central. Escolha um módulo para começar."
       />
 
-      <div className="page-content">
+      <div className="page-content space-y-6">
+        <Card>
+          <div className="space-y-6">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Operador ativo</p>
+                <h2 className="text-xl font-semibold text-gray-900">{session.displayName}</h2>
+                {session.userEmail && (
+                  <p className="text-sm text-gray-500">{session.userEmail}</p>
+                )}
+              </div>
+              <div className="rounded-lg border border-primary-100 bg-primary-50/40 px-4 py-3 text-sm text-primary-700">
+                Escolha um módulo abaixo para registrar ou consultar os dados do dia.
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {modulos.map((modulo) => (
+                <Link
+                  key={modulo.titulo}
+                  href={modulo.href}
+                  className="group flex h-full flex-col justify-between rounded-lg border border-gray-200 bg-white/80 p-4 shadow-sm transition hover:border-primary-300 hover:shadow-md"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-semibold text-gray-900 group-hover:text-primary-700">
+                        {modulo.titulo}
+                      </h3>
+                      {modulo.destaque && (
+                        <span className="rounded-full bg-primary-100 px-2 py-0.5 text-xs font-semibold text-primary-700">
+                          {modulo.destaque}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600">{modulo.descricao}</p>
+                  </div>
+                  <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary-600">
+                    Acessar módulo
+                    <svg
+                      className="h-4 w-4 transition group-hover:translate-x-1"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </Card>
+
         {loading ? (
           <div className="flex justify-center py-12">
             <Loading text="Calculando indicadores..." />

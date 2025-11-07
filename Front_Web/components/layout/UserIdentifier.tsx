@@ -27,7 +27,7 @@ export const UserIdentifier: React.FC = () => {
     userId: '',
     userName: null,
     userEmail: null,
-    displayName: 'Usuário Anônimo',
+    displayName: 'Selecione um usuário',
   });
 
   useEffect(() => {
@@ -57,9 +57,11 @@ export const UserIdentifier: React.FC = () => {
             <p className="text-sm font-medium text-gray-900">
               {session.displayName}
             </p>
-            <p className="text-xs text-gray-500">
-              ID: {session.userId.slice(0, 8)}...
-            </p>
+            {session.userId && (
+              <p className="text-xs text-gray-500">
+                ID: {session.userId.slice(0, 8)}...
+              </p>
+            )}
             {session.userEmail && (
               <p className="text-xs text-gray-500 mt-0.5">
                 {session.userEmail}

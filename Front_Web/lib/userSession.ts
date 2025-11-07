@@ -4,6 +4,7 @@
  */
 
 import {
+  USER_CONFIRMED_STORAGE_KEY,
   USER_EMAIL_STORAGE_KEY,
   USER_ID_STORAGE_KEY,
   USER_NAME_STORAGE_KEY,
@@ -116,10 +117,12 @@ export function setUserId(userId: string): void {
   const trimmed = userId?.trim?.() ?? "";
   if (trimmed.length === 0) {
     safeRemoveItem(USER_ID_STORAGE_KEY);
+    safeRemoveItem(USER_CONFIRMED_STORAGE_KEY);
     return;
   }
 
   safeSetItem(USER_ID_STORAGE_KEY, trimmed);
+  safeSetItem(USER_CONFIRMED_STORAGE_KEY, "1");
 }
 
 /**
@@ -196,6 +199,7 @@ export function clearUserSession(): void {
   safeRemoveItem(USER_ID_STORAGE_KEY);
   safeRemoveItem(USER_NAME_STORAGE_KEY);
   safeRemoveItem(USER_EMAIL_STORAGE_KEY);
+  safeRemoveItem(USER_CONFIRMED_STORAGE_KEY);
 }
 
 export type UserSessionSnapshot = {
@@ -213,11 +217,17 @@ export function getUserSession(): UserSessionSnapshot {
   const userName = getUserName();
   const userEmail = getUserEmail();
 
+  const displayName = userName
+    ? userName
+    : userId
+    ? `Operador ${userId.slice(0, 8)}`
+    : 'Selecione um usuário';
+
   return {
     userId,
     userName,
     userEmail,
-    displayName: userName ?? "Usuário Anônimo",
+    displayName,
   };
 }
 
@@ -226,5 +236,6 @@ export function getUserSession(): UserSessionSnapshot {
  */
 export function hasActiveSession(): boolean {
   const userId = safeGetItem(USER_ID_STORAGE_KEY);
-  return !!(userId && userId.trim().length > 0);
+  const confirmado = safeGetItem(USER_CONFIRMED_STORAGE_KEY);
+  return !!(userId && userId.trim().length > 0 && confirmado === "1");
 }
