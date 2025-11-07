@@ -15,8 +15,20 @@ import {
   getOrCreateUser,
   type UsuarioRow,
 } from '@/lib/supabaseClient';
+import { traduzirErroSupabase } from '@/lib/supabaseErrors';
 
 type Usuario = Pick<UsuarioRow, 'usr_id' | 'usr_nome' | 'usr_email' | 'usr_ativo'>;
+type UsuarioAdmin = Pick<
+  UsuarioRow,
+  'usr_id' | 'usr_nome' | 'usr_email' | 'usr_ativo' | 'usr_identificador'
+> & {
+  usr_criado_em: string | null;
+};
+
+type Mensagem = {
+  tipo: 'sucesso' | 'erro' | 'info';
+  texto: string;
+};
 
 export default function CadastroUsuarioPage() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
