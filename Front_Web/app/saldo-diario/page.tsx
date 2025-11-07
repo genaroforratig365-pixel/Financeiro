@@ -855,13 +855,13 @@ const SaldoDiarioPage: React.FC = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
           <Card title="Pagamentos por Área" subtitle={`Total registrado: ${formatCurrency(totalPagamentosArea)}`} variant="primary">
             <div className="space-y-5">
               <form className="space-y-4" onSubmit={handleRegistrarPagamentosArea}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-gray-600">
-                    Preencha os valores das áreas e utilize operações básicas (ex.: 10+20-5) para agilizar o registro.
+                    Preencha os valores das áreas e confirme abaixo os registros já lançados para conferência.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <Button
@@ -916,7 +916,7 @@ const SaldoDiarioPage: React.FC = () => {
                               <Input
                                 type="text"
                                 inputMode="decimal"
-                                placeholder="Ex.: 10+20+30"
+                                placeholder="0,00"
                                 value={pagamentosAreaForm[area.id] ?? ''}
                                 onChange={(event) =>
                                   setPagamentosAreaForm((prev) => ({
@@ -975,7 +975,7 @@ const SaldoDiarioPage: React.FC = () => {
               <form className="space-y-4" onSubmit={handleRegistrarReceitas}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-gray-600">
-                    Distribua as receitas por tipo. Você pode somar ou subtrair valores direto no campo.
+                    Distribua as receitas por tipo e utilize a lista abaixo para acompanhar os valores registrados na data.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <Button
@@ -1030,7 +1030,7 @@ const SaldoDiarioPage: React.FC = () => {
                               <Input
                                 type="text"
                                 inputMode="decimal"
-                                placeholder="Ex.: 500-125"
+                                placeholder="0,00"
                                 value={receitasForm[conta.id] ?? ''}
                                 onChange={(event) =>
                                   setReceitasForm((prev) => ({
@@ -1089,7 +1089,7 @@ const SaldoDiarioPage: React.FC = () => {
               <form className="space-y-4" onSubmit={handleRegistrarPagamentosBanco}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-gray-600">
-                    Informe os pagamentos bancários e utilize expressões para compor o valor rapidamente.
+                    Informe os pagamentos bancários. Utilize a relação abaixo para conferir o que já foi lançado.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <Button
@@ -1144,7 +1144,7 @@ const SaldoDiarioPage: React.FC = () => {
                               <Input
                                 type="text"
                                 inputMode="decimal"
-                                placeholder="Ex.: 1200/3"
+                                placeholder="0,00"
                                 value={pagamentosBancoForm[banco.id] ?? ''}
                                 onChange={(event) =>
                                   setPagamentosBancoForm((prev) => ({
@@ -1259,7 +1259,7 @@ const SaldoDiarioPage: React.FC = () => {
                               <Input
                                 type="text"
                                 inputMode="decimal"
-                                placeholder="Ex.: 1000-250"
+                                placeholder="0,00"
                                 value={saldosBancoForm[banco.id] ?? ''}
                                 onChange={(event) =>
                                   setSaldosBancoForm((prev) => ({

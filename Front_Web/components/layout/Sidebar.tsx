@@ -100,6 +100,34 @@ const navigationSections: NavSection[] = [
           </svg>
         ),
       },
+      {
+        label: 'Lançamento de Cobrança',
+        href: '/cobrancas',
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 7h18M3 12h18M3 17h12"
+            />
+          </svg>
+        ),
+      },
+      {
+        label: 'Previsão Semanal',
+        href: '/previsao-semanal',
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 5h2m4 0h12M3 12h18M3 19h12m4 0h2M7 3v4m0 9v4"
+            />
+          </svg>
+        ),
+      },
     ],
   },
   {

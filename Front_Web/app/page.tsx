@@ -160,12 +160,12 @@ const HomePage: React.FC = () => {
       setSessionAtual(snapshot);
       setMensagem({
         tipo: 'sucesso',
-        texto: `Sessão atualizada para ${snapshot.displayName}. Redirecionando...`,
+        texto: `Sessão ativada para ${snapshot.displayName}. Escolha um módulo para continuar.`,
       });
 
       setTimeout(() => {
-        router.push('/saldo-diario');
-      }, 400);
+        router.push('/dashboard');
+      }, 500);
     } catch (error) {
       console.error('Erro ao definir sessão do usuário:', error);
       setMensagem({
@@ -192,8 +192,8 @@ const HomePage: React.FC = () => {
           </div>
 
           {sessionAtual && (
-            <Button variant="outline" onClick={() => router.push('/saldo-diario')}>
-              Ir para Saldo Diário
+            <Button variant="outline" onClick={() => router.push('/dashboard')}>
+              Ir para Dashboard
             </Button>
           )}
         </header>
@@ -268,10 +268,25 @@ const HomePage: React.FC = () => {
                       <>
                         Operando como <strong>{usuarioAtualNome}</strong>.
                         <br />
-                        Identificador local: <code className="font-mono text-xs">{identificadorAtual}</code>
+                        {identificadorAtual && (
+                          <span className="block text-xs text-gray-500">
+                            Identificador local:{' '}
+                            <code className="font-mono text-xs">{identificadorAtual}</code>
+                          </span>
+                        )}
                       </>
                     ) : (
-                      'Nenhum usuário está ativo neste navegador. Selecione um para iniciar.'
+                      <>
+                        Nenhum usuário está ativo neste navegador.
+                        <br />
+                        Escolha um operador para liberar os módulos do sistema.
+                        {identificadorAtual && (
+                          <span className="mt-1 block text-xs text-gray-500">
+                            Identificador local:{' '}
+                            <code className="font-mono text-xs">{identificadorAtual}</code>
+                          </span>
+                        )}
+                      </>
                     )}
                   </div>
 
