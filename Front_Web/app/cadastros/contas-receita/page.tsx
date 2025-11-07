@@ -14,6 +14,8 @@ interface ContaReceita {
   ctr_descricao: string | null;
   ctr_ativo: boolean;
   ctr_criado_em: string;
+  ctr_ban_id: number | null;
+  ban_bancos?: { ban_nome?: string | null } | { ban_nome?: string | null }[] | null;
 }
 
 export default function ContasReceitaPage() {
@@ -49,11 +51,11 @@ export default function ContasReceitaPage() {
 
       const { data, error } = await supabase
         .from('ctr_contas_receita')
-        .select('*')
+        .select('*, ban_bancos(ban_nome)')
         .order('ctr_codigo', { ascending: true });
 
       if (error) throw error;
-      setContas(data ?? []);
+      setContas((data ?? []) as ContaReceita[]);
     } catch (error) {
       console.error('Erro ao carregar contas de receita:', error);
     } finally {
@@ -83,12 +85,23 @@ export default function ContasReceitaPage() {
       key: 'ctr_nome',
       label: 'Nome',
       sortable: true,
-      width: '35%',
+      width: '30%',
+    },
+    {
+      key: 'banco',
+      label: 'Banco',
+      width: '20%',
+      render: (conta) => {
+        const relacionado = Array.isArray(conta.ban_bancos)
+          ? conta.ban_bancos[0]
+          : conta.ban_bancos ?? null;
+        return relacionado?.ban_nome ?? 'Sem vínculo';
+      },
     },
     {
       key: 'ctr_descricao',
       label: 'Descrição',
-      width: '35%',
+      width: '20%',
       render: (conta) => conta.ctr_descricao || '-',
     },
     {

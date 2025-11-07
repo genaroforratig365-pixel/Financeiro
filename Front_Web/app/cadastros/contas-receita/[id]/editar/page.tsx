@@ -37,7 +37,7 @@ export default function EditarContaReceitaPage() {
         const supabase = getSupabaseClient();
         const { data, error } = await supabase
           .from('ctr_contas_receita')
-          .select('ctr_id, ctr_codigo, ctr_nome, ctr_descricao, ctr_ativo')
+          .select('ctr_id, ctr_codigo, ctr_nome, ctr_descricao, ctr_ativo, ctr_ban_id')
           .eq('ctr_id', contaId)
           .maybeSingle();
 
@@ -53,6 +53,7 @@ export default function EditarContaReceitaPage() {
           ctr_nome: data.ctr_nome,
           ctr_descricao: data.ctr_descricao ?? '',
           ctr_ativo: data.ctr_ativo,
+          ctr_ban_id: data.ctr_ban_id ?? null,
         });
       } catch (error) {
         console.error('Erro ao carregar conta:', error);
@@ -91,6 +92,7 @@ export default function EditarContaReceitaPage() {
           ctr_nome: values.ctr_nome,
           ctr_descricao: values.ctr_descricao || null,
           ctr_ativo: values.ctr_ativo,
+          ctr_ban_id: values.ctr_ban_id,
         })
         .eq('ctr_id', initialData.ctr_id);
 

@@ -83,6 +83,7 @@ CREATE TABLE financas.ctr_contas_receita (
   ctr_nome varchar(100) NOT NULL,
   ctr_descricao text,
   ctr_ativo boolean DEFAULT true,
+  ctr_ban_id bigint REFERENCES financas.ban_bancos(ban_id) ON DELETE SET NULL,
   ctr_usr_id uuid NOT NULL REFERENCES financas.usr_usuarios(usr_id),
   ctr_criado_em timestamptz DEFAULT now(),
   ctr_atualizado_em timestamptz DEFAULT now()
@@ -97,6 +98,7 @@ CREATE INDEX idx_ctr_usr_id ON financas.ctr_contas_receita(ctr_usr_id);
 - Cadastro de contas para classificação de receitas
 - Exemplos: "Vendas Produto A", "Serviços", "Comissões"
 - Código único para identificação rápida
+- Pode ser vinculada a um banco para facilitar agrupamentos por instituição
 
 ---
 
@@ -249,6 +251,67 @@ CREATE INDEX idx_sdb_usr_id ON financas.sdb_saldo_banco(sdb_usr_id);
 - Registra saldo diário por banco
 - Um único registro por banco por dia (UNIQUE constraint)
 - Pode ser positivo ou negativo (conta no vermelho)
+
+---
+
+### 9. `pvs_semanas` - Cabeçalho da Previsão Semanal
+
+**Sigla:** PVS
+
+```sql
+CREATE TABLE financas.pvs_semanas (
+  pvs_id bigserial PRIMARY KEY,
+  pvs_usr_id uuid NOT NULL REFERENCES financas.usr_usuarios(usr_id) ON DELETE CASCADE,
+  pvs_semana_inicio date NOT NULL,
+  pvs_semana_fim date NOT NULL,
+  pvs_status text NOT NULL CHECK (pvs_status IN ('rascunho', 'importado', 'confirmado')),
+  pvs_observacao text,
+  pvs_criado_em timestamptz DEFAULT now(),
+  pvs_atualizado_em timestamptz DEFAULT now()
+);
+
+CREATE INDEX idx_pvs_usr_id ON financas.pvs_semanas(pvs_usr_id);
+CREATE INDEX idx_pvs_semana ON financas.pvs_semanas(pvs_semana_inicio, pvs_semana_fim);
+```
+
+**Descrição:**
+- Registra cada importação semanal realizada pelo usuário
+- Garante unicidade por usuário + semana para evitar duplicidade de cabeçalho
+- Mantém status da previsão (rascunho/importado/confirmado)
+
+---
+
+### 10. `pvi_previsao_itens` - Itens da Previsão Semanal
+
+**Sigla:** PVI
+
+```sql
+CREATE TABLE financas.pvi_previsao_itens (
+  pvi_id bigserial PRIMARY KEY,
+  pvi_pvs_id bigint NOT NULL REFERENCES financas.pvs_semanas(pvs_id) ON DELETE CASCADE,
+  pvi_usr_id uuid NOT NULL REFERENCES financas.usr_usuarios(usr_id) ON DELETE CASCADE,
+  pvi_data date NOT NULL,
+  pvi_tipo text NOT NULL CHECK (pvi_tipo IN ('receita', 'gasto', 'saldo_inicial', 'saldo_diario', 'saldo_acumulado')),
+  pvi_categoria text NOT NULL,
+  pvi_are_id bigint REFERENCES financas.are_areas(are_id) ON DELETE SET NULL,
+  pvi_ctr_id bigint REFERENCES financas.ctr_contas_receita(ctr_id) ON DELETE SET NULL,
+  pvi_tpr_id bigint REFERENCES financas.tpr_tipos_receita(tpr_id) ON DELETE SET NULL,
+  pvi_ban_id bigint REFERENCES financas.ban_bancos(ban_id) ON DELETE SET NULL,
+  pvi_valor numeric(15,2) NOT NULL,
+  pvi_ordem integer,
+  pvi_importado boolean DEFAULT true,
+  pvi_criado_em timestamptz DEFAULT now(),
+  pvi_atualizado_em timestamptz DEFAULT now()
+);
+
+CREATE INDEX idx_pvi_pvs_id ON financas.pvi_previsao_itens(pvi_pvs_id);
+CREATE INDEX idx_pvi_data ON financas.pvi_previsao_itens(pvi_data);
+```
+
+**Descrição:**
+- Armazena os valores previstos por dia (receitas, gastos e saldos calculados)
+- Permite vincular cada item a áreas, contas de receita, tipos de receita e bancos
+- Mantém ordenação (`pvi_ordem`) para preservar a sequência importada da planilha
 
 ---
 
@@ -460,12 +523,17 @@ usr_usuarios (1) ──┬─ (N) are_areas
                    ├─ (N) pag_pagamentos_area
                    ├─ (N) rec_receitas
                    ├─ (N) pbk_pagamentos_banco
-                   └─ (N) sdb_saldo_banco
+                   ├─ (N) sdb_saldo_banco
+                   ├─ (N) pvs_semanas
+                   └─ (N) pvi_previsao_itens
 
 are_areas (1) ──── (N) pag_pagamentos_area
 
 ctr_contas_receita (1) ──── (N) rec_receitas
 
+pvs_semanas (1) ──── (N) pvi_previsao_itens
+
 ban_bancos (1) ──┬─ (N) pbk_pagamentos_banco
-                 └─ (N) sdb_saldo_banco
+                 ├─ (N) sdb_saldo_banco
+                 └─ (N) pvi_previsao_itens
 ```

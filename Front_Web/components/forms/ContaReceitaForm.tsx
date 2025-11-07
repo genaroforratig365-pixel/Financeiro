@@ -8,12 +8,14 @@ import React, {
   useState,
 } from 'react';
 import { Button, Input, Textarea } from '@/components/ui';
+import { getSupabaseClient } from '@/lib/supabaseClient';
 
 export interface ContaReceitaFormValues {
   ctr_codigo: string;
   ctr_nome: string;
   ctr_descricao: string;
   ctr_ativo: boolean;
+  ctr_ban_id: number | null;
 }
 
 export interface ContaReceitaFormProps {
@@ -26,11 +28,17 @@ export interface ContaReceitaFormProps {
 
 type ContaErrors = Partial<Record<keyof ContaReceitaFormValues, string>>;
 
+interface BancoOption {
+  id: number;
+  nome: string;
+}
+
 const DEFAULT_VALUES: ContaReceitaFormValues = {
   ctr_codigo: '',
   ctr_nome: '',
   ctr_descricao: '',
   ctr_ativo: true,
+  ctr_ban_id: null,
 };
 
 export const ContaReceitaForm: React.FC<ContaReceitaFormProps> = ({
@@ -45,9 +53,15 @@ export const ContaReceitaForm: React.FC<ContaReceitaFormProps> = ({
     ...initialValues,
     ctr_descricao: initialValues?.ctr_descricao ?? '',
     ctr_ativo: initialValues?.ctr_ativo ?? true,
+    ctr_ban_id:
+      initialValues?.ctr_ban_id === undefined
+        ? DEFAULT_VALUES.ctr_ban_id
+        : initialValues?.ctr_ban_id ?? null,
   });
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
+  const [bancos, setBancos] = useState<BancoOption[]>([]);
+  const [carregandoBancos, setCarregandoBancos] = useState(false);
 
   useEffect(() => {
     setValues((prev) => ({
@@ -55,11 +69,45 @@ export const ContaReceitaForm: React.FC<ContaReceitaFormProps> = ({
       ...initialValues,
       ctr_descricao: initialValues?.ctr_descricao ?? '',
       ctr_ativo: initialValues?.ctr_ativo ?? true,
+      ctr_ban_id:
+        initialValues?.ctr_ban_id === undefined
+          ? prev.ctr_ban_id
+          : initialValues?.ctr_ban_id ?? null,
     }));
   }, [initialValues]);
 
   useEffect(() => {
     firstFieldRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const carregarBancos = async () => {
+      try {
+        setCarregandoBancos(true);
+        const supabase = getSupabaseClient();
+        const { data, error } = await supabase
+          .from('ban_bancos')
+          .select('ban_id, ban_nome')
+          .eq('ban_ativo', true)
+          .order('ban_nome', { ascending: true });
+
+        if (error) throw error;
+
+        setBancos(
+          (data ?? []).map((banco) => ({
+            id: Number(banco.ban_id),
+            nome: banco.ban_nome ?? 'Banco sem nome',
+          }))
+        );
+      } catch (error) {
+        console.error('Erro ao carregar bancos para o formulário de contas de receita:', error);
+        setBancos([]);
+      } finally {
+        setCarregandoBancos(false);
+      }
+    };
+
+    carregarBancos();
   }, []);
 
   const errors: ContaErrors = useMemo(() => {
@@ -85,10 +133,23 @@ export const ContaReceitaForm: React.FC<ContaReceitaFormProps> = ({
   const isValid = useMemo(() => Object.keys(errors).length === 0, [errors]);
 
   const handleChange = (field: keyof ContaReceitaFormValues) =>
-    (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    (
+      event: React.ChangeEvent<
+        HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+      >,
+    ) => {
       if (field === 'ctr_ativo') {
         const checked = (event as React.ChangeEvent<HTMLInputElement>).target.checked;
         setValues((prev) => ({ ...prev, ctr_ativo: checked }));
+        return;
+      }
+
+      if (field === 'ctr_ban_id') {
+        const value = (event as React.ChangeEvent<HTMLSelectElement>).target.value;
+        setValues((prev) => ({
+          ...prev,
+          ctr_ban_id: value ? Number(value) : null,
+        }));
         return;
       }
 
@@ -110,6 +171,7 @@ export const ContaReceitaForm: React.FC<ContaReceitaFormProps> = ({
       ctr_nome: true,
       ctr_descricao: true,
       ctr_ativo: true,
+      ctr_ban_id: true,
     });
 
     if (!isValid) {
@@ -121,6 +183,7 @@ export const ContaReceitaForm: React.FC<ContaReceitaFormProps> = ({
       ctr_codigo: values.ctr_codigo.trim().toUpperCase(),
       ctr_nome: values.ctr_nome.trim(),
       ctr_descricao: values.ctr_descricao.trim(),
+      ctr_ban_id: values.ctr_ban_id,
     });
   }, [isValid, onSubmit, values]);
 
@@ -183,6 +246,26 @@ export const ContaReceitaForm: React.FC<ContaReceitaFormProps> = ({
         maxLength={300}
         helperText={`${values.ctr_descricao.length}/300 caracteres`}
       />
+
+      <label className="block text-sm text-gray-700">
+        Banco vinculado
+        <select
+          className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+          value={values.ctr_ban_id ?? ''}
+          onChange={handleChange('ctr_ban_id') as (event: React.ChangeEvent<HTMLSelectElement>) => void}
+          onBlur={handleBlur('ctr_ban_id')}
+        >
+          <option value="">Sem vínculo</option>
+          {bancos.map((banco) => (
+            <option key={banco.id} value={banco.id}>
+              {banco.nome}
+            </option>
+          ))}
+        </select>
+        {carregandoBancos && (
+          <p className="mt-1 text-xs text-gray-400">Carregando bancos...</p>
+        )}
+      </label>
 
       <label className="flex items-center gap-3 text-sm text-gray-700">
         <input

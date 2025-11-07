@@ -39,6 +39,7 @@ export default function NovaContaReceitaPage() {
         ctr_nome: values.ctr_nome,
         ctr_descricao: values.ctr_descricao || null,
         ctr_ativo: values.ctr_ativo,
+        ctr_ban_id: values.ctr_ban_id,
         ctr_usr_id: user.usr_id,
       });
 

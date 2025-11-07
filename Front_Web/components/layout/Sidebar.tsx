@@ -114,6 +114,20 @@ const navigationSections: NavSection[] = [
           </svg>
         ),
       },
+      {
+        label: 'Previsão Semanal',
+        href: '/previsao-semanal',
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 5h18M5 5v14m14-14v14M8 9h8m-8 4h5m-5 4h4"
+            />
+          </svg>
+        ),
+      },
     ],
   },
   {

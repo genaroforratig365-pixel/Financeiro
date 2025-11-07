@@ -855,13 +855,36 @@ const SaldoDiarioPage: React.FC = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-lg border border-gray-200 bg-white/80 p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Pagamentos por Área</p>
+            <p className="mt-2 text-2xl font-semibold text-gray-900">{formatCurrency(totalPagamentosArea)}</p>
+            <p className="mt-1 text-xs text-gray-400">Valores já registrados</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white/80 p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Receitas por Conta</p>
+            <p className="mt-2 text-2xl font-semibold text-gray-900">{formatCurrency(totalReceitas)}</p>
+            <p className="mt-1 text-xs text-gray-400">Receitas consolidadas</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white/80 p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Pagamentos por Banco</p>
+            <p className="mt-2 text-2xl font-semibold text-gray-900">{formatCurrency(totalPagamentosBanco)}</p>
+            <p className="mt-1 text-xs text-gray-400">Saídas bancárias do dia</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white/80 p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Saldo por Banco</p>
+            <p className="mt-2 text-2xl font-semibold text-gray-900">{formatCurrency(totalSaldos)}</p>
+            <p className="mt-1 text-xs text-gray-400">Saldos registrados</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           <Card title="Pagamentos por Área" subtitle={`Total registrado: ${formatCurrency(totalPagamentosArea)}`} variant="primary">
             <div className="space-y-5">
               <form className="space-y-4" onSubmit={handleRegistrarPagamentosArea}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-gray-600">
-                    Preencha os valores das áreas e utilize operações básicas (ex.: 10+20-5) para agilizar o registro.
+                    Informe os valores consolidados de pagamentos por área para o dia selecionado.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <Button
@@ -975,7 +998,7 @@ const SaldoDiarioPage: React.FC = () => {
               <form className="space-y-4" onSubmit={handleRegistrarReceitas}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-gray-600">
-                    Distribua as receitas por tipo. Você pode somar ou subtrair valores direto no campo.
+                    Distribua as receitas por conta para registrar o consolidado diário.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <Button
@@ -1089,7 +1112,7 @@ const SaldoDiarioPage: React.FC = () => {
               <form className="space-y-4" onSubmit={handleRegistrarPagamentosBanco}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-gray-600">
-                    Informe os pagamentos bancários e utilize expressões para compor o valor rapidamente.
+                    Informe os pagamentos consolidados por banco para o dia útil selecionado.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <Button
@@ -1204,7 +1227,7 @@ const SaldoDiarioPage: React.FC = () => {
               <form className="space-y-4" onSubmit={handleRegistrarSaldosBanco}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-gray-600">
-                    Informe os saldos consolidados para o dia útil selecionado. Expresse cálculos quando necessário.
+                    Atualize os saldos finais de cada banco para a data em edição.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <Button
