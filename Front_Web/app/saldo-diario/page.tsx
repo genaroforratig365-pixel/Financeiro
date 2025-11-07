@@ -19,13 +19,15 @@ type AreaOption = { id: number; nome: string };
 type ContaOption = { id: number; nome: string };
 type BancoOption = { id: number; nome: string };
 
-type FormPagamentoArea = { areaId: string; valor: string; descricao: string };
-type FormReceita = { contaId: string; valor: string; descricao: string };
-type FormPagamentoBanco = { bancoId: string; valor: string; descricao: string };
-type FormSaldoBanco = { bancoId: string; valor: string; descricao: string; data: string };
-
+type CampoValorDescricao = { valor: string; descricao: string };
 type RegistroMensagem = Record<Processo, Mensagem | null>;
 type RegistroProcesso = Record<Processo, boolean>;
+
+const criarMapaVazio = (lista: { id: number }[]): Record<number, CampoValorDescricao> =>
+  lista.reduce<Record<number, CampoValorDescricao>>((acc, item) => {
+    acc[item.id] = { valor: '', descricao: '' };
+    return acc;
+  }, {});
 
 type AreaRelacionada = { are_nome: string | null };
 type ContaReceitaRelacionada = { ctr_nome: string | null };
@@ -194,23 +196,51 @@ const SaldoDiarioPage: React.FC = () => {
     saldo: null,
   });
 
-  const [formPagamentoArea, setFormPagamentoArea] = useState<FormPagamentoArea>({
-    areaId: '',
-    valor: '',
-    descricao: '',
-  });
-  const [formReceita, setFormReceita] = useState<FormReceita>({ contaId: '', valor: '', descricao: '' });
-  const [formPagamentoBanco, setFormPagamentoBanco] = useState<FormPagamentoBanco>({
-    bancoId: '',
-    valor: '',
-    descricao: '',
-  });
-  const [formSaldoBanco, setFormSaldoBanco] = useState<FormSaldoBanco>({
-    bancoId: '',
-    valor: '',
-    descricao: '',
-    data: hojePadrao,
-  });
+  const [pagamentosAreaForm, setPagamentosAreaForm] = useState<Record<number, CampoValorDescricao>>({});
+  const [receitasForm, setReceitasForm] = useState<Record<number, CampoValorDescricao>>({});
+  const [pagamentosBancoForm, setPagamentosBancoForm] = useState<Record<number, CampoValorDescricao>>({});
+  const [saldosBancoForm, setSaldosBancoForm] = useState<Record<number, CampoValorDescricao>>({});
+  const [dataSaldoReferencia, setDataSaldoReferencia] = useState(hojePadrao);
+
+  useEffect(() => {
+    setPagamentosAreaForm((prev) => {
+      const next: Record<number, CampoValorDescricao> = {};
+      areaOptions.forEach((area) => {
+        next[area.id] = prev[area.id] ?? { valor: '', descricao: '' };
+      });
+      return next;
+    });
+  }, [areaOptions]);
+
+  useEffect(() => {
+    setReceitasForm((prev) => {
+      const next: Record<number, CampoValorDescricao> = {};
+      contaOptions.forEach((conta) => {
+        next[conta.id] = prev[conta.id] ?? { valor: '', descricao: '' };
+      });
+      return next;
+    });
+  }, [contaOptions]);
+
+  useEffect(() => {
+    setPagamentosBancoForm((prev) => {
+      const next: Record<number, CampoValorDescricao> = {};
+      bancoOptions.forEach((banco) => {
+        next[banco.id] = prev[banco.id] ?? { valor: '', descricao: '' };
+      });
+      return next;
+    });
+  }, [bancoOptions]);
+
+  useEffect(() => {
+    setSaldosBancoForm((prev) => {
+      const next: Record<number, CampoValorDescricao> = {};
+      bancoOptions.forEach((banco) => {
+        next[banco.id] = prev[banco.id] ?? { valor: '', descricao: '' };
+      });
+      return next;
+    });
+  }, [bancoOptions]);
 
   const atualizarMensagem = useCallback(
     (processo: Processo, mensagem: Mensagem | null) => {
@@ -375,22 +405,41 @@ const SaldoDiarioPage: React.FC = () => {
     }
   };
 
-  const handleRegistrarPagamentoArea = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleRegistrarPagamentosArea = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!usuario) return;
 
-    const areaId = Number(formPagamentoArea.areaId);
-    const valor = parseValorMonetario(formPagamentoArea.valor);
+    const registros = areaOptions
+      .map((area) => {
+        const campos = pagamentosAreaForm[area.id];
+        if (!campos) {
+          return null;
+        }
 
-    if (!areaId) {
-      atualizarMensagem('area', { tipo: 'erro', texto: 'Selecione uma área para registrar o pagamento.' });
-      return;
-    }
+        const valor = parseValorMonetario(campos.valor);
+        if (valor === null || valor <= 0) {
+          return null;
+        }
 
-    if (valor === null || valor <= 0) {
+        const descricao = campos.descricao.trim();
+        return {
+          pag_are_id: area.id,
+          pag_usr_id: usuario.usr_id,
+          pag_valor: valor,
+          pag_descricao: descricao.length > 0 ? descricao : null,
+        };
+      })
+      .filter(Boolean) as {
+      pag_are_id: number;
+      pag_usr_id: string;
+      pag_valor: number;
+      pag_descricao: string | null;
+    }[];
+
+    if (registros.length === 0) {
       atualizarMensagem('area', {
         tipo: 'erro',
-        texto: 'Informe um valor válido (maior que zero) para o pagamento.',
+        texto: 'Informe ao menos um valor maior que zero para registrar os pagamentos por área.',
       });
       return;
     }
@@ -400,51 +449,72 @@ const SaldoDiarioPage: React.FC = () => {
       atualizarMensagem('area', null);
 
       const supabase = getSupabaseClient();
-      const { error } = await supabase.from('pag_pagamentos_area').insert({
-        pag_are_id: areaId,
-        pag_usr_id: usuario.usr_id,
-        pag_valor: valor,
-        pag_descricao: formPagamentoArea.descricao.trim() || null,
-      });
+      const { error } = await supabase.from('pag_pagamentos_area').insert(registros);
 
       if (error) throw error;
 
-      setFormPagamentoArea({ areaId: '', valor: '', descricao: '' });
+      setPagamentosAreaForm((prev) => {
+        const next = { ...prev };
+        registros.forEach((registro) => {
+          next[registro.pag_are_id] = { valor: '', descricao: '' };
+        });
+        return next;
+      });
+
       atualizarMensagem('area', {
         tipo: 'sucesso',
-        texto: 'Pagamento registrado com sucesso.',
+        texto:
+          registros.length === 1
+            ? 'Pagamento por área registrado com sucesso.'
+            : `${registros.length} pagamentos por área registrados com sucesso.`,
       });
       await carregarMovimentacoes(usuario);
     } catch (error) {
       console.error('Erro ao registrar pagamento por área:', error);
       atualizarMensagem('area', {
         tipo: 'erro',
-        texto: 'Não foi possível registrar o pagamento. Verifique os dados e tente novamente.',
+        texto: 'Não foi possível registrar os pagamentos. Verifique os dados e tente novamente.',
       });
     } finally {
       atualizarProcesso('area', false);
     }
   };
 
-  const handleRegistrarReceita = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleRegistrarReceitas = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!usuario) return;
 
-    const contaId = Number(formReceita.contaId);
-    const valor = parseValorMonetario(formReceita.valor);
+    const registros = contaOptions
+      .map((conta) => {
+        const campos = receitasForm[conta.id];
+        if (!campos) {
+          return null;
+        }
 
-    if (!contaId) {
+        const valor = parseValorMonetario(campos.valor);
+        if (valor === null || valor <= 0) {
+          return null;
+        }
+
+        const descricao = campos.descricao.trim();
+        return {
+          rec_ctr_id: conta.id,
+          rec_usr_id: usuario.usr_id,
+          rec_valor: valor,
+          rec_descricao: descricao.length > 0 ? descricao : null,
+        };
+      })
+      .filter(Boolean) as {
+      rec_ctr_id: number;
+      rec_usr_id: string;
+      rec_valor: number;
+      rec_descricao: string | null;
+    }[];
+
+    if (registros.length === 0) {
       atualizarMensagem('receita', {
         tipo: 'erro',
-        texto: 'Selecione uma conta de receita antes de salvar.',
-      });
-      return;
-    }
-
-    if (valor === null || valor <= 0) {
-      atualizarMensagem('receita', {
-        tipo: 'erro',
-        texto: 'Informe um valor válido (maior que zero) para a receita.',
+        texto: 'Informe valores válidos para pelo menos uma conta de receita antes de registrar.',
       });
       return;
     }
@@ -454,51 +524,72 @@ const SaldoDiarioPage: React.FC = () => {
       atualizarMensagem('receita', null);
 
       const supabase = getSupabaseClient();
-      const { error } = await supabase.from('rec_receitas').insert({
-        rec_ctr_id: contaId,
-        rec_usr_id: usuario.usr_id,
-        rec_valor: valor,
-        rec_descricao: formReceita.descricao.trim() || null,
-      });
+      const { error } = await supabase.from('rec_receitas').insert(registros);
 
       if (error) throw error;
 
-      setFormReceita({ contaId: '', valor: '', descricao: '' });
+      setReceitasForm((prev) => {
+        const next = { ...prev };
+        registros.forEach((registro) => {
+          next[registro.rec_ctr_id] = { valor: '', descricao: '' };
+        });
+        return next;
+      });
+
       atualizarMensagem('receita', {
         tipo: 'sucesso',
-        texto: 'Receita registrada com sucesso.',
+        texto:
+          registros.length === 1
+            ? 'Receita registrada com sucesso.'
+            : `${registros.length} receitas registradas com sucesso.`,
       });
       await carregarMovimentacoes(usuario);
     } catch (error) {
-      console.error('Erro ao registrar receita:', error);
+      console.error('Erro ao registrar receitas:', error);
       atualizarMensagem('receita', {
         tipo: 'erro',
-        texto: 'Não foi possível registrar a receita. Tente novamente em instantes.',
+        texto: 'Não foi possível registrar as receitas. Tente novamente em instantes.',
       });
     } finally {
       atualizarProcesso('receita', false);
     }
   };
 
-  const handleRegistrarPagamentoBanco = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleRegistrarPagamentosBanco = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!usuario) return;
 
-    const bancoId = Number(formPagamentoBanco.bancoId);
-    const valor = parseValorMonetario(formPagamentoBanco.valor);
+    const registros = bancoOptions
+      .map((banco) => {
+        const campos = pagamentosBancoForm[banco.id];
+        if (!campos) {
+          return null;
+        }
 
-    if (!bancoId) {
+        const valor = parseValorMonetario(campos.valor);
+        if (valor === null || valor <= 0) {
+          return null;
+        }
+
+        const descricao = campos.descricao.trim();
+        return {
+          pbk_ban_id: banco.id,
+          pbk_usr_id: usuario.usr_id,
+          pbk_valor: valor,
+          pbk_descricao: descricao.length > 0 ? descricao : null,
+        };
+      })
+      .filter(Boolean) as {
+      pbk_ban_id: number;
+      pbk_usr_id: string;
+      pbk_valor: number;
+      pbk_descricao: string | null;
+    }[];
+
+    if (registros.length === 0) {
       atualizarMensagem('banco', {
         tipo: 'erro',
-        texto: 'Selecione um banco para vincular o pagamento.',
-      });
-      return;
-    }
-
-    if (valor === null || valor <= 0) {
-      atualizarMensagem('banco', {
-        tipo: 'erro',
-        texto: 'Informe um valor válido (maior que zero) para o pagamento.',
+        texto: 'Informe valores válidos para pelo menos um banco antes de registrar.',
       });
       return;
     }
@@ -508,51 +599,76 @@ const SaldoDiarioPage: React.FC = () => {
       atualizarMensagem('banco', null);
 
       const supabase = getSupabaseClient();
-      const { error } = await supabase.from('pbk_pagamentos_banco').insert({
-        pbk_ban_id: bancoId,
-        pbk_usr_id: usuario.usr_id,
-        pbk_valor: valor,
-        pbk_descricao: formPagamentoBanco.descricao.trim() || null,
-      });
+      const { error } = await supabase.from('pbk_pagamentos_banco').insert(registros);
 
       if (error) throw error;
 
-      setFormPagamentoBanco({ bancoId: '', valor: '', descricao: '' });
+      setPagamentosBancoForm((prev) => {
+        const next = { ...prev };
+        registros.forEach((registro) => {
+          next[registro.pbk_ban_id] = { valor: '', descricao: '' };
+        });
+        return next;
+      });
+
       atualizarMensagem('banco', {
         tipo: 'sucesso',
-        texto: 'Pagamento registrado com sucesso.',
+        texto:
+          registros.length === 1
+            ? 'Pagamento bancário registrado com sucesso.'
+            : `${registros.length} pagamentos bancários registrados com sucesso.`,
       });
       await carregarMovimentacoes(usuario);
     } catch (error) {
-      console.error('Erro ao registrar pagamento por banco:', error);
+      console.error('Erro ao registrar pagamentos bancários:', error);
       atualizarMensagem('banco', {
         tipo: 'erro',
-        texto: 'Não foi possível registrar o pagamento. Confirme os dados e tente novamente.',
+        texto: 'Não foi possível registrar os pagamentos bancários. Revise os dados e tente novamente.',
       });
     } finally {
       atualizarProcesso('banco', false);
     }
   };
 
-  const handleRegistrarSaldoBanco = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleRegistrarSaldosBanco = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!usuario) return;
 
-    const bancoId = Number(formSaldoBanco.bancoId);
-    const valor = parseValorMonetario(formSaldoBanco.valor);
+    const dataReferencia = dataSaldoReferencia || hojePadrao;
 
-    if (!bancoId) {
+    const registros = bancoOptions
+      .map((banco) => {
+        const campos = saldosBancoForm[banco.id];
+        if (!campos) {
+          return null;
+        }
+
+        const valor = parseValorMonetario(campos.valor);
+        if (valor === null || Number.isNaN(valor)) {
+          return null;
+        }
+
+        const descricao = campos.descricao.trim();
+        return {
+          sdb_ban_id: banco.id,
+          sdb_usr_id: usuario.usr_id,
+          sdb_saldo: valor,
+          sdb_data: dataReferencia,
+          sdb_descricao: descricao.length > 0 ? descricao : null,
+        };
+      })
+      .filter(Boolean) as {
+      sdb_ban_id: number;
+      sdb_usr_id: string;
+      sdb_saldo: number;
+      sdb_data: string;
+      sdb_descricao: string | null;
+    }[];
+
+    if (registros.length === 0) {
       atualizarMensagem('saldo', {
         tipo: 'erro',
-        texto: 'Selecione um banco antes de registrar o saldo.',
-      });
-      return;
-    }
-
-    if (valor === null) {
-      atualizarMensagem('saldo', {
-        tipo: 'erro',
-        texto: 'Informe um valor numérico válido para o saldo.',
+        texto: 'Informe saldos numéricos para ao menos um banco antes de salvar.',
       });
       return;
     }
@@ -564,29 +680,31 @@ const SaldoDiarioPage: React.FC = () => {
       const supabase = getSupabaseClient();
       const { error } = await supabase
         .from('sdb_saldo_banco')
-        .upsert(
-          {
-            sdb_ban_id: bancoId,
-            sdb_usr_id: usuario.usr_id,
-            sdb_saldo: valor,
-            sdb_data: formSaldoBanco.data || hojePadrao,
-            sdb_descricao: formSaldoBanco.descricao.trim() || null,
-          },
-          { onConflict: 'sdb_ban_id,sdb_data' }
-        );
+        .upsert(registros, { onConflict: 'sdb_ban_id,sdb_data' });
 
       if (error) throw error;
 
+      setSaldosBancoForm((prev) => {
+        const next = { ...prev };
+        registros.forEach((registro) => {
+          next[registro.sdb_ban_id] = { valor: '', descricao: '' };
+        });
+        return next;
+      });
+
       atualizarMensagem('saldo', {
         tipo: 'sucesso',
-        texto: 'Saldo atualizado com sucesso.',
+        texto:
+          registros.length === 1
+            ? 'Saldo bancário atualizado com sucesso.'
+            : `${registros.length} saldos bancários atualizados com sucesso.`,
       });
       await carregarMovimentacoes(usuario);
     } catch (error) {
-      console.error('Erro ao registrar saldo bancário:', error);
+      console.error('Erro ao registrar saldos bancários:', error);
       atualizarMensagem('saldo', {
         tipo: 'erro',
-        texto: 'Não foi possível registrar o saldo. Tente novamente.',
+        texto: 'Não foi possível registrar os saldos. Tente novamente.',
       });
     } finally {
       atualizarProcesso('saldo', false);
@@ -667,56 +785,99 @@ const SaldoDiarioPage: React.FC = () => {
             variant="primary"
           >
             <div className="space-y-5">
-              <form className="space-y-3" onSubmit={handleRegistrarPagamentoArea}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Área
-                    </label>
-                    <select
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      value={formPagamentoArea.areaId}
-                      onChange={(event) =>
-                        setFormPagamentoArea((prev) => ({ ...prev, areaId: event.target.value }))
-                      }
+              <form className="space-y-4" onSubmit={handleRegistrarPagamentosArea}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-gray-600">
+                    Preencha os valores nas áreas desejadas e confirme para registrar imediatamente os pagamentos do dia.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setPagamentosAreaForm(criarMapaVazio(areaOptions));
+                        atualizarMensagem('area', null);
+                      }}
                       disabled={processando.area || areaOptions.length === 0}
                     >
-                      <option value="">Selecione uma área</option>
-                      {areaOptions.map((area) => (
-                        <option key={area.id} value={area.id}>
-                          {area.nome}
-                        </option>
-                      ))}
-                    </select>
-                    {areaOptions.length === 0 && (
-                      <p className="mt-1 text-xs text-gray-500">
-                        Cadastre áreas no menu Cadastros &gt; Áreas para liberar esta opção.
-                      </p>
-                    )}
+                      Limpar campos
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="sm"
+                      loading={processando.area}
+                      disabled={areaOptions.length === 0}
+                    >
+                      Registrar pagamentos
+                    </Button>
                   </div>
-
-                  <Input
-                    label="Valor"
-                    type="number"
-                    step="0.01"
-                    placeholder="0,00"
-                    value={formPagamentoArea.valor}
-                    onChange={(event) =>
-                      setFormPagamentoArea((prev) => ({ ...prev, valor: event.target.value }))
-                    }
-                    disabled={processando.area}
-                  />
                 </div>
 
-                <Input
-                  label="Descrição"
-                  placeholder="Descreva rapidamente o pagamento"
-                  value={formPagamentoArea.descricao}
-                  onChange={(event) =>
-                    setFormPagamentoArea((prev) => ({ ...prev, descricao: event.target.value }))
-                  }
-                  disabled={processando.area}
-                />
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold">Área</th>
+                        <th className="px-4 py-3 text-left font-semibold w-40">Valor (R$)</th>
+                        <th className="px-4 py-3 text-left font-semibold">Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white/80">
+                      {areaOptions.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-500">
+                            Cadastre áreas no menu Cadastros &gt; Áreas para liberar esta seção.
+                          </td>
+                        </tr>
+                      ) : (
+                        areaOptions.map((area) => (
+                          <tr key={area.id}>
+                            <td className="px-4 py-3 font-medium text-gray-700">{area.nome}</td>
+                            <td className="px-4 py-3">
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="0,00"
+                                value={pagamentosAreaForm[area.id]?.valor ?? ''}
+                                onChange={(event) =>
+                                  setPagamentosAreaForm((prev) => ({
+                                    ...prev,
+                                    [area.id]: {
+                                      ...(prev[area.id] ?? { valor: '', descricao: '' }),
+                                      valor: event.target.value,
+                                    },
+                                  }))
+                                }
+                                disabled={processando.area}
+                                fullWidth
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <Input
+                                type="text"
+                                placeholder="Descrição (opcional)"
+                                value={pagamentosAreaForm[area.id]?.descricao ?? ''}
+                                onChange={(event) =>
+                                  setPagamentosAreaForm((prev) => ({
+                                    ...prev,
+                                    [area.id]: {
+                                      ...(prev[area.id] ?? { valor: '', descricao: '' }),
+                                      descricao: event.target.value,
+                                    },
+                                  }))
+                                }
+                                disabled={processando.area}
+                                fullWidth
+                              />
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
 
                 {mensagens.area && (
                   <div
@@ -729,18 +890,6 @@ const SaldoDiarioPage: React.FC = () => {
                     {mensagens.area.texto}
                   </div>
                 )}
-
-                <div className="flex justify-end">
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="sm"
-                    loading={processando.area}
-                    disabled={areaOptions.length === 0}
-                  >
-                    Registrar pagamento
-                  </Button>
-                </div>
               </form>
 
               {resumoPagamentosArea.length > 0 && (
@@ -794,56 +943,99 @@ const SaldoDiarioPage: React.FC = () => {
             variant="success"
           >
             <div className="space-y-5">
-              <form className="space-y-3" onSubmit={handleRegistrarReceita}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Conta de receita
-                    </label>
-                    <select
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-success-500"
-                      value={formReceita.contaId}
-                      onChange={(event) =>
-                        setFormReceita((prev) => ({ ...prev, contaId: event.target.value }))
-                      }
+              <form className="space-y-4" onSubmit={handleRegistrarReceitas}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-gray-600">
+                    Distribua as receitas por tipo e confirme para salvar todas de uma vez.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setReceitasForm(criarMapaVazio(contaOptions));
+                        atualizarMensagem('receita', null);
+                      }}
                       disabled={processando.receita || contaOptions.length === 0}
                     >
-                      <option value="">Selecione uma conta</option>
-                      {contaOptions.map((conta) => (
-                        <option key={conta.id} value={conta.id}>
-                          {conta.nome}
-                        </option>
-                      ))}
-                    </select>
-                    {contaOptions.length === 0 && (
-                      <p className="mt-1 text-xs text-gray-500">
-                        Cadastre contas no menu Cadastros &gt; Contas de Receita para liberar esta opção.
-                      </p>
-                    )}
+                      Limpar campos
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="sm"
+                      loading={processando.receita}
+                      disabled={contaOptions.length === 0}
+                    >
+                      Registrar receitas
+                    </Button>
                   </div>
-
-                  <Input
-                    label="Valor"
-                    type="number"
-                    step="0.01"
-                    placeholder="0,00"
-                    value={formReceita.valor}
-                    onChange={(event) =>
-                      setFormReceita((prev) => ({ ...prev, valor: event.target.value }))
-                    }
-                    disabled={processando.receita}
-                  />
                 </div>
 
-                <Input
-                  label="Descrição"
-                  placeholder="Descreva a origem da receita"
-                  value={formReceita.descricao}
-                  onChange={(event) =>
-                    setFormReceita((prev) => ({ ...prev, descricao: event.target.value }))
-                  }
-                  disabled={processando.receita}
-                />
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold">Conta de receita</th>
+                        <th className="px-4 py-3 text-left font-semibold w-40">Valor (R$)</th>
+                        <th className="px-4 py-3 text-left font-semibold">Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white/80">
+                      {contaOptions.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-500">
+                            Cadastre contas no menu Cadastros &gt; Contas de Receita para liberar esta seção.
+                          </td>
+                        </tr>
+                      ) : (
+                        contaOptions.map((conta) => (
+                          <tr key={conta.id}>
+                            <td className="px-4 py-3 font-medium text-gray-700">{conta.nome}</td>
+                            <td className="px-4 py-3">
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="0,00"
+                                value={receitasForm[conta.id]?.valor ?? ''}
+                                onChange={(event) =>
+                                  setReceitasForm((prev) => ({
+                                    ...prev,
+                                    [conta.id]: {
+                                      ...(prev[conta.id] ?? { valor: '', descricao: '' }),
+                                      valor: event.target.value,
+                                    },
+                                  }))
+                                }
+                                disabled={processando.receita}
+                                fullWidth
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <Input
+                                type="text"
+                                placeholder="Descrição (opcional)"
+                                value={receitasForm[conta.id]?.descricao ?? ''}
+                                onChange={(event) =>
+                                  setReceitasForm((prev) => ({
+                                    ...prev,
+                                    [conta.id]: {
+                                      ...(prev[conta.id] ?? { valor: '', descricao: '' }),
+                                      descricao: event.target.value,
+                                    },
+                                  }))
+                                }
+                                disabled={processando.receita}
+                                fullWidth
+                              />
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
 
                 {mensagens.receita && (
                   <div
@@ -856,18 +1048,6 @@ const SaldoDiarioPage: React.FC = () => {
                     {mensagens.receita.texto}
                   </div>
                 )}
-
-                <div className="flex justify-end">
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="sm"
-                    loading={processando.receita}
-                    disabled={contaOptions.length === 0}
-                  >
-                    Registrar receita
-                  </Button>
-                </div>
               </form>
 
               {resumoReceitas.length > 0 && (
@@ -921,56 +1101,99 @@ const SaldoDiarioPage: React.FC = () => {
             variant="danger"
           >
             <div className="space-y-5">
-              <form className="space-y-3" onSubmit={handleRegistrarPagamentoBanco}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Banco
-                    </label>
-                    <select
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-error-500"
-                      value={formPagamentoBanco.bancoId}
-                      onChange={(event) =>
-                        setFormPagamentoBanco((prev) => ({ ...prev, bancoId: event.target.value }))
-                      }
+              <form className="space-y-4" onSubmit={handleRegistrarPagamentosBanco}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-gray-600">
+                    Informe os pagamentos de cada banco e confirme para lançar todos juntos.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setPagamentosBancoForm(criarMapaVazio(bancoOptions));
+                        atualizarMensagem('banco', null);
+                      }}
                       disabled={processando.banco || bancoOptions.length === 0}
                     >
-                      <option value="">Selecione um banco</option>
-                      {bancoOptions.map((banco) => (
-                        <option key={banco.id} value={banco.id}>
-                          {banco.nome}
-                        </option>
-                      ))}
-                    </select>
-                    {bancoOptions.length === 0 && (
-                      <p className="mt-1 text-xs text-gray-500">
-                        Cadastre bancos no menu Cadastros &gt; Bancos para liberar esta opção.
-                      </p>
-                    )}
+                      Limpar campos
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="sm"
+                      loading={processando.banco}
+                      disabled={bancoOptions.length === 0}
+                    >
+                      Registrar pagamentos
+                    </Button>
                   </div>
-
-                  <Input
-                    label="Valor"
-                    type="number"
-                    step="0.01"
-                    placeholder="0,00"
-                    value={formPagamentoBanco.valor}
-                    onChange={(event) =>
-                      setFormPagamentoBanco((prev) => ({ ...prev, valor: event.target.value }))
-                    }
-                    disabled={processando.banco}
-                  />
                 </div>
 
-                <Input
-                  label="Descrição"
-                  placeholder="Descreva o pagamento"
-                  value={formPagamentoBanco.descricao}
-                  onChange={(event) =>
-                    setFormPagamentoBanco((prev) => ({ ...prev, descricao: event.target.value }))
-                  }
-                  disabled={processando.banco}
-                />
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold">Banco</th>
+                        <th className="px-4 py-3 text-left font-semibold w-40">Valor (R$)</th>
+                        <th className="px-4 py-3 text-left font-semibold">Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white/80">
+                      {bancoOptions.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-500">
+                            Cadastre bancos no menu Cadastros &gt; Bancos para liberar esta seção.
+                          </td>
+                        </tr>
+                      ) : (
+                        bancoOptions.map((banco) => (
+                          <tr key={banco.id}>
+                            <td className="px-4 py-3 font-medium text-gray-700">{banco.nome}</td>
+                            <td className="px-4 py-3">
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="0,00"
+                                value={pagamentosBancoForm[banco.id]?.valor ?? ''}
+                                onChange={(event) =>
+                                  setPagamentosBancoForm((prev) => ({
+                                    ...prev,
+                                    [banco.id]: {
+                                      ...(prev[banco.id] ?? { valor: '', descricao: '' }),
+                                      valor: event.target.value,
+                                    },
+                                  }))
+                                }
+                                disabled={processando.banco}
+                                fullWidth
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <Input
+                                type="text"
+                                placeholder="Descrição (opcional)"
+                                value={pagamentosBancoForm[banco.id]?.descricao ?? ''}
+                                onChange={(event) =>
+                                  setPagamentosBancoForm((prev) => ({
+                                    ...prev,
+                                    [banco.id]: {
+                                      ...(prev[banco.id] ?? { valor: '', descricao: '' }),
+                                      descricao: event.target.value,
+                                    },
+                                  }))
+                                }
+                                disabled={processando.banco}
+                                fullWidth
+                              />
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
 
                 {mensagens.banco && (
                   <div
@@ -983,18 +1206,6 @@ const SaldoDiarioPage: React.FC = () => {
                     {mensagens.banco.texto}
                   </div>
                 )}
-
-                <div className="flex justify-end">
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="sm"
-                    loading={processando.banco}
-                    disabled={bancoOptions.length === 0}
-                  >
-                    Registrar pagamento
-                  </Button>
-                </div>
               </form>
 
               {resumoPagamentosBanco.length > 0 && (
@@ -1048,61 +1259,113 @@ const SaldoDiarioPage: React.FC = () => {
             variant="default"
           >
             <div className="space-y-5">
-              <form className="space-y-3" onSubmit={handleRegistrarSaldoBanco}>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="md:col-span-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Banco
-                    </label>
-                    <select
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      value={formSaldoBanco.bancoId}
-                      onChange={(event) =>
-                        setFormSaldoBanco((prev) => ({ ...prev, bancoId: event.target.value }))
-                      }
+              <form className="space-y-4" onSubmit={handleRegistrarSaldosBanco}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="data-saldo-referencia">
+                        Data de referência
+                      </label>
+                      <Input
+                        id="data-saldo-referencia"
+                        type="date"
+                        value={dataSaldoReferencia}
+                        onChange={(event) => setDataSaldoReferencia(event.target.value)}
+                        disabled={processando.saldo}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 max-w-sm">
+                      Os valores informados serão associados a esta data. Utilize-a para consolidar o fechamento diário.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSaldosBancoForm(criarMapaVazio(bancoOptions));
+                        atualizarMensagem('saldo', null);
+                      }}
                       disabled={processando.saldo || bancoOptions.length === 0}
                     >
-                      <option value="">Selecione um banco</option>
-                      {bancoOptions.map((banco) => (
-                        <option key={banco.id} value={banco.id}>
-                          {banco.nome}
-                        </option>
-                      ))}
-                    </select>
+                      Limpar campos
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="sm"
+                      loading={processando.saldo}
+                      disabled={bancoOptions.length === 0}
+                    >
+                      Atualizar saldos
+                    </Button>
                   </div>
-
-                  <Input
-                    label="Data"
-                    type="date"
-                    value={formSaldoBanco.data}
-                    onChange={(event) =>
-                      setFormSaldoBanco((prev) => ({ ...prev, data: event.target.value }))
-                    }
-                    disabled={processando.saldo}
-                  />
-
-                  <Input
-                    label="Saldo"
-                    type="number"
-                    step="0.01"
-                    placeholder="0,00"
-                    value={formSaldoBanco.valor}
-                    onChange={(event) =>
-                      setFormSaldoBanco((prev) => ({ ...prev, valor: event.target.value }))
-                    }
-                    disabled={processando.saldo}
-                  />
                 </div>
 
-                <Input
-                  label="Descrição"
-                  placeholder="Observações sobre o saldo"
-                  value={formSaldoBanco.descricao}
-                  onChange={(event) =>
-                    setFormSaldoBanco((prev) => ({ ...prev, descricao: event.target.value }))
-                  }
-                  disabled={processando.saldo}
-                />
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold">Banco</th>
+                        <th className="px-4 py-3 text-left font-semibold w-36">Saldo (R$)</th>
+                        <th className="px-4 py-3 text-left font-semibold">Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white/80">
+                      {bancoOptions.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-500">
+                            Cadastre bancos no menu Cadastros &gt; Bancos para liberar esta seção.
+                          </td>
+                        </tr>
+                      ) : (
+                        bancoOptions.map((banco) => (
+                          <tr key={banco.id}>
+                            <td className="px-4 py-3 font-medium text-gray-700">{banco.nome}</td>
+                            <td className="px-4 py-3">
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="0,00"
+                                value={saldosBancoForm[banco.id]?.valor ?? ''}
+                                onChange={(event) =>
+                                  setSaldosBancoForm((prev) => ({
+                                    ...prev,
+                                    [banco.id]: {
+                                      ...(prev[banco.id] ?? { valor: '', descricao: '' }),
+                                      valor: event.target.value,
+                                    },
+                                  }))
+                                }
+                                disabled={processando.saldo}
+                                fullWidth
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <Input
+                                type="text"
+                                placeholder="Descrição (opcional)"
+                                value={saldosBancoForm[banco.id]?.descricao ?? ''}
+                                onChange={(event) =>
+                                  setSaldosBancoForm((prev) => ({
+                                    ...prev,
+                                    [banco.id]: {
+                                      ...(prev[banco.id] ?? { valor: '', descricao: '' }),
+                                      descricao: event.target.value,
+                                    },
+                                  }))
+                                }
+                                disabled={processando.saldo}
+                                fullWidth
+                              />
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
 
                 {mensagens.saldo && (
                   <div
@@ -1115,18 +1378,6 @@ const SaldoDiarioPage: React.FC = () => {
                     {mensagens.saldo.texto}
                   </div>
                 )}
-
-                <div className="flex justify-end">
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="sm"
-                    loading={processando.saldo}
-                    disabled={bancoOptions.length === 0}
-                  >
-                    Atualizar saldo
-                  </Button>
-                </div>
               </form>
 
               <div className="border-t border-gray-200 pt-3">

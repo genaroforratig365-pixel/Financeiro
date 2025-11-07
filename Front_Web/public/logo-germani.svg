@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 180" role="img" aria-labelledby="title desc">
+  <title id="title">Logotipo Germani</title>
+  <desc id="desc">Marca Germani com espiga estilizada e texto desde 1892</desc>
+  <defs>
+    <linearGradient id="wheat" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#c40d0d" />
+      <stop offset="1" stop-color="#a10808" />
+    </linearGradient>
+  </defs>
+  <g fill="#c40d0d">
+    <path d="M210 42c-43.6 0-79 35.4-79 79s35.4 79 79 79 79-35.4 79-79h-20c0 32.6-26.4 59-59 59s-59-26.4-59-59 26.4-59 59-59z" fill="#c40d0d" opacity="0.18" />
+    <path d="M256 26c-22.5 8.7-40.2 29.3-42.8 55.4-2.3 22.5 7 41.2 21.8 55.9 10.3 10.3 23.4 18.1 36.8 22.3l4.5-17.1c-9.6-3.4-18.3-8.8-25.5-16-10.9-10.9-17.8-24.6-16-41 2-19.6 16-37 32.8-42.9z" fill="url(#wheat)" />
+    <path d="M272.8 49.5c-6.8 6.2-13.4 12.8-19.3 19.9 8.2 1.6 17 1.6 25.3-.1zm-6.3 30.5c-4.7 5.8-8.7 11.7-12 17.8 7.3 1.5 14.6 1.5 21.8.1zm-8.3 29.5a184 184 0 0 0-7.5 16.2c5.8 1.7 11.5 1.6 17.3-.2z" fill="#c40d0d" />
+  </g>
+  <text x="40" y="120" font-family="'Playfair Display', 'Times New Roman', serif" font-size="96" fill="#c40d0d" font-weight="700">GERMANI</text>
+  <text x="150" y="155" font-family="'Playfair Display', 'Times New Roman', serif" font-size="32" fill="#c40d0d">desde 1892</text>
+</svg>

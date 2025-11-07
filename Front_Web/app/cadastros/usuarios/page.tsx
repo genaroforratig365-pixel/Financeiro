@@ -146,6 +146,25 @@ export default function CadastroUsuarioPage() {
   }, []);
 
   useEffect(() => {
+    if (!usuario) {
+      setPodeGerenciar(false);
+      return;
+    }
+
+    const session = getUserSession();
+    const candidatos = [
+      normalizarNome(usuario.usr_nome),
+      normalizarNome(session.userName),
+      normalizarNome(session.displayName),
+      normalizarNome(session.userEmail),
+      normalizarNome(session.userId),
+    ];
+
+    const ehGenaro = candidatos.some((valor) => valor.includes('genaro'));
+    setPodeGerenciar(ehGenaro);
+  }, [usuario]);
+
+  useEffect(() => {
     if (!podeGerenciar) {
       setUsuariosCadastrados([]);
       return;
