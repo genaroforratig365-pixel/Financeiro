@@ -62,15 +62,6 @@ function safeRemoveItem(key: string): void {
   }
 }
 
-function sanitizeValue(value: string | null | undefined): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
 function generateUserId(): string {
   if (isBrowser()) {
     const cryptoApi = window.crypto || (window as unknown as { msCrypto?: Crypto }).msCrypto;
@@ -108,50 +99,40 @@ export function getUserId(): string {
 /**
  * Obtém o identificador salvo sem gerar um novo UUID.
  */
-export function getStoredUserId(): string | null {
-  const stored = safeGetItem(USER_ID_STORAGE_KEY);
-  return stored && stored.trim().length > 0 ? stored : null;
-}
-
-/**
- * Define explicitamente o identificador do usuário.
- */
-export function setUserId(identifier: string | null | undefined): void {
-  const sanitized = sanitizeValue(identifier ?? null);
-
-  if (!sanitized) {
-    safeRemoveItem(USER_ID_STORAGE_KEY);
-    return;
+export function getUserName(): string | null {
+  const value = safeGetItem(USER_NAME_STORAGE_KEY);
+  if (!value) {
+    return null;
   }
 
-  safeSetItem(USER_ID_STORAGE_KEY, sanitized);
-}
-
-/**
- * Obtém o nome/apelido do usuário (se definido)
- */
-export function getUserName(): string | null {
-  return sanitizeValue(safeGetItem(USER_NAME_STORAGE_KEY));
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 /**
  * Obtém o e-mail do usuário (se definido)
  */
 export function getUserEmail(): string | null {
-  return sanitizeValue(safeGetItem(USER_EMAIL_STORAGE_KEY));
+  const value = safeGetItem(USER_EMAIL_STORAGE_KEY);
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 /**
  * Define o nome/apelido do usuário
  */
 export function setUserName(name: string): void {
-  const sanitized = sanitizeValue(name);
-  if (!sanitized) {
+  const trimmed = name?.trim?.() ?? "";
+  if (trimmed.length === 0) {
     safeRemoveItem(USER_NAME_STORAGE_KEY);
     return;
   }
 
-  safeSetItem(USER_NAME_STORAGE_KEY, sanitized);
+  safeSetItem(USER_NAME_STORAGE_KEY, trimmed);
 }
 
 /**
@@ -165,13 +146,13 @@ export function clearUserName(): void {
  * Define o e-mail do usuário
  */
 export function setUserEmail(email: string): void {
-  const sanitized = sanitizeValue(email);
-  if (!sanitized) {
+  const trimmed = email?.trim?.() ?? "";
+  if (trimmed.length === 0) {
     safeRemoveItem(USER_EMAIL_STORAGE_KEY);
     return;
   }
 
-  safeSetItem(USER_EMAIL_STORAGE_KEY, sanitized);
+  safeSetItem(USER_EMAIL_STORAGE_KEY, trimmed);
 }
 
 /**

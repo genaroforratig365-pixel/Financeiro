@@ -15,21 +15,8 @@ import {
   getOrCreateUser,
   type UsuarioRow,
 } from '@/lib/supabaseClient';
-import { traduzirErroSupabase } from '@/lib/supabaseErrors';
 
 type Usuario = Pick<UsuarioRow, 'usr_id' | 'usr_nome' | 'usr_email' | 'usr_ativo'>;
-
-type UsuarioAdmin = Pick<
-  UsuarioRow,
-  'usr_id' | 'usr_identificador' | 'usr_nome' | 'usr_email' | 'usr_ativo'
-> & {
-  usr_criado_em?: string | null;
-};
-
-type Mensagem = {
-  tipo: 'sucesso' | 'erro' | 'info';
-  texto: string;
-};
 
 export default function CadastroUsuarioPage() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
@@ -135,8 +122,6 @@ export default function CadastroUsuarioPage() {
         });
         setNome(data.usr_nome ?? '');
         setEmail(data.usr_email ?? '');
-
-        setPodeGerenciar(normalizarNome(data.usr_nome) === 'genaro');
       } catch (error) {
         console.error('Erro ao carregar usuário:', error);
         setFeedback('Não foi possível carregar os dados do usuário.');
@@ -175,11 +160,13 @@ export default function CadastroUsuarioPage() {
 
       if (error) {
         console.error('Erro ao salvar usuário:', error);
+        const isPermissionDenied = error.message
+          ?.toLowerCase()
+          .includes('permission denied');
         setFeedback(
-          traduzirErroSupabase(
-            error,
-            'Não foi possível salvar os dados. Verifique sua conexão e tente novamente.'
-          )
+          isPermissionDenied
+            ? 'Permissão negada para atualizar seus dados. Recarregue a página após aplicar as permissões no Supabase.'
+            : 'Não foi possível salvar os dados. Verifique sua conexão e tente novamente.'
         );
         return;
       }
