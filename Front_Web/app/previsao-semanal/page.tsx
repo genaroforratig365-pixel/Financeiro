@@ -1696,68 +1696,119 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                 </select>
               </label>
 
+              {/* Botões principais sempre visíveis no topo */}
+              {previsaoExistente && !modoEdicao && !modoInclusao && (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleIniciarEdicao}
+                    disabled={!edicaoPermitida}
+                  >
+                    Editar lançamentos
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleIniciarInclusao}
+                    disabled={!edicaoPermitida}
+                  >
+                    Incluir categorias adicionais
+                  </Button>
+                </div>
+              )}
+
               <div className="flex flex-col gap-3">
                 {!modoEdicao && !modoInclusao && (
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-                    <label className="flex flex-col text-sm font-medium text-gray-700">
-                      Arquivo Excel
+                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                    {/* Bloco: Arquivo Excel */}
+                    <div className="flex flex-col gap-3 rounded-md border border-gray-200 bg-white p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                        Arquivo Excel
+                      </p>
                       <input
                         type="file"
                         accept=".xlsx,.xls"
-                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        className="hidden"
                         ref={arquivoInputRef}
                         onChange={handleArquivoChange}
                         disabled={processandoArquivo || !edicaoPermitida}
+                        id="arquivo-excel-input"
                       />
-                    </label>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={handleCancelarArquivo}
-                      disabled={!arquivoNome || processandoArquivo}
-                    >
-                      Cancelar seleção
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="primary"
-                      onClick={handleImportar}
-                      disabled={
-                        !edicaoPermitida || importando || linhas.length === 0 || processandoArquivo
-                      }
-                      loading={importando}
-                    >
-                      Importar previsão
-                    </Button>
-                  </div>
-                )}
-
-                {/* Botões de edição e inclusão */}
-                {previsaoExistente && !modoEdicao && !modoInclusao && (
-                  <div className="flex flex-col gap-2 rounded-md border border-primary-200 bg-primary-50/30 p-3">
-                    <p className="text-xs font-medium text-primary-800">
-                      Ações sobre a previsão existente:
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={handleIniciarEdicao}
-                        disabled={!edicaoPermitida}
-                      >
-                        Editar lançamentos
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={handleIniciarInclusao}
-                        disabled={!edicaoPermitida}
-                      >
-                        Incluir categorias adicionais
-                      </Button>
+                      <label htmlFor="arquivo-excel-input" className="cursor-pointer">
+                        <span
+                          className={`inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
+                            processandoArquivo || !edicaoPermitida
+                              ? 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400'
+                              : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          Escolher arquivo
+                        </span>
+                      </label>
+                      {arquivoNome && (
+                        <p className="text-xs text-gray-600">
+                          <span className="font-medium">Arquivo:</span> {arquivoNome}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleCancelarArquivo}
+                          disabled={!arquivoNome || processandoArquivo}
+                        >
+                          Cancelar seleção
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="primary"
+                          size="sm"
+                          onClick={handleImportar}
+                          disabled={
+                            !edicaoPermitida || importando || linhas.length === 0 || processandoArquivo
+                          }
+                          loading={importando}
+                        >
+                          Importar previsão
+                        </Button>
+                      </div>
                     </div>
+
+                    {/* Bloco: Ações sobre o arquivo existente */}
+                    {previsaoExistente && (
+                      <div className="flex flex-col gap-3 rounded-md border border-primary-200 bg-primary-50/30 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-primary-800">
+                          Ações sobre a previsão existente
+                        </p>
+                        <p className="text-xs text-primary-700">
+                          Status atual: <span className="font-semibold">{previsaoExistente.status}</span>
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleIniciarEdicao}
+                            disabled={!edicaoPermitida}
+                          >
+                            Editar lançamentos
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleIniciarInclusao}
+                            disabled={!edicaoPermitida}
+                          >
+                            + Categorias
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1806,24 +1857,6 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                         disabled={importando}
                       >
                         Cancelar inclusão
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => handleAdicionarLinha('receita')}
-                        disabled={importando}
-                      >
-                        + Receita
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => handleAdicionarLinha('gasto')}
-                        disabled={importando}
-                      >
-                        + Gasto
                       </Button>
                       <Button
                         type="button"
@@ -1895,40 +1928,63 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
           </Card>
         )}
         {linhas.length > 0 && (
-          <Card title={modoEdicao ? "Edição de lançamentos" : modoInclusao ? "Inclusão de categorias" : "Pré-visualização da importação"}>
-            <div className="space-y-4">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        Incluir
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        Categoria
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        Associação
-                      </th>
-                      {datasTabela.map((data) => (
-                        <th
-                          key={data}
-                          className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500"
-                        >
-                          {formatarDataPt(data)}
+          <div className="space-y-4">
+            {/* Bloco: Receitas */}
+            {linhas.some((l) => l.tipo === 'receita' || l.tipo === 'saldo_inicial') && (
+              <Card
+                title={
+                  <div className="flex items-center justify-between">
+                    <span>Receitas</span>
+                    {modoInclusao && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleAdicionarLinha('receita')}
+                        disabled={importando}
+                      >
+                        + Receita
+                      </Button>
+                    )}
+                  </div>
+                }
+              >
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-success-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-success-700">
+                          Incluir
                         </th>
-                      ))}
-                      {modoInclusao && (
-                        <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
-                          Ações
+                        {modoInclusao && (
+                          <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-success-700">
+                            Categoria
+                          </th>
+                        )}
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-success-700">
+                          Conta de Receita
                         </th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white/80">
-                    {linhas.map((linha) => {
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-success-700">
+                          Tipo de Receita
+                        </th>
+                        {datasTabela.map((data) => (
+                          <th
+                            key={data}
+                            className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-success-700"
+                          >
+                            {formatarDataPt(data)}
+                          </th>
+                        ))}
+                        {modoInclusao && (
+                          <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-success-700">
+                            Ações
+                          </th>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white/80">
+                      {linhas.filter((l) => l.tipo === 'receita' || l.tipo === 'saldo_inicial').map((linha) => {
                       const contaRelacionada = encontrarContaPorId(contas, linha.contaId);
-                      const areaRelacionada = encontrarAreaPorId(areas, linha.areaId);
                       const tipoRelacionado = encontrarTipoPorId(tiposReceita, linha.tipoReceitaId);
                       return (
                         <React.Fragment key={linha.id}>
@@ -1936,94 +1992,73 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                             <td className="px-3 py-2 align-top">
                               <input
                                 type="checkbox"
-                                className="h-4 w-4 text-primary-600 focus:ring-primary-500"
+                                className="h-4 w-4 text-success-600 focus:ring-success-500"
                                 checked={linha.selecionado}
                                 onChange={(event) => handleToggleLinha(linha.id, event.target.checked)}
                               />
                             </td>
+                            {modoInclusao && (
+                              <td className="px-3 py-2 align-top">
+                                <input
+                                  type="text"
+                                  list={`categorias-${linha.id}`}
+                                  className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-success-500"
+                                  placeholder="Digite ou selecione uma categoria..."
+                                  value={linha.titulo}
+                                  onChange={(e) => handleTituloChange(linha.id, e.target.value)}
+                                />
+                                <datalist id={`categorias-${linha.id}`}>
+                                  {categoriasExistentes.filter(cat => !cat.toLowerCase().startsWith('gasto')).map(cat => (
+                                    <option key={cat} value={cat} />
+                                  ))}
+                                </datalist>
+                              </td>
+                            )}
                             <td className="px-3 py-2 align-top">
-                              <div className="flex flex-col">
-                                {modoInclusao ? (
-                                  <>
-                                    <input
-                                      type="text"
-                                      list={`categorias-${linha.id}`}
-                                      className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                      placeholder="Digite ou selecione uma categoria..."
-                                      value={linha.titulo}
-                                      onChange={(e) => handleTituloChange(linha.id, e.target.value)}
-                                    />
-                                    <datalist id={`categorias-${linha.id}`}>
-                                      {categoriasExistentes.map(cat => (
-                                        <option key={cat} value={cat} />
-                                      ))}
-                                    </datalist>
-                                  </>
-                                ) : (
-                                  <span className="font-medium text-gray-900">{linha.titulo}</span>
-                                )}
-                                <span className="text-xs text-gray-400 uppercase">{linha.tipo}</span>
-                              </div>
-                            </td>
-                            <td className="px-3 py-2 align-top">
-                              {linha.tipo === 'gasto' ? (
+                              {linha.tipo === 'saldo_inicial' ? (
+                                <span className="text-sm text-gray-500">Saldo inicial</span>
+                              ) : (
                                 <select
-                                  className="w-56 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                  value={linha.areaId ?? ''}
+                                  className="w-64 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-success-500"
+                                  value={linha.contaId ?? ''}
                                   onChange={(event) =>
-                                    handleAreaChange(
+                                    handleContaChange(
                                       linha.id,
                                       event.target.value ? Number(event.target.value) : null,
                                     )
                                   }
                                 >
-                                  <option value="">Selecione uma área</option>
-                                  {areas.map((area) => (
-                                    <option key={area.id} value={area.id}>
-                                      {area.nome}
+                                  <option value="">Selecione uma conta</option>
+                                  {contas.map((conta) => (
+                                    <option key={conta.id} value={conta.id}>
+                                      {conta.nome}
+                                      {conta.bancoNome ? ` • ${conta.bancoNome}` : ''}
                                     </option>
                                   ))}
                                 </select>
-                              ) : linha.tipo === 'receita' ? (
-                                <div className="flex flex-col gap-2">
-                                  <select
-                                    className="w-64 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    value={linha.contaId ?? ''}
-                                    onChange={(event) =>
-                                      handleContaChange(
-                                        linha.id,
-                                        event.target.value ? Number(event.target.value) : null,
-                                      )
-                                    }
-                                  >
-                                    <option value="">Selecione uma conta</option>
-                                    {contas.map((conta) => (
-                                      <option key={conta.id} value={conta.id}>
-                                        {conta.nome}
-                                        {conta.bancoNome ? ` • ${conta.bancoNome}` : ''}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <select
-                                    className="w-64 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    value={linha.tipoReceitaId ?? ''}
-                                    onChange={(event) =>
-                                      handleTipoReceitaChange(
-                                        linha.id,
-                                        event.target.value ? Number(event.target.value) : null,
-                                      )
-                                    }
-                                  >
-                                    <option value="">Tipo de receita</option>
-                                    {tiposReceita.map((tipo) => (
-                                      <option key={tipo.id} value={tipo.id}>
-                                        {tipo.nome}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 align-top">
+                              {linha.tipo === 'saldo_inicial' ? (
+                                <span className="text-sm text-gray-500">—</span>
                               ) : (
-                                <span className="text-sm text-gray-500">Saldo inicial</span>
+                                <select
+                                  className="w-56 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-success-500"
+                                  value={linha.tipoReceitaId ?? ''}
+                                  onChange={(event) =>
+                                    handleTipoReceitaChange(
+                                      linha.id,
+                                      event.target.value ? Number(event.target.value) : null,
+                                    )
+                                  }
+                                >
+                                  <option value="">Tipo de receita</option>
+                                  {tiposReceita.map((tipo) => (
+                                    <option key={tipo.id} value={tipo.id}>
+                                      {tipo.nome}
+                                    </option>
+                                  ))}
+                                </select>
                               )}
                             </td>
                             {linha.valores.map((valor) => (
@@ -2059,7 +2094,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                           </tr>
                           {linha.erros.length > 0 && (
                             <tr>
-                              <td colSpan={3 + datasTabela.length + (modoInclusao ? 1 : 0)} className="bg-error-50 px-3 py-2 text-xs text-error-700">
+                              <td colSpan={(modoInclusao ? 2 : 1) + 2 + datasTabela.length + (modoInclusao ? 1 : 0)} className="bg-error-50 px-3 py-2 text-xs text-error-700">
                                 {linha.erros.join(' ')}
                               </td>
                             </tr>
@@ -2070,32 +2105,183 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-lg border border-gray-200 bg-white/80 p-4 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total de receitas</p>
-                  <p className="mt-2 text-2xl font-semibold text-success-700">
-                    {formatCurrency(totaisReceita.reduce((acc, valor) => acc + valor, 0))}
-                  </p>
+            </Card>
+          )}
+
+          {/* Bloco: Despesas */}
+          {linhas.some((l) => l.tipo === 'gasto') && (
+            <Card
+              title={
+                <div className="flex items-center justify-between">
+                  <span>Despesas</span>
+                  {modoInclusao && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleAdicionarLinha('gasto')}
+                      disabled={importando}
+                    >
+                      + Gasto
+                    </Button>
+                  )}
                 </div>
-                <div className="rounded-lg border border-gray-200 bg-white/80 p-4 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total de gastos</p>
-                  <p className="mt-2 text-2xl font-semibold text-error-700">
-                    {formatCurrency(totaisGasto.reduce((acc, valor) => acc + valor, 0))}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-gray-200 bg-white/80 p-4 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Saldo inicial</p>
-                  <p className="mt-2 text-2xl font-semibold text-gray-900">{formatCurrency(saldoInicialValor)}</p>
-                </div>
-                <div className="rounded-lg border border-gray-200 bg-white/80 p-4 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Saldo acumulado final</p>
-                  <p className="mt-2 text-2xl font-semibold text-gray-900">
-                    {formatCurrency(saldoAcumuladoPrevisto[saldoAcumuladoPrevisto.length - 1] ?? 0)}
-                  </p>
-                </div>
+              }
+            >
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-error-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-error-700">
+                        Incluir
+                      </th>
+                      {modoInclusao && (
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-error-700">
+                          Categoria
+                        </th>
+                      )}
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-error-700">
+                        Área
+                      </th>
+                      {datasTabela.map((data) => (
+                        <th
+                          key={data}
+                          className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-error-700"
+                        >
+                          {formatarDataPt(data)}
+                        </th>
+                      ))}
+                      {modoInclusao && (
+                        <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-error-700">
+                          Ações
+                        </th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white/80">
+                    {linhas.filter((l) => l.tipo === 'gasto').map((linha) => {
+                      const areaRelacionada = encontrarAreaPorId(areas, linha.areaId);
+                      return (
+                        <React.Fragment key={linha.id}>
+                          <tr>
+                            <td className="px-3 py-2 align-top">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 text-error-600 focus:ring-error-500"
+                                checked={linha.selecionado}
+                                onChange={(event) => handleToggleLinha(linha.id, event.target.checked)}
+                              />
+                            </td>
+                            {modoInclusao && (
+                              <td className="px-3 py-2 align-top">
+                                <input
+                                  type="text"
+                                  list={`categorias-gasto-${linha.id}`}
+                                  className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-error-500"
+                                  placeholder="Digite ou selecione uma categoria..."
+                                  value={linha.titulo}
+                                  onChange={(e) => handleTituloChange(linha.id, e.target.value)}
+                                />
+                                <datalist id={`categorias-gasto-${linha.id}`}>
+                                  {categoriasExistentes.filter(cat => cat.toLowerCase().startsWith('gasto') || !cat.toLowerCase().startsWith('gasto')).map(cat => (
+                                    <option key={cat} value={cat} />
+                                  ))}
+                                </datalist>
+                              </td>
+                            )}
+                            <td className="px-3 py-2 align-top">
+                              <select
+                                className="w-64 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-error-500"
+                                value={linha.areaId ?? ''}
+                                onChange={(event) =>
+                                  handleAreaChange(
+                                    linha.id,
+                                    event.target.value ? Number(event.target.value) : null,
+                                  )
+                                }
+                              >
+                                <option value="">Selecione uma área</option>
+                                {areas.map((area) => (
+                                  <option key={area.id} value={area.id}>
+                                    {area.nome}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            {linha.valores.map((valor) => (
+                              <td key={valor.data} className="px-3 py-2 align-top text-right">
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  pattern="[0-9.,-]*"
+                                  placeholder="0,00"
+                                  autoComplete="off"
+                                  className="w-28 rounded-md border border-gray-300 px-2 py-1 text-right text-sm focus:outline-none focus:ring-2 focus:ring-error-500"
+                                  value={valor.texto}
+                                  onChange={(event) =>
+                                    handleValorChange(linha.id, valor.data, event.target.value)
+                                  }
+                                  onBlur={() => handleValorBlur(linha.id, valor.data)}
+                                />
+                              </td>
+                            ))}
+                            {modoInclusao && (
+                              <td className="px-3 py-2 align-top text-center">
+                                <button
+                                  type="button"
+                                  className="rounded-md px-2 py-1 text-xs text-error-600 hover:bg-error-50 hover:text-error-700 focus:outline-none focus:ring-2 focus:ring-error-500"
+                                  onClick={() => handleRemoverLinha(linha.id)}
+                                  title="Remover linha"
+                                >
+                                  ✕
+                                </button>
+                              </td>
+                            )}
+                          </tr>
+                          {linha.erros.length > 0 && (
+                            <tr>
+                              <td colSpan={(modoInclusao ? 2 : 1) + 1 + datasTabela.length + (modoInclusao ? 1 : 0)} className="bg-error-50 px-3 py-2 text-xs text-error-700">
+                                {linha.erros.join(' ')}
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+
+          {/* Resumo financeiro */}
+          <Card title="Resumo Financeiro">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-lg border border-success-200 bg-success-50/60 p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-success-700">Total de receitas</p>
+                <p className="mt-2 text-2xl font-semibold text-success-800">
+                  {formatCurrency(totaisReceita.reduce((acc, valor) => acc + valor, 0))}
+                </p>
+              </div>
+              <div className="rounded-lg border border-error-200 bg-error-50/70 p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-error-700">Total de gastos</p>
+                <p className="mt-2 text-2xl font-semibold text-error-800">
+                  {formatCurrency(totaisGasto.reduce((acc, valor) => acc + valor, 0))}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Saldo inicial</p>
+                <p className="mt-2 text-2xl font-semibold text-gray-900">{formatCurrency(saldoInicialValor)}</p>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Saldo acumulado final</p>
+                <p className="mt-2 text-2xl font-semibold text-gray-900">
+                  {formatCurrency(saldoAcumuladoPrevisto[saldoAcumuladoPrevisto.length - 1] ?? 0)}
+                </p>
               </div>
             </div>
           </Card>
+        </div>
         )}
         <Card title="Previsão registrada">
           {carregandoPrevisao ? (
