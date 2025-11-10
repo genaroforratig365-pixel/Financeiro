@@ -117,16 +117,29 @@ const normalizarCodigoConta = (codigo: string): string => {
   return apenasNumeros.padStart(3, '0');
 };
 
-const INFORMACOES_CONTA: Record<string, { titulo: string; descricao: string }> = {
+const INFORMACOES_CONTA: Record<
+  string,
+  { titulo: string; subtitulo: string; topicos: string[] }
+> = {
   '200': {
-    titulo: 'Receita de títulos',
-    descricao:
-      'Informe os valores cobrados em boletos e títulos registrados na conta de receita código 200 para o banco selecionado.',
+    titulo: 'Títulos — registrar como conta de receita 200',
+    subtitulo:
+      'Utilize esta seção para distribuir os valores recebidos por boletos e títulos entre os tipos de receita configurados.',
+    topicos: [
+      'Confirme se o banco selecionado corresponde ao extrato utilizado para registrar a cobrança.',
+      'Some os valores de boletos liquidados no dia e informe o total no tipo de receita adequado.',
+      'Revise o total informado antes de salvar para evitar diferenças com a previsão.',
+    ],
   },
   '201': {
-    titulo: 'Receita de depósitos',
-    descricao:
-      'Informe os valores recebidos por depósitos, PIX e cartões vinculados à conta de receita código 201 do banco selecionado.',
+    titulo: 'Depósitos e PIX — registrar como conta de receita 201',
+    subtitulo:
+      'Informe depósitos, PIX e recebimentos com cartões vinculados ao banco selecionado na conta de receita 201.',
+    topicos: [
+      'Verifique se o banco escolhido é o responsável pelo crédito da movimentação.',
+      'Distribua os valores por tipo de receita conforme a origem do recebimento (PIX, cartão, depósito).',
+      'Garanta que os valores informados correspondam ao extrato bancário do dia.',
+    ],
   },
 };
 
@@ -138,7 +151,12 @@ const obterDescricaoConta = (conta: ContaOption) => {
   }
   return {
     titulo: `Conta de receita ${conta.codigo}`,
-    descricao: `Registre os valores lançados para a conta ${conta.nome}.`,
+    subtitulo: `Registre os valores lançados para a conta ${conta.nome}.`,
+    topicos: [
+      'Selecione o banco onde o lançamento foi realizado.',
+      'Informe o valor total correspondente ao tipo de receita.',
+      'Confira os totais calculados antes de concluir o registro.',
+    ],
   };
 };
 
@@ -159,9 +177,9 @@ const gerarMapaTextoInicial = (
     }
 
     const valoresConta: ValoresTextoPorTipo = {};
-    tiposLista.forEach((tipo) => {
-      const chave = gerarChaveLancamento(conta.id, tipo.id);
-      const registro = registros[chave];
+      tiposLista.forEach((tipo) => {
+        const chave = gerarChaveLancamento(conta.bancoId!, conta.id, tipo.id);
+        const registro = registros[chave];
       valoresConta[tipo.id] = registro && registro.valor > 0 ? formatarValorParaInput(registro.valor) : '';
     });
 
@@ -241,18 +259,20 @@ export default function LancamentoCobrancaPage() {
     return mapa;
   }, [tipos]);
 
-  const contasPorBanco = useMemo(() => {
-    const mapa = new Map<number, ContaOption[]>();
-    contas.forEach((conta) => {
-      if (conta.bancoId === null || conta.bancoId === undefined) {
-        return;
-      }
-      const listaAtual = mapa.get(conta.bancoId) ?? [];
-      listaAtual.push(conta);
-      mapa.set(conta.bancoId, listaAtual);
-    });
+    const contasPorBanco = useMemo(() => {
+      const mapa = new Map<number, ContaOption[]>();
+      contas.forEach((conta) => {
+        if (conta.bancoId === null || conta.bancoId === undefined) {
+          return;
+        }
+        const listaAtual = mapa.get(conta.bancoId) ?? [];
+        listaAtual.push(conta);
+        mapa.set(conta.bancoId, listaAtual);
+      });
+      return mapa;
+    }, [contas]);
 
-  const tiposOrdenados = useMemo(() => {
+    const tiposOrdenados = useMemo(() => {
     const filtrados = tipos.filter((tipo) => {
       const codigoNormalizado = (tipo.codigo ?? '').replace(/[^0-9]/g, '');
       if (!codigoNormalizado) {
@@ -710,10 +730,10 @@ export default function LancamentoCobrancaPage() {
     contasBanco.forEach((conta) => {
       const valoresConta = valoresBanco[conta.id] ?? {};
 
-      tiposOrdenados.forEach((tipo) => {
-        const valorEntrada = valoresConta[tipo.id] ?? '';
-        const valorCalculado = avaliarValor(valorEntrada);
-        const chave = gerarChaveLancamento(conta.id, tipo.id);
+        tiposOrdenados.forEach((tipo) => {
+          const valorEntrada = valoresConta[tipo.id] ?? '';
+          const valorCalculado = avaliarValor(valorEntrada);
+          const chave = gerarChaveLancamento(bancoSelecionadoId!, conta.id, tipo.id);
         const registroExistente = lancamentosExistentes[chave];
 
         if (valorCalculado !== null && valorCalculado > 0) {
@@ -801,16 +821,15 @@ export default function LancamentoCobrancaPage() {
     ? bancos.find((banco) => banco.id === bancoSelecionadoId)
     : null;
 
-  const valoresBancoSelecionado: ValoresTextoPorConta = bancoSelecionadoId
-    ? valoresPorBanco[bancoSelecionadoId] ?? {}
-    : {};
-  const valoresSalvosBancoSelecionado: ValoresNumericosPorConta = bancoSelecionadoId
-    ? valoresSalvosPorBanco[bancoSelecionadoId] ?? {}
-    : {};
+  let valoresBancoSelecionado: ValoresTextoPorConta = {};
+  let valoresSalvosBancoSelecionado: ValoresNumericosPorConta = {};
+  let contasBancoSelecionado: ContaOption[] = [];
 
-  const contasBancoSelecionado = bancoSelecionadoId
-    ? contasPorBanco.get(bancoSelecionadoId) ?? []
-    : [];
+  if (bancoSelecionadoId !== null) {
+    valoresBancoSelecionado = valoresPorBanco[bancoSelecionadoId] ?? {};
+    valoresSalvosBancoSelecionado = valoresSalvosPorBanco[bancoSelecionadoId] ?? {};
+    contasBancoSelecionado = contasPorBanco.get(bancoSelecionadoId) ?? [];
+  }
 
   return (
     <>
@@ -857,9 +876,9 @@ export default function LancamentoCobrancaPage() {
               </div>
               <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
                 <div className="border-b border-gray-200 px-4 py-3">
-                  <h3 className="text-base font-semibold text-gray-900">Resumo por banco (lançamentos salvos)</h3>
+                  <h3 className="text-base font-semibold text-gray-900">Resumo por banco (valores registrados)</h3>
                   <p className="mt-1 text-xs text-gray-500">
-                    Exibe somente os bancos que possuem valores registrados para a data selecionada.
+                    Mostra apenas os bancos da tabela <strong>ban_bancos</strong> que possuem lançamentos para a data selecionada.
                   </p>
                 </div>
                 <div className="px-4 py-3">
@@ -899,9 +918,9 @@ export default function LancamentoCobrancaPage() {
               </div>
               <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
                 <div className="border-b border-gray-200 px-4 py-3">
-                  <h3 className="text-base font-semibold text-gray-900">Resumo por tipo (lançamentos salvos)</h3>
+                  <h3 className="text-base font-semibold text-gray-900">Resumo por tipo de receita (registros existentes)</h3>
                   <p className="mt-1 text-xs text-gray-500">
-                    Consolida os valores registrados por código de receita na data selecionada.
+                    Agrupa os lançamentos registrados por código na tabela <strong>tip_tipos_receita</strong> para a data selecionada.
                   </p>
                 </div>
                 <div className="px-4 py-3">
@@ -958,65 +977,50 @@ export default function LancamentoCobrancaPage() {
               </div>
             )}
 
-            <div className="grid gap-4 md:grid-cols-[minmax(0,320px)_minmax(0,1fr)] md:items-start">
-              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm space-y-3">
-                <div>
+            <div className="grid gap-4 md:grid-cols-[minmax(0,360px)_minmax(0,1fr)] md:items-start">
+              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm space-y-4">
+                <div className="space-y-1">
                   <h3 className="text-base font-semibold text-gray-900">Seleção do banco</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Escolha o banco para informar os valores das contas de receita 200 e 201.
+                  <p className="text-sm text-gray-500">
+                    Os bancos listados abaixo são carregados da tabela <strong>ban_bancos</strong> e devem possuir contas de receita vinculadas.
                   </p>
                 </div>
-                <select
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  value={bancoSelecionadoId ?? ''}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    setBancoSelecionadoId(value ? Number(value) : null);
-                    setMensagem(null);
-                  }}
-                  disabled={bancos.length === 0}
-                >
-                  <option value="">Selecione um banco</option>
-                  {bancos.map((banco) => (
-                    <option key={banco.id} value={banco.id}>
-                      {banco.nome}
-                    </option>
-                  ))}
-                </select>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Escolha o banco para lançar os valores de cobrança
+                    <select
+                      className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      value={bancoSelecionadoId ?? ''}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setBancoSelecionadoId(value ? Number(value) : null);
+                        setMensagem(null);
+                      }}
+                      disabled={bancos.length === 0}
+                    >
+                      <option value="">Selecione um banco</option>
+                      {bancos.map((banco) => (
+                        <option key={banco.id} value={banco.id}>
+                          {banco.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <ul className="list-disc space-y-1 pl-5 text-xs text-gray-500">
+                    <li>Somente bancos com contas 200 e 201 associadas estarão habilitados para lançamento.</li>
+                    <li>Se o banco desejado não aparecer, confira o cadastro e a vinculação das contas no painel administrativo.</li>
+                  </ul>
+                </div>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <h3 className="text-base font-semibold text-gray-900">Seleção do banco</h3>
-              <p className="text-sm text-gray-500">
-                Escolha o banco para informar os valores das contas contábeis configuradas na tabela de tipos de receita.
-              </p>
-              <select
-                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 md:w-80"
-                value={bancoSelecionadoId ?? ''}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setBancoSelecionadoId(value ? Number(value) : null);
-                  setMensagem(null);
-                }}
-                disabled={bancos.length === 0}
-              >
-                <option value="">Selecione um banco</option>
-                {bancos.map((banco) => (
-                  <option key={banco.id} value={banco.id}>
-                    {banco.nome}
-                  </option>
-                ))}
-              </select>
             </div>
 
             {contas.length > 0 && tiposOrdenados.length > 0 && (
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
                   <div className="border-b border-gray-200 px-4 py-3">
-                    <h3 className="text-base font-semibold text-gray-900">Resumo por banco (formulário)</h3>
+                    <h3 className="text-base font-semibold text-gray-900">Resumo por banco (valores informados)</h3>
                     <p className="mt-1 text-xs text-gray-500">
-                      Visualize o total informado em cada banco antes de salvar os lançamentos do dia.
+                      Verifique o total digitado para cada banco antes de registrar os lançamentos no Supabase.
                     </p>
                   </div>
                   <div className="px-4 py-3">
@@ -1058,9 +1062,9 @@ export default function LancamentoCobrancaPage() {
                 </div>
                 <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
                   <div className="border-b border-gray-200 px-4 py-3">
-                    <h3 className="text-base font-semibold text-gray-900">Resumo por tipo (formulário)</h3>
+                    <h3 className="text-base font-semibold text-gray-900">Resumo por tipo de receita (valores informados)</h3>
                     <p className="mt-1 text-xs text-gray-500">
-                      Acompanhe o total distribuído por código de receita considerando todas as contas e bancos preenchidos.
+                      Acompanhe como os valores informados foram distribuídos entre os códigos disponíveis.
                     </p>
                   </div>
                   <div className="px-4 py-3">
@@ -1108,9 +1112,9 @@ export default function LancamentoCobrancaPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
                   <div className="border-b border-gray-200 px-4 py-3">
-                    <h3 className="text-base font-semibold text-gray-900">Valores já registrados por banco</h3>
+                    <h3 className="text-base font-semibold text-gray-900">Valores salvos por banco</h3>
                     <p className="mt-1 text-xs text-gray-500">
-                      Total atualmente salvo na base de dados para a data selecionada.
+                      Consultado diretamente na tabela <strong>cob_cobrancas</strong> para a data escolhida.
                     </p>
                   </div>
                   <div className="px-4 py-3">
@@ -1151,9 +1155,9 @@ export default function LancamentoCobrancaPage() {
 
                 <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
                   <div className="border-b border-gray-200 px-4 py-3">
-                    <h3 className="text-base font-semibold text-gray-900">Valores já registrados por tipo</h3>
+                    <h3 className="text-base font-semibold text-gray-900">Valores salvos por tipo de receita</h3>
                     <p className="mt-1 text-xs text-gray-500">
-                      Totais consolidados por código de receita com base nos lançamentos existentes.
+                      Totalização dos lançamentos aprovados por código de receita para a data selecionada.
                     </p>
                   </div>
                   <div className="px-4 py-3">
@@ -1191,9 +1195,9 @@ export default function LancamentoCobrancaPage() {
                           </tfoot>
                         </table>
                       </div>
-                    </div>
-                  );
-                })}
+                    )}
+                  </div>
+                </div>
               </div>
             ) : null}
 
@@ -1241,9 +1245,16 @@ export default function LancamentoCobrancaPage() {
                       <div key={`conta-${conta.id}`} className="rounded-lg border border-gray-200 bg-white shadow-sm">
                         <div className="border-b border-gray-200 px-4 py-3">
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div>
-                              <h3 className="text-base font-semibold text-gray-900">{descricaoConta.titulo}</h3>
-                              <p className="mt-1 text-xs text-gray-500">{descricaoConta.descricao}</p>
+                            <div className="space-y-2">
+                              <div>
+                                <h3 className="text-base font-semibold text-gray-900">{descricaoConta.titulo}</h3>
+                                <p className="mt-1 text-xs text-gray-500">{descricaoConta.subtitulo}</p>
+                              </div>
+                              <ul className="list-disc space-y-1 pl-5 text-xs text-gray-500">
+                                {descricaoConta.topicos.map((topico, index) => (
+                                  <li key={`topico-${conta.id}-${index}`}>{topico}</li>
+                                ))}
+                              </ul>
                             </div>
                             <div className="text-right text-xs text-gray-500">
                               <div>Conta: {conta.nome}</div>
