@@ -841,297 +841,65 @@ export default function LancamentoCobrancaPage() {
       <div className="page-content space-y-6">
         <Card>
           <form className="space-y-6" onSubmit={handleSalvarLancamentos}>
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,260px)_repeat(2,minmax(0,1fr))]">
-              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm space-y-3">
-                <label className="block text-sm font-medium text-gray-700">
-                  Data dos lançamentos
-                  <input
-                    type="date"
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    min={limiteRetroativo}
-                    max={hojeIso}
-                    value={dataReferencia}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      if (!value) return;
-                      setDataReferencia(value);
-                      setMensagem(null);
-                    }}
-                  />
-                </label>
-                {!podeEditar && (
-                  <div className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-xs text-warning-800">
-                    Edição disponível apenas para os últimos 7 dias úteis. Ajuste a data para atualizar os valores.
-                  </div>
-                )}
-                <div className="rounded-md border border-dashed border-primary-200 bg-primary-50 px-3 py-2 text-xs text-primary-700">
-                  <div className="font-medium text-primary-800">Limite de edição</div>
-                  <div className="mt-1">
-                    Os lançamentos podem ser criados ou ajustados até 7 dias retroativos em relação a {formatarDataPt(hojeIso)}.
-                  </div>
-                  <div className="mt-1">
-                    Intervalo permitido: {formatarDataPt(limiteRetroativo)} até {formatarDataPt(hojeIso)}.
-                  </div>
+            {/* Seleção de data no topo */}
+            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm space-y-3">
+              <label className="block text-sm font-medium text-gray-700">
+                Data de registro da movimentação
+                <input
+                  type="date"
+                  className="mt-1 w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  min={limiteRetroativo}
+                  max={hojeIso}
+                  value={dataReferencia}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (!value) return;
+                    setDataReferencia(value);
+                    setMensagem(null);
+                  }}
+                />
+              </label>
+              {!podeEditar && (
+                <div className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-xs text-warning-800">
+                  Edição disponível apenas para os últimos 7 dias úteis. Ajuste a data para atualizar os valores.
                 </div>
-              </div>
-              <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-                <div className="border-b border-gray-200 px-4 py-3">
-                  <h3 className="text-base font-semibold text-gray-900">Resumo por banco (valores registrados)</h3>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Mostra apenas os bancos da tabela <strong>ban_bancos</strong> que possuem lançamentos para a data selecionada.
-                  </p>
+              )}
+              <div className="rounded-md border border-dashed border-primary-200 bg-primary-50 px-3 py-2 text-xs text-primary-700">
+                <div className="font-medium text-primary-800">Limite de edição</div>
+                <div className="mt-1">
+                  Os lançamentos podem ser criados ou ajustados até 7 dias retroativos em relação a {formatarDataPt(hojeIso)}.
                 </div>
-                <div className="px-4 py-3">
-                  {resumoLancadoPorBanco.length === 0 ? (
-                    <p className="text-sm text-gray-500">Nenhum lançamento salvo para exibir o resumo por banco.</p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-3 py-2 text-left font-semibold text-gray-600">Banco</th>
-                            <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor registrado</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 bg-white">
-                          {resumoLancadoPorBanco.map((linha) => (
-                            <tr key={`salvo-banco-${linha.bancoId}`}>
-                              <td className="px-3 py-2 text-gray-700">{linha.bancoNome}</td>
-                              <td className="px-3 py-2 text-right font-medium text-gray-900">
-                                {formatCurrency(linha.total)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot className="bg-gray-50">
-                          <tr>
-                            <th className="px-3 py-2 text-left font-semibold text-gray-700">Total</th>
-                            <th className="px-3 py-2 text-right font-semibold text-gray-900">
-                              {formatCurrency(totalLancadoPorBanco)}
-                            </th>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-                <div className="border-b border-gray-200 px-4 py-3">
-                  <h3 className="text-base font-semibold text-gray-900">Resumo por tipo de receita (registros existentes)</h3>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Agrupa os lançamentos registrados por código na tabela <strong>tip_tipos_receita</strong> para a data selecionada.
-                  </p>
-                </div>
-                <div className="px-4 py-3">
-                  {resumoLancadoPorTipo.length === 0 ? (
-                    <p className="text-sm text-gray-500">Nenhum lançamento salvo para exibir o resumo por tipo.</p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-3 py-2 text-left font-semibold text-gray-600">Tipo de receita</th>
-                            <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor registrado</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 bg-white">
-                          {resumoLancadoPorTipo.map((linha) => (
-                            <tr key={`resumo-salvo-tipo-${linha.tipoId}`}>
-                              <td className="px-3 py-2 text-gray-700">
-                                <div className="font-semibold text-gray-900">{linha.nome}</div>
-                                <div className="text-xs text-gray-500">Código: {linha.codigo}</div>
-                              </td>
-                              <td className="px-3 py-2 text-right font-medium text-gray-900">
-                                {formatCurrency(linha.total)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot className="bg-gray-50">
-                          <tr>
-                            <th className="px-3 py-2 text-left font-semibold text-gray-700">Total geral</th>
-                            <th className="px-3 py-2 text-right font-semibold text-gray-900">
-                              {formatCurrency(totalLancadoPorTipo)}
-                            </th>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  )}
+                <div className="mt-1">
+                  Intervalo permitido: {formatarDataPt(limiteRetroativo)} até {formatarDataPt(hojeIso)}.
                 </div>
               </div>
             </div>
 
-            {mensagem && (
-              <div
-                className={`rounded-md border px-4 py-3 text-sm ${
-                  mensagem.tipo === 'sucesso'
-                    ? 'border-success-200 bg-success-50 text-success-700'
-                    : mensagem.tipo === 'erro'
-                    ? 'border-error-200 bg-error-50 text-error-700'
-                    : 'border-primary-200 bg-primary-50 text-primary-800'
-                }`}
-              >
-                {mensagem.texto}
-              </div>
-            )}
-
-            <div className="grid gap-4 md:grid-cols-[minmax(0,360px)_minmax(0,1fr)] md:items-start">
-              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm space-y-4">
-                <div className="space-y-1">
-                  <h3 className="text-base font-semibold text-gray-900">Seleção do banco</h3>
-                  <p className="text-sm text-gray-500">
-                    Os bancos listados abaixo são carregados da tabela <strong>ban_bancos</strong> e devem possuir contas de receita vinculadas.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Escolha o banco para lançar os valores de cobrança
-                    <select
-                      className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      value={bancoSelecionadoId ?? ''}
-                      onChange={(event) => {
-                        const value = event.target.value;
-                        setBancoSelecionadoId(value ? Number(value) : null);
-                        setMensagem(null);
-                      }}
-                      disabled={bancos.length === 0}
-                    >
-                      <option value="">Selecione um banco</option>
-                      {bancos.map((banco) => (
-                        <option key={banco.id} value={banco.id}>
-                          {banco.nome}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <ul className="list-disc space-y-1 pl-5 text-xs text-gray-500">
-                    <li>Somente bancos com contas 200 e 201 associadas estarão habilitados para lançamento.</li>
-                    <li>Se o banco desejado não aparecer, confira o cadastro e a vinculação das contas no painel administrativo.</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            {contas.length > 0 && tiposOrdenados.length > 0 && (
+            {/* Dois cards de resumo lado a lado */}
+            {(resumoLancadoPorBanco.length > 0 || resumoLancadoPorTipo.length > 0) && (
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
                   <div className="border-b border-gray-200 px-4 py-3">
-                    <h3 className="text-base font-semibold text-gray-900">Resumo por banco (valores informados)</h3>
+                    <h3 className="text-base font-semibold text-gray-900">Resumo por banco</h3>
                     <p className="mt-1 text-xs text-gray-500">
-                      Verifique o total digitado para cada banco antes de registrar os lançamentos no Supabase.
-                    </p>
-                  </div>
-                  <div className="px-4 py-3">
-                    {resumoFormularioPorBanco.length === 0 ? (
-                      <p className="text-sm text-gray-500">
-                        Nenhum valor informado nas contas bancárias selecionadas.
-                      </p>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-3 py-2 text-left font-semibold text-gray-600">Banco</th>
-                              <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor informado</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100 bg-white">
-                            {resumoFormularioPorBanco.map((resumo) => (
-                              <tr key={`form-resumo-${resumo.bancoId ?? 'sem-banco'}`}>
-                                <td className="px-3 py-2 text-gray-700">{resumo.bancoNome}</td>
-                                <td className="px-3 py-2 text-right font-medium text-gray-900">
-                                  {formatCurrency(resumo.total)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot className="bg-gray-50">
-                            <tr>
-                              <th className="px-3 py-2 text-left font-semibold text-gray-700">Total</th>
-                              <th className="px-3 py-2 text-right font-semibold text-gray-900">
-                                {formatCurrency(totalFormulario)}
-                              </th>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-                  <div className="border-b border-gray-200 px-4 py-3">
-                    <h3 className="text-base font-semibold text-gray-900">Resumo por tipo de receita (valores informados)</h3>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Acompanhe como os valores informados foram distribuídos entre os códigos disponíveis.
-                    </p>
-                  </div>
-                  <div className="px-4 py-3">
-                    {resumoTiposFormulario.length === 0 ? (
-                      <p className="text-sm text-gray-500">Nenhum valor informado para os tipos de receita disponíveis.</p>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-3 py-2 text-left font-semibold text-gray-600">Tipo de receita</th>
-                              <th className="px-3 py-2 text-right font-semibold text-gray-600">Total</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100 bg-white">
-                            {resumoTiposFormulario.map((linha) => (
-                              <tr key={`resumo-form-tipo-${linha.tipoId}`}>
-                                <td className="px-3 py-2 text-gray-700">
-                                  <div className="font-semibold text-gray-900">{linha.nome}</div>
-                                  <div className="text-xs text-gray-500">Código: {linha.codigo}</div>
-                                </td>
-                                <td className="px-3 py-2 text-right font-medium text-gray-900">
-                                  {formatCurrency(linha.total)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot className="bg-gray-50">
-                            <tr>
-                              <th className="px-3 py-2 text-left font-semibold text-gray-700">Total geral</th>
-                              <th className="px-3 py-2 text-right font-semibold text-gray-900">
-                                {formatCurrency(totalResumoTiposFormulario)}
-                              </th>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {resumoLancadoPorBanco.length > 0 || resumoLancadoPorTipo.length > 0 ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-                  <div className="border-b border-gray-200 px-4 py-3">
-                    <h3 className="text-base font-semibold text-gray-900">Valores salvos por banco</h3>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Consultado diretamente na tabela <strong>cob_cobrancas</strong> para a data escolhida.
+                      Lançamentos registrados por conta de banco
                     </p>
                   </div>
                   <div className="px-4 py-3">
                     {resumoLancadoPorBanco.length === 0 ? (
-                      <p className="text-sm text-gray-500">Nenhum lançamento salvo para a data informada.</p>
+                      <p className="text-sm text-gray-500">Nenhum lançamento registrado</p>
                     ) : (
                       <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200 text-sm">
                           <thead className="bg-gray-50">
                             <tr>
                               <th className="px-3 py-2 text-left font-semibold text-gray-600">Banco</th>
-                              <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor registrado</th>
+                              <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100 bg-white">
                             {resumoLancadoPorBanco.map((linha) => (
-                              <tr key={`salvo-banco-${linha.bancoId ?? 'sem'}`}>
+                              <tr key={`resumo-banco-${linha.bancoId}`}>
                                 <td className="px-3 py-2 text-gray-700">{linha.bancoNome}</td>
                                 <td className="px-3 py-2 text-right font-medium text-gray-900">
                                   {formatCurrency(linha.total)}
@@ -1155,26 +923,26 @@ export default function LancamentoCobrancaPage() {
 
                 <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
                   <div className="border-b border-gray-200 px-4 py-3">
-                    <h3 className="text-base font-semibold text-gray-900">Valores salvos por tipo de receita</h3>
+                    <h3 className="text-base font-semibold text-gray-900">Resumo por tipo de receita</h3>
                     <p className="mt-1 text-xs text-gray-500">
-                      Totalização dos lançamentos aprovados por código de receita para a data selecionada.
+                      Lançamentos registrados por tipo de receita
                     </p>
                   </div>
                   <div className="px-4 py-3">
                     {resumoLancadoPorTipo.length === 0 ? (
-                      <p className="text-sm text-gray-500">Nenhum lançamento salvo para exibir o resumo por tipo.</p>
+                      <p className="text-sm text-gray-500">Nenhum lançamento registrado</p>
                     ) : (
                       <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200 text-sm">
                           <thead className="bg-gray-50">
                             <tr>
                               <th className="px-3 py-2 text-left font-semibold text-gray-600">Tipo de receita</th>
-                              <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor registrado</th>
+                              <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100 bg-white">
                             {resumoLancadoPorTipo.map((linha) => (
-                              <tr key={`salvo-tipo-${linha.tipoId}`}>
+                              <tr key={`resumo-tipo-${linha.tipoId}`}>
                                 <td className="px-3 py-2 text-gray-700">
                                   <div className="font-semibold text-gray-900">{linha.nome}</div>
                                   <div className="text-xs text-gray-500">Código: {linha.codigo}</div>
@@ -1187,7 +955,7 @@ export default function LancamentoCobrancaPage() {
                           </tbody>
                           <tfoot className="bg-gray-50">
                             <tr>
-                              <th className="px-3 py-2 text-left font-semibold text-gray-700">Total geral</th>
+                              <th className="px-3 py-2 text-left font-semibold text-gray-700">Total</th>
                               <th className="px-3 py-2 text-right font-semibold text-gray-900">
                                 {formatCurrency(totalLancadoPorTipo)}
                               </th>
@@ -1199,7 +967,53 @@ export default function LancamentoCobrancaPage() {
                   </div>
                 </div>
               </div>
-            ) : null}
+            )}
+
+            {mensagem && (
+              <div
+                className={`rounded-md border px-4 py-3 text-sm ${
+                  mensagem.tipo === 'sucesso'
+                    ? 'border-success-200 bg-success-50 text-success-700'
+                    : mensagem.tipo === 'erro'
+                    ? 'border-error-200 bg-error-50 text-error-700'
+                    : 'border-primary-200 bg-primary-50 text-primary-800'
+                }`}
+              >
+                {mensagem.texto}
+              </div>
+            )}
+
+            {/* Seletor de banco */}
+            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm space-y-4">
+              <div className="space-y-1">
+                <h3 className="text-base font-semibold text-gray-900">Seleção do banco</h3>
+                <p className="text-sm text-gray-500">
+                  Selecione o banco para registrar os lançamentos. Todos os bancos cadastrados na tabela <strong>ban_bancos</strong> estão listados abaixo.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Banco
+                  <select
+                    className="mt-1 w-full max-w-md rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    value={bancoSelecionadoId ?? ''}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setBancoSelecionadoId(value ? Number(value) : null);
+                      setMensagem(null);
+                    }}
+                    disabled={bancos.length === 0}
+                  >
+                    <option value="">Selecione um banco</option>
+                    {bancos.map((banco) => (
+                      <option key={banco.id} value={banco.id}>
+                        {banco.nome}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
 
             {carregandoLancamentos ? (
               <div className="py-12">
@@ -1217,18 +1031,32 @@ export default function LancamentoCobrancaPage() {
               <div className="rounded-md border border-warning-200 bg-warning-50 px-4 py-6 text-center text-sm text-warning-800">
                 Nenhuma conta de receita foi vinculada ao banco selecionado. Configure as contas 200 e 201 para continuar.
               </div>
-            ) : (
-              <div className="space-y-6">
-                {contasBancoSelecionado
-                  .slice()
-                  .sort((a, b) => {
-                    const diffCodigo = a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true, sensitivity: 'base' });
-                    if (diffCodigo !== 0) {
-                      return diffCodigo;
-                    }
-                    return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' });
-                  })
-                  .map((conta) => {
+            ) : (() => {
+                const contasFiltradas = contasBancoSelecionado.filter((conta) => {
+                  const codigo = normalizarCodigoConta(conta.codigo);
+                  return codigo === '200' || codigo === '201';
+                });
+
+                if (contasFiltradas.length === 0) {
+                  return (
+                    <div className="rounded-md border border-warning-200 bg-warning-50 px-4 py-6 text-center text-sm text-warning-800">
+                      O banco selecionado não possui as contas de receita 200 e 201 vinculadas. Configure estas contas para continuar.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-6">
+                    {contasFiltradas
+                      .slice()
+                      .sort((a, b) => {
+                        const diffCodigo = a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true, sensitivity: 'base' });
+                        if (diffCodigo !== 0) {
+                          return diffCodigo;
+                        }
+                        return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' });
+                      })
+                      .map((conta) => {
                     const descricaoConta = obterDescricaoConta(conta);
                     const valoresContaSelecionada = valoresBancoSelecionado[conta.id] ?? {};
                     const totalConta = Object.values(valoresContaSelecionada).reduce((acc, valorTexto) => {
@@ -1358,8 +1186,9 @@ export default function LancamentoCobrancaPage() {
                       </div>
                     );
                   })}
-              </div>
-            )}
+                  </div>
+                );
+              })()}
 
             <div className="flex justify-end">
               <Button
