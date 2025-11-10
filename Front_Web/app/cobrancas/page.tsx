@@ -802,6 +802,9 @@ export default function LancamentoCobrancaPage() {
         texto: 'Lançamentos de cobrança atualizados com sucesso.',
       });
 
+      // Limpa os campos do formulário após salvar
+      setValoresPorBanco({});
+
       await carregarLancamentosDia(usuario, dataReferencia);
     } catch (error) {
       console.error('Erro ao registrar cobranças:', error);
@@ -1145,8 +1148,8 @@ export default function LancamentoCobrancaPage() {
                                             )
                                           }
                                           onKeyDown={(event) => {
-                                            // Enter move para próximo campo ao invés de submeter
-                                            if (event.key === 'Enter') {
+                                            // Enter, Tab e Seta para baixo movem para próximo campo
+                                            if (event.key === 'Enter' || event.key === 'ArrowDown' || event.key === 'Tab') {
                                               event.preventDefault();
                                               const inputs = Array.from(
                                                 document.querySelectorAll('input[type="text"]:not([disabled])')
@@ -1154,6 +1157,17 @@ export default function LancamentoCobrancaPage() {
                                               const currentIndex = inputs.indexOf(event.currentTarget as HTMLInputElement);
                                               if (currentIndex >= 0 && currentIndex < inputs.length - 1) {
                                                 inputs[currentIndex + 1].focus();
+                                              }
+                                            }
+                                            // Seta para cima move para campo anterior
+                                            if (event.key === 'ArrowUp') {
+                                              event.preventDefault();
+                                              const inputs = Array.from(
+                                                document.querySelectorAll('input[type="text"]:not([disabled])')
+                                              ) as HTMLInputElement[];
+                                              const currentIndex = inputs.indexOf(event.currentTarget as HTMLInputElement);
+                                              if (currentIndex > 0) {
+                                                inputs[currentIndex - 1].focus();
                                               }
                                             }
                                           }}

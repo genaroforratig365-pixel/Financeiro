@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 import { Header } from '@/components/layout';
 import { Button, Card, Loading } from '@/components/ui';
@@ -379,72 +381,148 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
   }, [relatorio, saldoInicialTotal, resultadoSemana]);
 
   const handleExportPdf = () => {
-    if (!reportRef.current) {
+    if (!relatorio) {
+      alert('Nenhum relatório disponível para exportar.');
       return;
     }
 
-    const html = reportRef.current.innerHTML;
-    const titulo = 'Previsão de Pagamentos';
-    const janela = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=900');
-    if (!janela) {
-      return;
+    try {
+      const doc = new jsPDF('landscape', 'mm', 'a4');
+      const pageWidth = doc.internal.pageSize.getWidth();
+
+      // Título
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Relatório - Previsão Semanal', 14, 15);
+
+      // Período
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      if (semanaAtual) {
+        const dataInicio = formatarData(semanaAtual.inicio);
+        const dataFim = formatarData(semanaAtual.fim);
+        doc.text(`Período: ${dataInicio} a ${dataFim}`, 14, 22);
+      }
+
+      let yPos = 30;
+
+      // Resumo financeiro
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Resumo Financeiro:', 14, yPos);
+      yPos += 7;
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Total de Receitas: ${formatCurrency(totalReceitas)}`, 14, yPos);
+      doc.text(`Total de Despesas: ${formatCurrency(totalDespesas)}`, 90, yPos);
+      yPos += 6;
+      doc.text(`Resultado da Semana: ${formatCurrency(resultadoSemana)}`, 14, yPos);
+      doc.text(`Saldo Final Previsto: ${formatCurrency(saldoFinalPrevisto)}`, 90, yPos);
+      yPos += 10;
+
+      // Tabela principal
+      const datasOrdenadas = relatorio.datas.sort();
+      const headers = ['Categoria', ...datasOrdenadas.map(d => formatarData(d)), 'Total'];
+
+      // Receitas
+      const receitasData = relatorio.receitas.map(row => [
+        row.categoria,
+        ...datasOrdenadas.map(d => formatCurrency(row.valores[d] || 0)),
+        formatCurrency(row.total)
+      ]);
+
+      // Despesas
+      const despesasData = relatorio.despesas.map(row => [
+        row.categoria,
+        ...datasOrdenadas.map(d => formatCurrency(row.valores[d] || 0)),
+        formatCurrency(row.total)
+      ]);
+
+      // Saldos
+      const saldosData = [];
+      if (relatorio.saldoInicial) {
+        saldosData.push([
+          'Saldo inicial',
+          ...datasOrdenadas.map(d => formatCurrency(relatorio.saldoInicial!.valores[d] || 0)),
+          formatCurrency(relatorio.saldoInicial.total)
+        ]);
+      }
+      if (relatorio.saldoDiario) {
+        saldosData.push([
+          'Saldo diário previsto',
+          ...datasOrdenadas.map(d => formatCurrency(relatorio.saldoDiario!.valores[d] || 0)),
+          formatCurrency(relatorio.saldoDiario.total)
+        ]);
+      }
+      if (relatorio.saldoAcumulado) {
+        saldosData.push([
+          'Saldo acumulado previsto',
+          ...datasOrdenadas.map(d => formatCurrency(relatorio.saldoAcumulado!.valores[d] || 0)),
+          formatCurrency(relatorio.saldoAcumulado.total)
+        ]);
+      }
+
+      // Adiciona tabelas
+      if (receitasData.length > 0) {
+        autoTable(doc, {
+          startY: yPos,
+          head: [headers],
+          body: receitasData,
+          headStyles: { fillColor: [34, 197, 94], textColor: 255, fontStyle: 'bold' },
+          margin: { left: 14, right: 14 },
+          theme: 'grid',
+          styles: { fontSize: 8, cellPadding: 2 },
+          columnStyles: {
+            0: { halign: 'left', cellWidth: 50 },
+            [headers.length - 1]: { fontStyle: 'bold' }
+          }
+        });
+        yPos = (doc as any).lastAutoTable.finalY + 8;
+      }
+
+      if (despesasData.length > 0) {
+        autoTable(doc, {
+          startY: yPos,
+          head: [headers],
+          body: despesasData,
+          headStyles: { fillColor: [239, 68, 68], textColor: 255, fontStyle: 'bold' },
+          margin: { left: 14, right: 14 },
+          theme: 'grid',
+          styles: { fontSize: 8, cellPadding: 2 },
+          columnStyles: {
+            0: { halign: 'left', cellWidth: 50 },
+            [headers.length - 1]: { fontStyle: 'bold' }
+          }
+        });
+        yPos = (doc as any).lastAutoTable.finalY + 8;
+      }
+
+      if (saldosData.length > 0) {
+        autoTable(doc, {
+          startY: yPos,
+          head: [headers],
+          body: saldosData,
+          headStyles: { fillColor: [100, 116, 139], textColor: 255, fontStyle: 'bold' },
+          margin: { left: 14, right: 14 },
+          theme: 'grid',
+          styles: { fontSize: 8, cellPadding: 2 },
+          columnStyles: {
+            0: { halign: 'left', cellWidth: 50 },
+            [headers.length - 1]: { fontStyle: 'bold' }
+          }
+        });
+      }
+
+      // Salva o PDF
+      const nomeArquivo = semanaAtual
+        ? `Previsao_Semanal_${semanaAtual.inicio}_${semanaAtual.fim}.pdf`
+        : 'Previsao_Semanal.pdf';
+      doc.save(nomeArquivo);
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      alert('Erro ao gerar PDF. Verifique o console para mais detalhes.');
     }
-
-    const estilos = `
-      * { font-family: 'Segoe UI', Arial, sans-serif; color: #111827; box-sizing: border-box; }
-      body { margin: 24px; background-color: #f8fafc; }
-      h1 { font-size: 20px; margin-bottom: 4px; }
-      h2 { font-size: 14px; color: #6b7280; margin-bottom: 16px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 12px; background-color: #ffffff; }
-      th, td { border: 1px solid #d1d5db; padding: 8px 10px; font-size: 12px; }
-      th { background-color: #f3f4f6; text-align: right; font-weight: 600; }
-      th:first-child, td:first-child { text-align: left; }
-      .text-right { text-align: right; }
-      .text-left { text-align: left; }
-      .font-semibold { font-weight: 600; }
-      .uppercase { text-transform: uppercase; }
-      .tracking-wide { letter-spacing: 0.05em; }
-      .bg-white { background-color: #ffffff; }
-      .bg-gray-50 { background-color: #f9fafb; }
-      .bg-gray-100 { background-color: #f3f4f6; }
-      .bg-primary-50 { background-color: #eef2ff; }
-      .bg-primary-50\/70 { background-color: rgba(238, 242, 255, 0.7); }
-      .bg-error-50 { background-color: #fee2e2; }
-      .bg-error-50\/70 { background-color: rgba(254, 226, 226, 0.7); }
-      .text-gray-700 { color: #374151; }
-      .text-gray-900 { color: #111827; }
-      .text-primary-800 { color: #3730a3; }
-      .text-primary-900 { color: #312e81; }
-      .text-error-800 { color: #9b1c1c; }
-      .text-error-900 { color: #7f1d1d; }
-      .px-4 { padding-left: 16px; padding-right: 16px; }
-      .py-3 { padding-top: 12px; padding-bottom: 12px; }
-      .rounded-lg { border-radius: 12px; }
-      .border { border: 1px solid #e5e7eb; }
-      .border-gray-200 { border-color: #e5e7eb; }
-      .divide-y > * + * { border-top: 1px solid #e5e7eb; }
-      .divide-gray-100 > * + * { border-color: #f5f5f5; }
-      .divide-gray-200 > * + * { border-color: #e5e7eb; }
-    `;
-
-    const documento = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${titulo}</title><style>${estilos}</style></head><body>${html}</body></html>`;
-
-    // Define o onload ANTES de escrever o documento
-    janela.onload = () => {
-      setTimeout(() => {
-        try {
-          janela.focus();
-          janela.print();
-        } catch (err) {
-          console.error('Erro ao imprimir:', err);
-          alert('Não foi possível abrir a janela de impressão. Verifique se os popups estão habilitados.');
-        }
-      }, 1000);
-    };
-
-    janela.document.open();
-    janela.document.write(documento);
-    janela.document.close();
   };
 
   if (carregandoUsuario) {
@@ -515,16 +593,22 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
         {relatorio && !carregandoDados && (
           <>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-lg border border-primary-200 bg-primary-50/60 p-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-primary-700">Total de Receitas</p>
-                <p className="mt-2 text-2xl font-semibold text-primary-900">{formatCurrency(totalReceitas)}</p>
+              <div className="rounded-lg border border-success-200 bg-success-50/60 p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-success-700">Total de Receitas</p>
+                <p className={`mt-2 text-2xl font-semibold ${totalReceitas >= 0 ? 'text-success-800' : 'text-error-700'}`}>
+                  {formatCurrency(totalReceitas)}
+                </p>
               </div>
               <div className="rounded-lg border border-error-200 bg-error-50/70 p-4 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-wide text-error-700">Total de Despesas</p>
-                <p className="mt-2 text-2xl font-semibold text-error-800">{formatCurrency(totalDespesas)}</p>
+                <p className={`mt-2 text-2xl font-semibold ${totalDespesas >= 0 ? 'text-error-800' : 'text-success-700'}`}>
+                  {formatCurrency(totalDespesas)}
+                </p>
               </div>
-              <div className="rounded-lg border border-success-200 bg-success-50/70 p-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-success-700">Resultado da Semana</p>
+              <div className={`rounded-lg border p-4 shadow-sm ${resultadoSemana >= 0 ? 'border-success-200 bg-success-50/70' : 'border-error-200 bg-error-50/70'}`}>
+                <p className={`text-xs font-semibold uppercase tracking-wide ${resultadoSemana >= 0 ? 'text-success-700' : 'text-error-700'}`}>
+                  Resultado da Semana
+                </p>
                 <p className={`mt-2 text-2xl font-semibold ${resultadoSemana >= 0 ? 'text-success-800' : 'text-error-700'}`}>
                   {formatCurrency(resultadoSemana)}
                 </p>

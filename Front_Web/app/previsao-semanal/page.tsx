@@ -39,6 +39,8 @@ const TITULO_CORRECOES: Record<string, string> = {
   'com materail e consumo': 'material e consumo',
   'com material e consumo': 'material e consumo',
   'COM MATERIAL E CONSUMO': 'MATERIAL E CONSUMO',
+  'GASTO COM MATERIAL E CONSUMO': 'MATERIAL E CONSUMO',
+  'gasto com material e consumo': 'material e consumo',
 };
 
 const TIPO_RECEITA_PREFERENCIAS: Record<string, string> = {
@@ -1117,6 +1119,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
 
       let semanaId = semanaExistente?.pvs_id as number | undefined;
       const semanaFim = toISODate(addDays(new Date(`${semanaSelecionada}T00:00:00`), 4));
+      let chavesParaInserir = new Set<string>(); // Chaves dos itens que devem ser inseridos
 
       if (!semanaId) {
         const { data: criada, error: criarErro } = await supabase
@@ -1132,6 +1135,12 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
 
         if (criarErro) throw criarErro;
         semanaId = criada?.pvs_id as number | undefined;
+
+        // Semana nova - todos os itens devem ser inseridos
+        itensParaInserir.forEach(item => {
+          const chave = `${item.data}|${item.tipo}|${item.categoria}`;
+          chavesParaInserir.add(chave);
+        });
       } else {
         // Semana já existe - carregar itens existentes para comparação
         const { data: itensExistentes, error: carregarErro } = await supabase
@@ -1141,13 +1150,6 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
 
         if (carregarErro) throw carregarErro;
 
-        // Atualiza status da semana
-        const { error: atualizarErro } = await supabase
-          .from('pvs_semanas')
-          .update({ pvs_semana_fim: semanaFim, pvs_status: 'importado' })
-          .eq('pvs_id', semanaId);
-        if (atualizarErro) throw atualizarErro;
-
         // Compara valores e identifica diferenças
         const itensExistentesMap = new Map<string, any>();
         (itensExistentes || []).forEach(item => {
@@ -1156,7 +1158,9 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
         });
 
         const idsParaDeletar: number[] = [];
-        let totalDiferencas = 0;
+        const itensNovos: typeof itensParaInserir = [];
+        const itensModificados: Array<{ existente: number; novo: number }> = [];
+        let totalIguais = 0;
 
         itensParaInserir.forEach(itemNovo => {
           const chave = `${itemNovo.data}|${itemNovo.tipo}|${itemNovo.categoria}`;
@@ -1170,23 +1174,56 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
             if (Math.abs(valorExistente - valorNovo) > 0.01) {
               // Valor diferente - marca para deletar e reinserir
               idsParaDeletar.push(itemExistente.pvi_id);
-              totalDiferencas++;
+              chavesParaInserir.add(chave);
+              itensModificados.push({ existente: valorExistente, novo: valorNovo });
             } else {
-              // Valor igual - não faz nada, mantém o existente
+              // Valor igual - ignora completamente (não insere novamente)
+              totalIguais++;
               itensExistentesMap.delete(chave);
             }
+          } else {
+            // Item novo - marca para inserir
+            chavesParaInserir.add(chave);
+            itensNovos.push(itemNovo);
           }
-          // Se não existe, será inserido normalmente
         });
 
-        // Remove itens que não estão mais no arquivo importado
-        itensExistentesMap.forEach(item => {
+        // Itens removidos (estão no banco mas não no arquivo)
+        const itensRemovidos = Array.from(itensExistentesMap.values());
+        itensRemovidos.forEach(item => {
           idsParaDeletar.push(item.pvi_id);
         });
 
+        // Se há diferenças, pede confirmação
+        const totalDiferencas = itensModificados.length + itensNovos.length + itensRemovidos.length;
+
         if (totalDiferencas > 0) {
-          console.log(`Reimportação: ${totalDiferencas} valores diferentes detectados e serão atualizados.`);
+          let mensagemConfirmacao = `Reimportação detectada! Diferenças encontradas:\n\n`;
+          mensagemConfirmacao += `• ${totalIguais} itens iguais (serão ignorados)\n`;
+          if (itensModificados.length > 0) {
+            mensagemConfirmacao += `• ${itensModificados.length} itens com valores alterados\n`;
+          }
+          if (itensNovos.length > 0) {
+            mensagemConfirmacao += `• ${itensNovos.length} itens novos\n`;
+          }
+          if (itensRemovidos.length > 0) {
+            mensagemConfirmacao += `• ${itensRemovidos.length} itens removidos\n`;
+          }
+          mensagemConfirmacao += `\nDeseja continuar com a atualização?`;
+
+          if (!window.confirm(mensagemConfirmacao)) {
+            setImportando(false);
+            setMensagem({ tipo: 'info', texto: 'Importação cancelada pelo usuário.' });
+            return;
+          }
         }
+
+        // Atualiza status da semana
+        const { error: atualizarErro } = await supabase
+          .from('pvs_semanas')
+          .update({ pvs_semana_fim: semanaFim, pvs_status: 'importado' })
+          .eq('pvs_id', semanaId);
+        if (atualizarErro) throw atualizarErro;
 
         // Deleta apenas os itens que mudaram ou não existem mais
         if (idsParaDeletar.length > 0) {
@@ -1202,11 +1239,12 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
         throw new Error('Semana não pôde ser determinada para importação.');
       }
 
-      // Prepara payload apenas com itens novos ou modificados
+      // Prepara payload apenas com itens novos ou modificados (ignora duplicados)
       const payload = itensParaInserir
         .filter(item => {
-          // Filtra apenas itens que foram marcados para atualização ou são novos
-          return true; // Por simplicidade, inserimos todos - os duplicados já foram deletados
+          const chave = `${item.data}|${item.tipo}|${item.categoria}`;
+          // Insere apenas itens marcados para inserção (novos ou modificados)
+          return chavesParaInserir.has(chave);
         })
         .map((item) => ({
           pvi_pvs_id: semanaId,
