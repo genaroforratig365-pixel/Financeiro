@@ -519,10 +519,10 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
       try {
         setCarregandoPrevisao(true);
         const supabase = getSupabaseClient();
+        // Todos os usuários podem visualizar todas as semanas
         const { data: semana, error: semanaErro } = await supabase
           .from('pvs_semanas')
           .select('pvs_id, pvs_status')
-          .eq('pvs_usr_id', usuarioId)
           .eq('pvs_semana_inicio', semanaInicio)
           .maybeSingle();
 
@@ -1105,10 +1105,10 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
       setImportando(true);
       setMensagem(null);
       const supabase = getSupabaseClient();
+      // Todos os usuários podem visualizar e importar semanas (dados compartilhados)
       const { data: semanaExistente, error: semanaErro } = await supabase
         .from('pvs_semanas')
         .select('pvs_id')
-        .eq('pvs_usr_id', usuario.usr_id)
         .eq('pvs_semana_inicio', semanaSelecionada)
         .maybeSingle();
 

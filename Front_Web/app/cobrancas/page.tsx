@@ -461,10 +461,10 @@ export default function LancamentoCobrancaPage() {
       try {
         setCarregandoLancamentos(true);
         const supabase = getSupabaseClient();
+        // Todos os usuários podem visualizar todos os lançamentos
         const { data: registros, error } = await supabase
           .from('cob_cobrancas')
           .select('cob_id, cob_ban_id, cob_ctr_id, cob_tpr_id, cob_valor')
-          .eq('cob_usr_id', usuarioAtual.usr_id)
           .eq('cob_data', data);
 
         if (error) throw error;
@@ -621,16 +621,6 @@ export default function LancamentoCobrancaPage() {
       proximo[bancoId] = mapaBanco;
       return proximo;
     });
-  };
-
-  const handlePreencherValorSalvo = (bancoId: number, contaId: number, tipoId: number) => {
-    const valorSalvo = valoresSalvosPorBanco[bancoId]?.[contaId]?.[tipoId] ?? 0;
-    handleValorBancoChange(
-      bancoId,
-      contaId,
-      tipoId,
-      valorSalvo > 0 ? formatarValorParaInput(valorSalvo) : '',
-    );
   };
 
   const handleSalvarLancamentos = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -835,41 +825,56 @@ export default function LancamentoCobrancaPage() {
               </div>
             </div>
 
-            {/* Dois cards de resumo lado a lado */}
-            {(resumoLancadoPorBanco.length > 0 || resumoLancadoPorTipo.length > 0) && (
+            {/* Dois cards de resumo lado a lado - atualiza em tempo real conforme digitação */}
+            {(resumoFormularioPorBanco.length > 0 || resumoTiposFormulario.length > 0 || resumoLancadoPorBanco.length > 0 || resumoLancadoPorTipo.length > 0) && (
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
                   <div className="border-b border-gray-200 px-4 py-3">
                     <h3 className="text-base font-semibold text-gray-900">Resumo por banco</h3>
                     <p className="mt-1 text-xs text-gray-500">
-                      Lançamentos registrados por conta de banco
+                      Valores digitados e salvos por banco
                     </p>
                   </div>
                   <div className="px-4 py-3">
-                    {resumoLancadoPorBanco.length === 0 ? (
-                      <p className="text-sm text-gray-500">Nenhum lançamento registrado</p>
+                    {resumoFormularioPorBanco.length === 0 && resumoLancadoPorBanco.length === 0 ? (
+                      <p className="text-sm text-gray-500">Nenhum valor informado</p>
                     ) : (
                       <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200 text-sm">
                           <thead className="bg-gray-50">
                             <tr>
                               <th className="px-3 py-2 text-left font-semibold text-gray-600">Banco</th>
-                              <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor</th>
+                              <th className="px-3 py-2 text-right font-semibold text-gray-600">Digitado</th>
+                              <th className="px-3 py-2 text-right font-semibold text-gray-600">Salvo</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100 bg-white">
-                            {resumoLancadoPorBanco.map((linha) => (
-                              <tr key={`resumo-banco-${linha.bancoId}`}>
-                                <td className="px-3 py-2 text-gray-700">{linha.bancoNome}</td>
-                                <td className="px-3 py-2 text-right font-medium text-gray-900">
-                                  {formatCurrency(linha.total)}
-                                </td>
-                              </tr>
-                            ))}
+                            {Array.from(new Set([
+                              ...resumoFormularioPorBanco.map(r => r.bancoId),
+                              ...resumoLancadoPorBanco.map(r => r.bancoId)
+                            ])).map((bancoId) => {
+                              const form = resumoFormularioPorBanco.find(r => r.bancoId === bancoId);
+                              const salvo = resumoLancadoPorBanco.find(r => r.bancoId === bancoId);
+                              const nome = form?.bancoNome || salvo?.bancoNome || 'Banco não identificado';
+                              return (
+                                <tr key={`resumo-banco-${bancoId}`}>
+                                  <td className="px-3 py-2 text-gray-700">{nome}</td>
+                                  <td className="px-3 py-2 text-right font-medium text-primary-700">
+                                    {form ? formatCurrency(form.total) : '-'}
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-medium text-gray-900">
+                                    {salvo ? formatCurrency(salvo.total) : '-'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                           <tfoot className="bg-gray-50">
                             <tr>
                               <th className="px-3 py-2 text-left font-semibold text-gray-700">Total</th>
+                              <th className="px-3 py-2 text-right font-semibold text-primary-800">
+                                {formatCurrency(totalFormulario)}
+                              </th>
                               <th className="px-3 py-2 text-right font-semibold text-gray-900">
                                 {formatCurrency(totalLancadoPorBanco)}
                               </th>
@@ -885,37 +890,53 @@ export default function LancamentoCobrancaPage() {
                   <div className="border-b border-gray-200 px-4 py-3">
                     <h3 className="text-base font-semibold text-gray-900">Resumo por tipo de receita</h3>
                     <p className="mt-1 text-xs text-gray-500">
-                      Lançamentos registrados por tipo de receita
+                      Valores digitados e salvos por tipo de receita
                     </p>
                   </div>
                   <div className="px-4 py-3">
-                    {resumoLancadoPorTipo.length === 0 ? (
-                      <p className="text-sm text-gray-500">Nenhum lançamento registrado</p>
+                    {resumoTiposFormulario.length === 0 && resumoLancadoPorTipo.length === 0 ? (
+                      <p className="text-sm text-gray-500">Nenhum valor informado</p>
                     ) : (
                       <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200 text-sm">
                           <thead className="bg-gray-50">
                             <tr>
                               <th className="px-3 py-2 text-left font-semibold text-gray-600">Tipo de receita</th>
-                              <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor</th>
+                              <th className="px-3 py-2 text-right font-semibold text-gray-600">Digitado</th>
+                              <th className="px-3 py-2 text-right font-semibold text-gray-600">Salvo</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100 bg-white">
-                            {resumoLancadoPorTipo.map((linha) => (
-                              <tr key={`resumo-tipo-${linha.tipoId}`}>
-                                <td className="px-3 py-2 text-gray-700">
-                                  <div className="font-semibold text-gray-900">{linha.nome}</div>
-                                  <div className="text-xs text-gray-500">Código: {linha.codigo}</div>
-                                </td>
-                                <td className="px-3 py-2 text-right font-medium text-gray-900">
-                                  {formatCurrency(linha.total)}
-                                </td>
-                              </tr>
-                            ))}
+                            {Array.from(new Set([
+                              ...resumoTiposFormulario.map(r => r.tipoId),
+                              ...resumoLancadoPorTipo.map(r => r.tipoId)
+                            ])).map((tipoId) => {
+                              const form = resumoTiposFormulario.find(r => r.tipoId === tipoId);
+                              const salvo = resumoLancadoPorTipo.find(r => r.tipoId === tipoId);
+                              const nome = form?.nome || salvo?.nome || 'Tipo não identificado';
+                              const codigo = form?.codigo || salvo?.codigo || '';
+                              return (
+                                <tr key={`resumo-tipo-${tipoId}`}>
+                                  <td className="px-3 py-2 text-gray-700">
+                                    <div className="font-semibold text-gray-900">{nome}</div>
+                                    <div className="text-xs text-gray-500">Código: {codigo}</div>
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-medium text-primary-700">
+                                    {form ? formatCurrency(form.total) : '-'}
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-medium text-gray-900">
+                                    {salvo ? formatCurrency(salvo.total) : '-'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                           <tfoot className="bg-gray-50">
                             <tr>
                               <th className="px-3 py-2 text-left font-semibold text-gray-700">Total</th>
+                              <th className="px-3 py-2 text-right font-semibold text-primary-800">
+                                {formatCurrency(totalResumoTiposFormulario)}
+                              </th>
                               <th className="px-3 py-2 text-right font-semibold text-gray-900">
                                 {formatCurrency(totalLancadoPorTipo)}
                               </th>
@@ -1061,6 +1082,19 @@ export default function LancamentoCobrancaPage() {
                                               event.target.value,
                                             )
                                           }
+                                          onKeyDown={(event) => {
+                                            // Enter move para próximo campo ao invés de submeter
+                                            if (event.key === 'Enter') {
+                                              event.preventDefault();
+                                              const inputs = Array.from(
+                                                document.querySelectorAll('input[type="text"]:not([disabled])')
+                                              ) as HTMLInputElement[];
+                                              const currentIndex = inputs.indexOf(event.currentTarget as HTMLInputElement);
+                                              if (currentIndex >= 0 && currentIndex < inputs.length - 1) {
+                                                inputs[currentIndex + 1].focus();
+                                              }
+                                            }
+                                          }}
                                           helperText={
                                             valorCampo
                                               ? (() => {
@@ -1078,31 +1112,18 @@ export default function LancamentoCobrancaPage() {
                                       <td className="px-3 py-2 text-right font-semibold text-gray-900">
                                         {valorSalvo > 0 ? formatCurrency(valorSalvo) : '-'}
                                       </td>
-                                      <td className="px-3 py-2">
-                                        <div className="flex items-center justify-center gap-2">
-                                          <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="secondary"
-                                            onClick={() =>
-                                              handlePreencherValorSalvo(bancoSelecionado.id, conta.id, tipo.id)
-                                            }
-                                            disabled={valorSalvo <= 0 || !podeEditar}
-                                          >
-                                            Reutilizar salvo
-                                          </Button>
-                                          <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() =>
-                                              handleValorBancoChange(bancoSelecionado.id, conta.id, tipo.id, '')
-                                            }
-                                            disabled={valorCampo === '' || !podeEditar}
-                                          >
-                                            Limpar
-                                          </Button>
-                                        </div>
+                                      <td className="px-3 py-2 text-center">
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() =>
+                                            handleValorBancoChange(bancoSelecionado.id, conta.id, tipo.id, '')
+                                          }
+                                          disabled={valorCampo === '' || !podeEditar}
+                                        >
+                                          Excluir movimento
+                                        </Button>
                                       </td>
                                     </tr>
                                   );

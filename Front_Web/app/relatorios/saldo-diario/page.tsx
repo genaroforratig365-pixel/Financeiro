@@ -208,28 +208,25 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
         setCarregandoDados(true);
         const supabase = getSupabaseClient();
 
+        // Todos os usuários podem visualizar todos os dados
         const [previsoesRes, gastosRes, receitasRes, saldosRes] = await Promise.all([
           supabase
             .from('pvi_previsao_itens')
             .select(
               'pvi_tipo, pvi_categoria, pvi_valor, pvi_are_id, pvi_ctr_id, pvi_ban_id, are_areas(are_nome), ctr_contas_receita(ctr_nome, ctr_codigo), ban_bancos(ban_nome), tpr_tipos_receita(tpr_nome)',
             )
-            .eq('pvi_usr_id', usuarioAtual.usr_id)
             .eq('pvi_data', data),
           supabase
             .from('pag_pagamentos_area')
             .select('pag_valor, pag_are_id, are_areas(are_nome)')
-            .eq('pag_usr_id', usuarioAtual.usr_id)
             .eq('pag_data', data),
           supabase
             .from('rec_receitas')
             .select('rec_valor, rec_ctr_id, ctr_contas_receita(ctr_nome, ctr_codigo)')
-            .eq('rec_usr_id', usuarioAtual.usr_id)
             .eq('rec_data', data),
           supabase
             .from('sdb_saldo_banco')
             .select('sdb_saldo, sdb_ban_id, ban_bancos(ban_nome)')
-            .eq('sdb_usr_id', usuarioAtual.usr_id)
             .eq('sdb_data', data),
         ]);
 
@@ -442,17 +439,22 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
 
     const documento = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${titulo}</title><style>${estilos}</style></head><body>${html}</body></html>`;
 
+    // Define o onload ANTES de escrever o documento
+    janela.onload = () => {
+      setTimeout(() => {
+        try {
+          janela.focus();
+          janela.print();
+        } catch (err) {
+          console.error('Erro ao imprimir:', err);
+          alert('Não foi possível abrir a janela de impressão. Verifique se os popups estão habilitados.');
+        }
+      }, 1000);
+    };
+
     janela.document.open();
     janela.document.write(documento);
     janela.document.close();
-
-    // Aguarda a janela carregar completamente antes de imprimir
-    janela.addEventListener('load', () => {
-      setTimeout(() => {
-        janela.focus();
-        janela.print();
-      }, 500);
-    });
   };
 
   const renderTabelaComparativa = useCallback(

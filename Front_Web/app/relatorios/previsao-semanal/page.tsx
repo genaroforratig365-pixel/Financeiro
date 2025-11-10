@@ -176,10 +176,10 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
     async (usuarioAtual: UsuarioRow) => {
       try {
         const supabase = getSupabaseClient();
+        // Todos os usuários podem visualizar todas as semanas
         const { data, error } = await supabase
           .from('pvs_semanas')
           .select('pvs_id, pvs_semana_inicio, pvs_semana_fim, pvs_status')
-          .eq('pvs_usr_id', usuarioAtual.usr_id)
           .order('pvs_semana_inicio', { ascending: false });
 
         if (error) throw error;
@@ -264,18 +264,25 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
         const saldoInicial = construirLinha(saldoInicialItens, datasOrdenadas, 'Saldo inicial');
         const saldoDiario = construirLinha(saldoDiarioItens, datasOrdenadas, 'Saldo diário previsto');
 
-        // Calcula saldo acumulado corretamente: saldo inicial + acumulado de (receitas - despesas)
+        // Calcula saldo acumulado corretamente: primeiro dia usa saldo inicial importado,
+        // demais dias usam saldo do dia anterior + (receitas - despesas) do dia atual
         let saldoAcumulado: ReportRow | null = null;
         if (saldoInicial) {
           const valores: Record<string, number> = {};
-          let acumulado = 0;
+          let saldoAnterior = 0;
 
-          datasOrdenadas.forEach((data) => {
-            const receitaDia = receitas.reduce((sum, row) => sum + (row.valores[data] ?? 0), 0);
-            const despesaDia = despesas.reduce((sum, row) => sum + (row.valores[data] ?? 0), 0);
-            const saldoDiaDia = receitaDia - despesaDia;
-            acumulado += saldoDiaDia;
-            valores[data] = Math.round((saldoInicial.valores[data] ?? 0) + acumulado) * 100 / 100;
+          datasOrdenadas.forEach((data, index) => {
+            if (index === 0) {
+              // Primeiro dia: usa o saldo inicial importado
+              valores[data] = Math.round((saldoInicial.valores[data] ?? 0) * 100) / 100;
+            } else {
+              // Demais dias: saldo anterior + (receitas - despesas) do dia
+              const receitaDia = receitas.reduce((sum, row) => sum + (row.valores[data] ?? 0), 0);
+              const despesaDia = despesas.reduce((sum, row) => sum + (row.valores[data] ?? 0), 0);
+              const saldoDiaDia = receitaDia - despesaDia;
+              valores[data] = Math.round((saldoAnterior + saldoDiaDia) * 100) / 100;
+            }
+            saldoAnterior = valores[data];
           });
 
           const ultimaData = datasOrdenadas[datasOrdenadas.length - 1];
@@ -416,17 +423,22 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
 
     const documento = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${titulo}</title><style>${estilos}</style></head><body>${html}</body></html>`;
 
+    // Define o onload ANTES de escrever o documento
+    janela.onload = () => {
+      setTimeout(() => {
+        try {
+          janela.focus();
+          janela.print();
+        } catch (err) {
+          console.error('Erro ao imprimir:', err);
+          alert('Não foi possível abrir a janela de impressão. Verifique se os popups estão habilitados.');
+        }
+      }, 1000);
+    };
+
     janela.document.open();
     janela.document.write(documento);
     janela.document.close();
-
-    // Aguarda a janela carregar completamente antes de imprimir
-    janela.addEventListener('load', () => {
-      setTimeout(() => {
-        janela.focus();
-        janela.print();
-      }, 500);
-    });
   };
 
   if (carregandoUsuario) {
