@@ -710,35 +710,26 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
         }
 
         const datasSemanaSelecionada = obterDatasDaSemana(semanaSelecionada);
-        const tamanhoEsperado = datasSemanaSelecionada.length;
-        const colunasSelecionadas = datasDetectadas.slice(0, tamanhoEsperado);
+        const dataInicio = datasSemanaSelecionada[0];
+        const dataFim = datasSemanaSelecionada[datasSemanaSelecionada.length - 1];
 
-        const datasCompatíveis = datasSemanaSelecionada.every((dataEsperada, index) => {
-          const detectada = colunasSelecionadas[index];
-          if (!detectada) {
-            return false;
-          }
-
-          if (detectada.data === dataEsperada) {
-            return true;
-          }
-
-          const [, mesEsperado, diaEsperado] = dataEsperada.split('-');
-          const [, mesPlanilha, diaPlanilha] = detectada.data.split('-');
-
-          return mesEsperado === mesPlanilha && diaEsperado === diaPlanilha;
+        // Filtra apenas as datas detectadas que estão dentro do período da semana
+        const colunasDentroDoPeriodo = datasDetectadas.filter((cabecalho) => {
+          const dataDetectada = cabecalho.data;
+          return dataDetectada >= dataInicio && dataDetectada <= dataFim;
         });
 
-        if (colunasSelecionadas.length < tamanhoEsperado || !datasCompatíveis) {
+        if (colunasDentroDoPeriodo.length === 0) {
           throw new Error(
-            'As datas identificadas na planilha não correspondem à semana selecionada. Verifique o arquivo e tente novamente.',
+            `Nenhuma data da planilha está dentro do período selecionado (${formatarDataPt(dataInicio)} a ${formatarDataPt(dataFim)}). Verifique o arquivo e tente novamente.`,
           );
         }
 
-        datasDetectadas = colunasSelecionadas.map((cabecalho, index) => ({
-          coluna: cabecalho.coluna,
-          data: datasSemanaSelecionada[index],
-        }));
+        // Ordena as colunas por data
+        colunasDentroDoPeriodo.sort((a, b) => a.data.localeCompare(b.data));
+
+        // Usa as datas detectadas que estão dentro do período
+        datasDetectadas = colunasDentroDoPeriodo;
 
         const mapaAreas = new Map(areas.map((area) => [area.normalizado, area]));
         const mapaContasCodigo = new Map(contas.map((conta) => [conta.codigo, conta]));

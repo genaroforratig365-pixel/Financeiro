@@ -598,17 +598,7 @@ export default function LancamentoCobrancaPage() {
     };
 
     carregarDados();
-  }, [carregarLancamentosDia, dataReferencia]);
-
-  useEffect(() => {
-    if (!usuario) {
-      return;
-    }
-    if (contas.length === 0 || tipos.length === 0) {
-      return;
-    }
-    carregarLancamentosDia(usuario, dataReferencia);
-  }, [usuario, contas, tipos, dataReferencia, carregarLancamentosDia]);
+  }, [dataReferencia]);
 
   useEffect(() => {
     if (bancos.length > 0 && bancoSelecionadoId === null) {
