@@ -125,6 +125,7 @@ export default function LancamentoCobrancaPage() {
 
   const [dataReferencia, setDataReferencia] = useState(() => toISODate(new Date()));
   const [bancoSelecionadoId, setBancoSelecionadoId] = useState<number | null>(null);
+  const [categoriaSelecionada, setCategoriaSelecionada] = useState<CategoriaPrincipal>('titulos');
 
   const podeEditar = dataReferencia >= limiteRetroativo && dataReferencia <= hojeIso;
 
@@ -133,6 +134,12 @@ export default function LancamentoCobrancaPage() {
     contas.forEach((conta) => mapa.set(conta.id, conta));
     return mapa;
   }, [contas]);
+
+  const tiposMap = useMemo(() => {
+    const mapa = new Map<number, TipoOption>();
+    tipos.forEach((tipo) => mapa.set(tipo.id, tipo));
+    return mapa;
+  }, [tipos]);
 
   const contasPorBanco = useMemo(() => {
     const mapa = new Map<number, ContaOption[]>();
@@ -291,11 +298,96 @@ export default function LancamentoCobrancaPage() {
     return mapa;
   }, [valoresSalvosPorBanco]);
 
+  const resumoLancadoPorBanco = useMemo<ResumoBanco[]>(() => {
+    const linhas: ResumoBanco[] = [];
+
+    Object.entries(valoresSalvosPorBanco).forEach(([bancoIdTexto, valores]) => {
+      const total = Object.values(valores).reduce((acc, valor) => {
+        if (valor > 0 && Number.isFinite(valor)) {
+          return acc + valor;
+        }
+        return acc;
+      }, 0);
+
+      if (total <= 0) {
+        return;
+      }
+
+      const bancoId = Number(bancoIdTexto);
+      const banco = bancos.find((item) => item.id === bancoId);
+      linhas.push({
+        bancoId,
+        bancoNome: banco?.nome ?? 'Sem banco vinculado',
+        total: Math.round(total * 100) / 100,
+      });
+    });
+
+    return linhas.sort((a, b) => a.bancoNome.localeCompare(b.bancoNome, 'pt-BR', { sensitivity: 'base' }));
+  }, [bancos, valoresSalvosPorBanco]);
+
+  const totalLancadoPorBanco = useMemo(() => {
+    return resumoLancadoPorBanco.reduce((acc, item) => acc + item.total, 0);
+  }, [resumoLancadoPorBanco]);
+
+  const resumoLancadoPorTipo = useMemo<ResumoTipo[]>(() => {
+    const totais = new Map<number, number>();
+
+    Object.values(valoresSalvosPorBanco).forEach((tiposBanco) => {
+      Object.entries(tiposBanco).forEach(([tipoIdTexto, valor]) => {
+        if (valor <= 0 || !Number.isFinite(valor)) {
+          return;
+        }
+
+        const tipoId = Number(tipoIdTexto);
+        totais.set(tipoId, (totais.get(tipoId) ?? 0) + valor);
+      });
+    });
+
+    const linhas: ResumoTipo[] = [];
+
+    totais.forEach((total, tipoId) => {
+      const tipo = tiposMap.get(tipoId);
+      if (!tipo) {
+        return;
+      }
+
+      linhas.push({
+        tipoId,
+        nome: tipo.nome,
+        codigo: tipo.codigo,
+        categoria: tipo.categoria,
+        total: Math.round(total * 100) / 100,
+      });
+    });
+
+    return linhas.sort((a, b) => {
+      const codigoDiff = a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true, sensitivity: 'base' });
+      if (codigoDiff !== 0) {
+        return codigoDiff;
+      }
+      return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' });
+    });
+  }, [tiposMap, valoresSalvosPorBanco]);
+
+  const totalLancadoPorTipo = useMemo(() => {
+    return resumoLancadoPorTipo.reduce((acc, item) => acc + item.total, 0);
+  }, [resumoLancadoPorTipo]);
+
   useEffect(() => {
     if (bancos.length > 0 && bancoSelecionadoId === null) {
       setBancoSelecionadoId(bancos[0].id);
     }
   }, [bancos, bancoSelecionadoId]);
+
+  useEffect(() => {
+    if (categoriasPrincipais.length === 0) {
+      return;
+    }
+
+    if (!categoriasPrincipais.some((categoria) => categoria.id === categoriaSelecionada)) {
+      setCategoriaSelecionada(categoriasPrincipais[0].id);
+    }
+  }, [categoriaSelecionada, categoriasPrincipais]);
 
   useEffect(() => {
     if (bancos.length === 0 || tipos.length === 0) {
@@ -680,6 +772,9 @@ export default function LancamentoCobrancaPage() {
     valoresSalvosBancoSelecionado = valoresSalvosPorBanco[bancoSelecionadoId] ?? {};
   }
 
+  const categoriaAtual = categoriasPrincipais.find((categoria) => categoria.id === categoriaSelecionada) ?? null;
+  const tiposCategoriaAtual = categoriaAtual ? tiposPorCategoria[categoriaAtual.id] : [];
+
   return (
     <>
       <Header
@@ -854,7 +949,6 @@ export default function LancamentoCobrancaPage() {
                   </div>
                 </div>
               </div>
-            )}
 
             {carregandoLancamentos ? (
               <div className="py-12">
@@ -1012,7 +1106,9 @@ export default function LancamentoCobrancaPage() {
                                         valorCampo
                                           ? (() => {
                                               const resultado = avaliarValor(valorCampo ?? '');
-                                              return resultado !== null ? `Resultado: ${formatCurrency(resultado)}` : undefined;
+                                              return resultado !== null
+                                                ? `Resultado: ${formatCurrency(resultado)}`
+                                                : undefined;
                                             })()
                                           : undefined
                                       }
