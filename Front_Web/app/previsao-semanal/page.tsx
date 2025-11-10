@@ -354,6 +354,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
     onCancel: () => void;
   } | null>(null);
   const [modoEdicao, setModoEdicao] = useState(false);
+  const [modoInclusao, setModoInclusao] = useState(false);
   const arquivoInputRef = useRef<HTMLInputElement | null>(null);
 
   const datasTabela = useMemo(() => {
@@ -1092,6 +1093,101 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
     setLinhas([]);
     setMensagem(null);
   };
+
+  const handleIniciarInclusao = () => {
+    if (!previsaoExistente) {
+      setMensagem({ tipo: 'erro', texto: 'Não há previsão registrada para incluir novos itens.' });
+      return;
+    }
+
+    const datasSemanaSelecionada = obterDatasDaSemana(semanaSelecionada);
+
+    // Cria uma linha vazia de gasto
+    const novaLinhaGasto: LinhaImportada = {
+      id: gerarUUID(),
+      tipo: 'gasto',
+      titulo: '',
+      valores: datasSemanaSelecionada.map(data => criarDiaValor(data, 0)),
+      selecionado: true,
+      areaId: null,
+      contaId: null,
+      tipoReceitaId: null,
+      bancoId: null,
+      erros: ['Selecione uma área para este gasto.'],
+    };
+
+    // Cria uma linha vazia de receita
+    const novaLinhaReceita: LinhaImportada = {
+      id: gerarUUID(),
+      tipo: 'receita',
+      titulo: '',
+      valores: datasSemanaSelecionada.map(data => criarDiaValor(data, 0)),
+      selecionado: true,
+      areaId: null,
+      contaId: null,
+      tipoReceitaId: null,
+      bancoId: null,
+      erros: ['Selecione uma conta de receita.', 'Informe o tipo de receita correspondente.'],
+    };
+
+    setLinhas([novaLinhaReceita, novaLinhaGasto]);
+    setModoInclusao(true);
+    setMensagem({
+      tipo: 'info',
+      texto: 'Modo de inclusão ativado. Preencha os dados da nova categoria e clique em "Salvar inclusão".'
+    });
+  };
+
+  const handleCancelarInclusao = () => {
+    setModoInclusao(false);
+    setLinhas([]);
+    setMensagem(null);
+  };
+
+  const handleAdicionarLinha = (tipo: 'gasto' | 'receita') => {
+    const datasSemanaSelecionada = obterDatasDaSemana(semanaSelecionada);
+
+    if (tipo === 'gasto') {
+      const novaLinha: LinhaImportada = {
+        id: gerarUUID(),
+        tipo: 'gasto',
+        titulo: '',
+        valores: datasSemanaSelecionada.map(data => criarDiaValor(data, 0)),
+        selecionado: true,
+        areaId: null,
+        contaId: null,
+        tipoReceitaId: null,
+        bancoId: null,
+        erros: ['Selecione uma área para este gasto.'],
+      };
+      setLinhas(prev => [...prev, novaLinha]);
+    } else {
+      const novaLinha: LinhaImportada = {
+        id: gerarUUID(),
+        tipo: 'receita',
+        titulo: '',
+        valores: datasSemanaSelecionada.map(data => criarDiaValor(data, 0)),
+        selecionado: true,
+        areaId: null,
+        contaId: null,
+        tipoReceitaId: null,
+        bancoId: null,
+        erros: ['Selecione uma conta de receita.', 'Informe o tipo de receita correspondente.'],
+      };
+      setLinhas(prev => [novaLinha, ...prev]);
+    }
+  };
+
+  const handleTituloChange = (linhaId: string, novoTitulo: string) => {
+    atualizarLinha(linhaId, (linha) => ({
+      ...linha,
+      titulo: novoTitulo,
+    }));
+  };
+
+  const handleRemoverLinha = (linhaId: string) => {
+    setLinhas(prev => prev.filter(linha => linha.id !== linhaId));
+  };
   const handleImportar = async () => {
     if (!usuario) {
       setMensagem({ tipo: 'erro', texto: 'Usuário não identificado para importar a previsão.' });
@@ -1223,6 +1319,20 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
         const { error: atualizarErro } = await supabase
           .from('pvs_semanas')
           .update({ pvs_semana_fim: semanaFim, pvs_status: 'editado' })
+          .eq('pvs_id', semanaId);
+        if (atualizarErro) throw atualizarErro;
+
+        // Marca todos os itens para inserção
+        itensParaInserir.forEach(item => {
+          const chave = `${item.data}|${item.tipo}|${item.categoria}`;
+          chavesParaInserir.add(chave);
+        });
+      } else if (modoInclusao && semanaId) {
+        // Modo de inclusão: apenas adiciona novos itens sem deletar existentes
+        // Atualiza status da semana
+        const { error: atualizarErro } = await supabase
+          .from('pvs_semanas')
+          .update({ pvs_semana_fim: semanaFim, pvs_status: 'complementado' })
           .eq('pvs_id', semanaId);
         if (atualizarErro) throw atualizarErro;
 
@@ -1378,13 +1488,19 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
 
       const mensagemSucesso = modoEdicao
         ? 'Alterações salvas com sucesso.'
+        : modoInclusao
+        ? 'Novos itens incluídos com sucesso.'
         : 'Previsão semanal importada com sucesso.';
 
       setMensagem({ tipo: 'sucesso', texto: mensagemSucesso });
 
-      // Limpa modo de edição se estava ativo
+      // Limpa modo de edição ou inclusão se estava ativo
       if (modoEdicao) {
         setModoEdicao(false);
+        setLinhas([]);
+      }
+      if (modoInclusao) {
+        setModoInclusao(false);
         setLinhas([]);
       }
 
@@ -1463,7 +1579,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
               </label>
 
               <div className="flex flex-col gap-3">
-                {!modoEdicao && (
+                {!modoEdicao && !modoInclusao && (
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
                     <label className="flex flex-col text-sm font-medium text-gray-700">
                       Arquivo Excel
@@ -1499,7 +1615,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                 )}
 
                 {/* Botões de edição e inclusão */}
-                {previsaoExistente && !modoEdicao && (
+                {previsaoExistente && !modoEdicao && !modoInclusao && (
                   <div className="flex flex-col gap-2 rounded-md border border-primary-200 bg-primary-50/30 p-3">
                     <p className="text-xs font-medium text-primary-800">
                       Ações sobre a previsão existente:
@@ -1518,15 +1634,12 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                         type="button"
                         variant="secondary"
                         size="sm"
-                        onClick={() => alert('Funcionalidade de inclusão será implementada em breve.\n\nPermitirá adicionar novas áreas/categorias não previstas.\n\nLimitação: Apenas 1 área por semana pode ser cadastrada.')}
+                        onClick={handleIniciarInclusao}
                         disabled={!edicaoPermitida}
                       >
-                        Incluir área sem previsão
+                        Incluir categorias adicionais
                       </Button>
                     </div>
-                    <p className="text-xs text-gray-600">
-                      <strong>Importante:</strong> Apenas 1 área pode ser cadastrada por semana.
-                    </p>
                   </div>
                 )}
 
@@ -1555,6 +1668,54 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                         loading={importando}
                       >
                         Salvar alterações
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Modo de inclusão ativo */}
+                {modoInclusao && (
+                  <div className="flex flex-col gap-2 rounded-md border border-primary-200 bg-primary-50/30 p-3">
+                    <p className="text-xs font-medium text-primary-800">
+                      Modo de inclusão ativo - Adicione novas categorias
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleCancelarInclusao}
+                        disabled={importando}
+                      >
+                        Cancelar inclusão
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleAdicionarLinha('receita')}
+                        disabled={importando}
+                      >
+                        + Receita
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleAdicionarLinha('gasto')}
+                        disabled={importando}
+                      >
+                        + Gasto
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        onClick={handleImportar}
+                        disabled={importando || linhas.length === 0}
+                        loading={importando}
+                      >
+                        Salvar inclusão
                       </Button>
                     </div>
                   </div>
@@ -1595,7 +1756,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
           </Card>
         )}
         {linhas.length > 0 && (
-          <Card title={modoEdicao ? "Edição de lançamentos" : "Pré-visualização da importação"}>
+          <Card title={modoEdicao ? "Edição de lançamentos" : modoInclusao ? "Inclusão de categorias" : "Pré-visualização da importação"}>
             <div className="space-y-4">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -1618,6 +1779,11 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                           {formatarDataPt(data)}
                         </th>
                       ))}
+                      {modoInclusao && (
+                        <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          Ações
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 bg-white/80">
@@ -1638,7 +1804,17 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                             </td>
                             <td className="px-3 py-2 align-top">
                               <div className="flex flex-col">
-                                <span className="font-medium text-gray-900">{linha.titulo}</span>
+                                {modoInclusao ? (
+                                  <input
+                                    type="text"
+                                    className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    placeholder="Nome da categoria..."
+                                    value={linha.titulo}
+                                    onChange={(e) => handleTituloChange(linha.id, e.target.value)}
+                                  />
+                                ) : (
+                                  <span className="font-medium text-gray-900">{linha.titulo}</span>
+                                )}
                                 <span className="text-xs text-gray-400 uppercase">{linha.tipo}</span>
                               </div>
                             </td>
@@ -1721,10 +1897,22 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                                 />
                               </td>
                             ))}
+                            {modoInclusao && (
+                              <td className="px-3 py-2 align-top text-center">
+                                <button
+                                  type="button"
+                                  className="rounded-md px-2 py-1 text-xs text-error-600 hover:bg-error-50 hover:text-error-700 focus:outline-none focus:ring-2 focus:ring-error-500"
+                                  onClick={() => handleRemoverLinha(linha.id)}
+                                  title="Remover linha"
+                                >
+                                  ✕
+                                </button>
+                              </td>
+                            )}
                           </tr>
                           {linha.erros.length > 0 && (
                             <tr>
-                              <td colSpan={3 + datasTabela.length} className="bg-error-50 px-3 py-2 text-xs text-error-700">
+                              <td colSpan={3 + datasTabela.length + (modoInclusao ? 1 : 0)} className="bg-error-50 px-3 py-2 text-xs text-error-700">
                                 {linha.erros.join(' ')}
                               </td>
                             </tr>
