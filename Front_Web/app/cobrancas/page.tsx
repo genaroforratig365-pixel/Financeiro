@@ -54,11 +54,7 @@ type ResumoTipo = {
   total: number;
 };
 
-type CategoriaConfig = {
-  chave: CategoriaReceita;
-  titulo: string;
-  descricao: string;
-};
+type CategoriaPrincipal = Extract<CategoriaReceita, 'titulos' | 'depositos'>;
 
 const toISODate = (date: Date): string => date.toISOString().split('T')[0];
 
@@ -105,24 +101,6 @@ const formatarDataPt = (iso: string): string => {
   return `${day}/${month}/${year}`;
 };
 
-const CATEGORIAS_CONFIG: CategoriaConfig[] = [
-  {
-    chave: 'depositos',
-    titulo: 'Depósitos e PIX',
-    descricao: 'Informe aqui os valores recebidos via depósito ou PIX.',
-  },
-  {
-    chave: 'titulos',
-    titulo: 'Títulos',
-    descricao: 'Registre os valores quitados através de boletos e carnês.',
-  },
-  {
-    chave: 'outras',
-    titulo: 'Outras Receitas',
-    descricao: 'Demais recebimentos associados ao banco selecionado.',
-  },
-];
-
 const obterCategoriaPorCodigo = (codigo: string | null): CategoriaReceita => {
   const referencia = (codigo ?? '').trim();
   if (referencia.startsWith('200')) return 'titulos';
@@ -149,6 +127,7 @@ export default function LancamentoCobrancaPage() {
 
   const [dataReferencia, setDataReferencia] = useState(() => toISODate(new Date()));
   const [bancoSelecionadoId, setBancoSelecionadoId] = useState<number | null>(null);
+  const [categoriaSelecionada, setCategoriaSelecionada] = useState<CategoriaPrincipal>('titulos');
 
   const podeEditar = dataReferencia >= limiteRetroativo && dataReferencia <= hojeIso;
 
@@ -157,6 +136,12 @@ export default function LancamentoCobrancaPage() {
     contas.forEach((conta) => mapa.set(conta.id, conta));
     return mapa;
   }, [contas]);
+
+  const tiposMap = useMemo(() => {
+    const mapa = new Map<number, TipoOption>();
+    tipos.forEach((tipo) => mapa.set(tipo.id, tipo));
+    return mapa;
+  }, [tipos]);
 
   const contasPorBanco = useMemo(() => {
     const mapa = new Map<number, ContaOption[]>();
@@ -191,103 +176,27 @@ export default function LancamentoCobrancaPage() {
     return mapa;
   }, [tipos]);
 
-  const resumoFormularioPorBanco = useMemo<ResumoBanco[]>(() => {
-    const totais = new Map<number, number>();
+  const categoriasPrincipais = useMemo(
+    () =>
+      (
+        [
+          {
+            id: 'titulos' as CategoriaPrincipal,
+            titulo: 'Receita de títulos',
+            descricao: 'Tipos vinculados à conta de receita código 200.',
+            codigo: '200',
+          },
+          {
+            id: 'depositos' as CategoriaPrincipal,
+            titulo: 'Receita de depósitos',
+            descricao: 'Tipos vinculados à conta de receita código 201.',
+            codigo: '201',
+          },
+        ] satisfies { id: CategoriaPrincipal; titulo: string; descricao: string; codigo: string }[]
+      ).filter((categoria) => tiposPorCategoria[categoria.id].length > 0),
+    [tiposPorCategoria],
+  );
 
-    Object.entries(valoresPorBanco).forEach(([bancoIdTexto, valores]) => {
-      const totalCalculado = Object.values(valores).reduce((acc, valorTexto) => {
-        const valor = avaliarValor(valorTexto);
-        if (valor !== null && Number.isFinite(valor)) {
-          return acc + valor;
-        }
-        return acc;
-      }, 0);
-
-      if (totalCalculado <= 0) {
-        return;
-      }
-
-      const bancoId = Number(bancoIdTexto);
-      totais.set(bancoId, Math.round(totalCalculado * 100) / 100);
-    });
-
-    return Array.from(totais.entries())
-      .map(([bancoId, total]) => {
-        const banco = bancos.find((item) => item.id === bancoId);
-        return {
-          bancoId,
-          bancoNome: banco?.nome ?? 'Sem banco vinculado',
-          total,
-        } satisfies ResumoBanco;
-      })
-      .sort((a, b) => a.bancoNome.localeCompare(b.bancoNome, 'pt-BR', { sensitivity: 'base' }));
-  }, [bancos, valoresPorBanco]);
-
-  const totalFormulario = useMemo(() => {
-    return resumoFormularioPorBanco.reduce((acc, item) => acc + item.total, 0);
-  }, [resumoFormularioPorBanco]);
-
-  const categoriasResumo = useMemo(() => {
-    return [...CATEGORIAS_CONFIG].sort((a, b) => {
-      if (a.chave === 'titulos' && b.chave !== 'titulos') return 1;
-      if (b.chave === 'titulos' && a.chave !== 'titulos') return -1;
-      return 0;
-    });
-  }, []);
-
-  const resumoTiposPorCategoria = useMemo<Record<CategoriaReceita, ResumoTipo[]>>(() => {
-    const base: Record<CategoriaReceita, ResumoTipo[]> = {
-      depositos: [],
-      titulos: [],
-      outras: [],
-    };
-
-    tipos.forEach((tipo) => {
-      let total = 0;
-
-      Object.values(valoresPorBanco).forEach((valoresBanco) => {
-        const valorCalculado = avaliarValor(valoresBanco[tipo.id] ?? '');
-        if (valorCalculado !== null && Number.isFinite(valorCalculado)) {
-          total += valorCalculado;
-        }
-      });
-
-      base[tipo.categoria].push({
-        tipoId: tipo.id,
-        nome: tipo.nome,
-        codigo: tipo.codigo,
-        categoria: tipo.categoria,
-        total: Math.round(total * 100) / 100,
-      });
-    });
-
-    (Object.keys(base) as CategoriaReceita[]).forEach((categoria) => {
-      base[categoria] = base[categoria].sort((a, b) => {
-        const codigoDiff = a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true, sensitivity: 'base' });
-        if (codigoDiff !== 0) return codigoDiff;
-        return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' });
-      });
-    });
-
-    return base;
-  }, [tipos, valoresPorBanco]);
-
-  const totaisPorCategoria = useMemo<Record<CategoriaReceita, number>>(() => {
-    const totais: Record<CategoriaReceita, number> = {
-      depositos: 0,
-      titulos: 0,
-      outras: 0,
-    };
-
-    (Object.entries(resumoTiposPorCategoria) as [CategoriaReceita, ResumoTipo[]][]).forEach(
-      ([categoria, linhas]) => {
-        const totalCategoria = linhas.reduce((acc, linha) => acc + linha.total, 0);
-        totais[categoria] = Math.round(totalCategoria * 100) / 100;
-      },
-    );
-
-    return totais;
-  }, [resumoTiposPorCategoria]);
 
   const valoresSalvosPorBanco = useMemo<Record<number, Record<number, number>>>(() => {
     const base: Record<number, Record<number, number>> = {};
@@ -319,11 +228,96 @@ export default function LancamentoCobrancaPage() {
     return mapa;
   }, [valoresSalvosPorBanco]);
 
+  const resumoLancadoPorBanco = useMemo<ResumoBanco[]>(() => {
+    const linhas: ResumoBanco[] = [];
+
+    Object.entries(valoresSalvosPorBanco).forEach(([bancoIdTexto, valores]) => {
+      const total = Object.values(valores).reduce((acc, valor) => {
+        if (valor > 0 && Number.isFinite(valor)) {
+          return acc + valor;
+        }
+        return acc;
+      }, 0);
+
+      if (total <= 0) {
+        return;
+      }
+
+      const bancoId = Number(bancoIdTexto);
+      const banco = bancos.find((item) => item.id === bancoId);
+      linhas.push({
+        bancoId,
+        bancoNome: banco?.nome ?? 'Sem banco vinculado',
+        total: Math.round(total * 100) / 100,
+      });
+    });
+
+    return linhas.sort((a, b) => a.bancoNome.localeCompare(b.bancoNome, 'pt-BR', { sensitivity: 'base' }));
+  }, [bancos, valoresSalvosPorBanco]);
+
+  const totalLancadoPorBanco = useMemo(() => {
+    return resumoLancadoPorBanco.reduce((acc, item) => acc + item.total, 0);
+  }, [resumoLancadoPorBanco]);
+
+  const resumoLancadoPorTipo = useMemo<ResumoTipo[]>(() => {
+    const totais = new Map<number, number>();
+
+    Object.values(valoresSalvosPorBanco).forEach((tiposBanco) => {
+      Object.entries(tiposBanco).forEach(([tipoIdTexto, valor]) => {
+        if (valor <= 0 || !Number.isFinite(valor)) {
+          return;
+        }
+
+        const tipoId = Number(tipoIdTexto);
+        totais.set(tipoId, (totais.get(tipoId) ?? 0) + valor);
+      });
+    });
+
+    const linhas: ResumoTipo[] = [];
+
+    totais.forEach((total, tipoId) => {
+      const tipo = tiposMap.get(tipoId);
+      if (!tipo) {
+        return;
+      }
+
+      linhas.push({
+        tipoId,
+        nome: tipo.nome,
+        codigo: tipo.codigo,
+        categoria: tipo.categoria,
+        total: Math.round(total * 100) / 100,
+      });
+    });
+
+    return linhas.sort((a, b) => {
+      const codigoDiff = a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true, sensitivity: 'base' });
+      if (codigoDiff !== 0) {
+        return codigoDiff;
+      }
+      return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' });
+    });
+  }, [tiposMap, valoresSalvosPorBanco]);
+
+  const totalLancadoPorTipo = useMemo(() => {
+    return resumoLancadoPorTipo.reduce((acc, item) => acc + item.total, 0);
+  }, [resumoLancadoPorTipo]);
+
   useEffect(() => {
     if (bancos.length > 0 && bancoSelecionadoId === null) {
       setBancoSelecionadoId(bancos[0].id);
     }
   }, [bancos, bancoSelecionadoId]);
+
+  useEffect(() => {
+    if (categoriasPrincipais.length === 0) {
+      return;
+    }
+
+    if (!categoriasPrincipais.some((categoria) => categoria.id === categoriaSelecionada)) {
+      setCategoriaSelecionada(categoriasPrincipais[0].id);
+    }
+  }, [categoriaSelecionada, categoriasPrincipais]);
 
   useEffect(() => {
     if (bancos.length === 0 || tipos.length === 0) {
@@ -649,6 +643,24 @@ export default function LancamentoCobrancaPage() {
     }
   };
 
+  const totalCategoriaSelecionada = useMemo(() => {
+    if (bancoSelecionadoId === null || bancoSelecionadoId === undefined) {
+      return 0;
+    }
+
+    const valores = valoresPorBanco[bancoSelecionadoId] ?? {};
+    const tiposCategoria = tiposPorCategoria[categoriaSelecionada] ?? [];
+    const total = tiposCategoria.reduce((acc, tipo) => {
+      const resultado = avaliarValor(valores[tipo.id] ?? '');
+      if (resultado === null || !Number.isFinite(resultado)) {
+        return acc;
+      }
+      return acc + resultado;
+    }, 0);
+
+    return Math.round(total * 100) / 100;
+  }, [bancoSelecionadoId, categoriaSelecionada, tiposPorCategoria, valoresPorBanco]);
+
   if (carregando) {
     return (
       <>
@@ -673,6 +685,9 @@ export default function LancamentoCobrancaPage() {
     valoresBancoSelecionado = valoresPorBanco[bancoSelecionadoId] ?? {};
     valoresSalvosBancoSelecionado = valoresSalvosPorBanco[bancoSelecionadoId] ?? {};
   }
+
+  const categoriaAtual = categoriasPrincipais.find((categoria) => categoria.id === categoriaSelecionada) ?? null;
+  const tiposCategoriaAtual = categoriaAtual ? tiposPorCategoria[categoriaAtual.id] : [];
 
   return (
     <>
@@ -709,16 +724,6 @@ export default function LancamentoCobrancaPage() {
               )}
             </div>
 
-            <div className="rounded-md border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-800">
-              Limite de edição
-              <div className="mt-1 text-xs text-primary-700">
-                Os lançamentos podem ser criados ou ajustados até 7 dias retroativos em relação a {formatarDataPt(hojeIso)}.
-              </div>
-              <div className="mt-1 text-xs text-primary-700">
-                Intervalo permitido: {formatarDataPt(limiteRetroativo)} até {formatarDataPt(hojeIso)}.
-              </div>
-            </div>
-
             {mensagem && (
               <div
                 className={`rounded-md border px-4 py-3 text-sm ${
@@ -733,159 +738,105 @@ export default function LancamentoCobrancaPage() {
               </div>
             )}
 
-            {contas.length > 0 && tipos.length > 0 && (
-              <div className="grid gap-4 lg:grid-cols-3">
-                <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-                  <div className="border-b border-gray-200 px-4 py-3">
-                    <h3 className="text-base font-semibold text-gray-900">Resumo por banco</h3>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Totais informados no formulário agrupados pelos bancos vinculados.
-                    </p>
-                  </div>
-                  <div className="px-4 py-3">
-                    {resumoFormularioPorBanco.length === 0 ? (
-                      <p className="text-sm text-gray-500">
-                        Nenhum valor informado para os bancos cadastrados.
-                      </p>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-3 py-2 text-left font-semibold text-gray-600">Banco</th>
-                              <th className="px-3 py-2 text-right font-semibold text-gray-600">
-                                Valor informado
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100 bg-white">
-                            {resumoFormularioPorBanco.map((resumo) => (
-                              <tr key={`form-resumo-${resumo.bancoId ?? 'sem-banco'}`}>
-                                <td className="px-3 py-2 text-gray-700">{resumo.bancoNome}</td>
-                                <td className="px-3 py-2 text-right font-medium text-gray-900">
-                                  {formatCurrency(resumo.total)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot className="bg-gray-50">
-                            <tr>
-                              <th className="px-3 py-2 text-left font-semibold text-gray-700">Total</th>
-                              <th className="px-3 py-2 text-right font-semibold text-gray-900">
-                                {formatCurrency(totalFormulario)}
-                              </th>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {categoriasResumo.map((categoria) => {
-                  const linhas = resumoTiposPorCategoria[categoria.chave];
-                  const totalCategoria = totaisPorCategoria[categoria.chave];
-                  const classes = [
-                    'rounded-lg border border-gray-200 bg-white shadow-sm',
-                    categoria.chave === 'titulos' ? 'lg:col-span-3' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ');
-
-                  return (
-                    <div key={`resumo-${categoria.chave}`} className={classes}>
-                      <div className="border-b border-gray-200 px-4 py-3">
-                        <h3 className="text-base font-semibold text-gray-900">{categoria.titulo}</h3>
-                        <p className="mt-1 text-xs text-gray-500">
-                          Dados da tabela de tipos de receita vinculada à categoria selecionada.
-                        </p>
-                      </div>
-                      <div className="px-4 py-3">
-                        {linhas.length === 0 ? (
-                          <p className="text-sm text-gray-500">
-                            Nenhum tipo de receita foi configurado para esta categoria.
-                          </p>
-                        ) : (
-                          <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200 text-sm">
-                              <thead className="bg-gray-50">
-                                <tr>
-                                  <th className="px-3 py-2 text-left font-semibold text-gray-600">
-                                    Código / Tipo
-                                  </th>
-                                  <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-100 bg-white">
-                                {linhas.map((linha) => (
-                                  <tr key={linha.tipoId}>
-                                    <td className="px-3 py-2 text-gray-700">
-                                      <span className="font-medium text-gray-800">{linha.codigo}</span>
-                                      <span className="ml-2 text-gray-500">{linha.nome}</span>
-                                    </td>
-                                    <td className="px-3 py-2 text-right font-medium text-gray-900">
-                                      {formatCurrency(linha.total)}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                              <tfoot className="bg-gray-50">
-                                <tr>
-                                  <th className="px-3 py-2 text-left font-semibold text-gray-700">Total</th>
-                                  <th className="px-3 py-2 text-right font-semibold text-gray-900">
-                                    {formatCurrency(totalCategoria)}
-                                  </th>
-                                </tr>
-                              </tfoot>
-                            </table>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+            <div className="rounded-md border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-800">
+              Limite de edição
+              <div className="mt-1 text-xs text-primary-700">
+                Os lançamentos podem ser criados ou ajustados até 7 dias retroativos em relação a {formatarDataPt(hojeIso)}.
               </div>
-            )}
+              <div className="mt-1 text-xs text-primary-700">
+                Intervalo permitido: {formatarDataPt(limiteRetroativo)} até {formatarDataPt(hojeIso)}.
+              </div>
+            </div>
 
-            <div className="space-y-6">
-              {carregandoLancamentos ? (
-                <div className="py-12">
-                  <Loading text="Carregando lançamentos para a data selecionada..." />
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div className="border-b border-gray-200 px-4 py-3">
+                  <h3 className="text-base font-semibold text-gray-900">Totais lançados por banco</h3>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Visualize apenas os bancos que possuem valores já registrados nas cobranças.
+                  </p>
                 </div>
-              ) : contas.length === 0 || tipos.length === 0 ? (
-                <div className="rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
-                  Cadastre contas de receita e tipos de receita para habilitar os lançamentos de cobrança.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-3 py-2 text-left font-semibold text-gray-600">Banco</th>
-                        <th className="px-3 py-2 text-right font-semibold text-gray-600">Total registrado</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white">
-                      {bancos.map((banco) => {
-                        const total = totaisSalvosPorBanco.get(banco.id) ?? 0;
-                        return (
-                          <tr key={banco.id} className="hover:bg-gray-50">
-                            <td className="px-3 py-2 text-gray-700">
-                              <div className="font-medium text-gray-900">{banco.nome}</div>
-                              {banco.codigo && (
-                                <div className="text-xs text-gray-500">Código: {banco.codigo}</div>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 text-right font-semibold text-gray-900">
-                              {formatCurrency(total)}
-                            </td>
+                <div className="px-4 py-3">
+                  {resumoLancadoPorBanco.length === 0 ? (
+                    <p className="text-sm text-gray-500">Nenhum lançamento registrado para os bancos disponíveis.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-semibold text-gray-600">Banco</th>
+                            <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor lançado</th>
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                          {resumoLancadoPorBanco.map((resumo) => (
+                            <tr key={`resumo-banco-${resumo.bancoId ?? 'sem-banco'}`}>
+                              <td className="px-3 py-2 text-gray-700">{resumo.bancoNome}</td>
+                              <td className="px-3 py-2 text-right font-medium text-gray-900">
+                                {formatCurrency(resumo.total)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-semibold text-gray-700">Total</th>
+                            <th className="px-3 py-2 text-right font-semibold text-gray-900">
+                              {formatCurrency(totalLancadoPorBanco)}
+                            </th>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
+
+              <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div className="border-b border-gray-200 px-4 py-3">
+                  <h3 className="text-base font-semibold text-gray-900">Totais lançados por tipo</h3>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Consulte apenas os tipos de receita que já possuem valores confirmados.
+                  </p>
+                </div>
+                <div className="px-4 py-3">
+                  {resumoLancadoPorTipo.length === 0 ? (
+                    <p className="text-sm text-gray-500">Nenhum tipo de receita possui lançamentos registrados.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-semibold text-gray-600">Tipo de receita</th>
+                            <th className="px-3 py-2 text-right font-semibold text-gray-600">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                          {resumoLancadoPorTipo.map((linha) => (
+                            <tr key={`resumo-tipo-${linha.tipoId}`}>
+                              <td className="px-3 py-2 text-gray-700">
+                                <div className="font-semibold text-gray-900">{linha.nome}</div>
+                                <div className="text-xs text-gray-500">Código: {linha.codigo}</div>
+                              </td>
+                              <td className="px-3 py-2 text-right font-medium text-gray-900">
+                                {formatCurrency(linha.total)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-semibold text-gray-700">Total geral</th>
+                            <th className="px-3 py-2 text-right font-semibold text-gray-900">
+                              {formatCurrency(totalLancadoPorTipo)}
+                            </th>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -918,46 +869,84 @@ export default function LancamentoCobrancaPage() {
               </div>
             ) : bancos.length === 0 || tipos.length === 0 ? (
               <div className="rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
-                Cadastre bancos ativos e tipos de receita para habilitar os lançamentos de cobrança.
+                Cadastre bancos ativos, contas e tipos de receita para habilitar os lançamentos de cobrança.
               </div>
             ) : !bancoSelecionado ? (
               <div className="rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
-                Escolha um banco para visualizar os tipos disponíveis.
+                Escolha um banco para visualizar as categorias de lançamento disponíveis.
+              </div>
+            ) : categoriasPrincipais.length === 0 ? (
+              <div className="rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+                Nenhum tipo de receita das contas 200 ou 201 está configurado para lançamento.
               </div>
             ) : (
-              <div className="space-y-5">
-                {CATEGORIAS_CONFIG.map((categoria) => {
-                  const tiposCategoria = tiposPorCategoria[categoria.chave];
-                  if (tiposCategoria.length === 0) {
-                    return null;
-                  }
+              <>
+                <div className="space-y-2">
+                  <h3 className="text-base font-semibold text-gray-900">Conta de receita</h3>
+                  <p className="text-sm text-gray-500">
+                    Escolha se deseja registrar valores na conta código 200 (títulos) ou 201 (depósitos) antes de selecionar o tipo de receita.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {categoriasPrincipais.map((categoria) => {
+                      const selecionada = categoriaSelecionada === categoria.id;
+                      return (
+                        <button
+                          key={categoria.id}
+                          type="button"
+                          onClick={() => setCategoriaSelecionada(categoria.id)}
+                          className={`flex min-w-[200px] flex-col rounded-md border px-3 py-2 text-left text-sm transition ${
+                            selecionada
+                              ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm'
+                              : 'border-gray-200 bg-white text-gray-600 hover:border-primary-300 hover:text-primary-600'
+                          }`}
+                        >
+                          <span className="font-semibold">{categoria.titulo}</span>
+                          <span className="text-xs">Código {categoria.codigo}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-                  return (
-                    <div key={categoria.chave} className="space-y-4">
-                      <div>
-                        <h4 className="text-lg font-semibold text-gray-900">{categoria.titulo}</h4>
-                        <p className="text-sm text-gray-500">{categoria.descricao}</p>
-                      </div>
-
+                <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+                  <div className="border-b border-gray-200 px-4 py-3">
+                    <h3 className="text-base font-semibold text-gray-900">
+                      {categoriaAtual?.titulo ?? 'Tipos de receita'}
+                    </h3>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {categoriaAtual?.descricao ??
+                        'Selecione uma conta de receita para visualizar os tipos disponíveis.'}
+                    </p>
+                  </div>
+                  <div className="px-4 py-3">
+                    {!categoriaAtual ? (
+                      <p className="text-sm text-gray-500">
+                        Selecione uma conta de receita para carregar os tipos correspondentes.
+                      </p>
+                    ) : tiposCategoriaAtual.length === 0 ? (
+                      <p className="text-sm text-gray-500">
+                        Nenhum tipo de receita foi configurado para esta conta contábil.
+                      </p>
+                    ) : (
                       <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200 text-sm">
                           <thead className="bg-gray-50">
                             <tr>
-                              <th className="px-3 py-2 text-left font-semibold text-gray-600">Código / Conta</th>
+                              <th className="px-3 py-2 text-left font-semibold text-gray-600">Tipo de receita</th>
                               <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor</th>
                               <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor registrado</th>
-                              <th className="px-3 py-2 text-center font-semibold text-gray-600">Editar / Excluir</th>
+                              <th className="px-3 py-2 text-center font-semibold text-gray-600">Edição / Exclusão</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100 bg-white">
-                            {tiposCategoria.map((tipo) => {
+                            {tiposCategoriaAtual.map((tipo) => {
                               const valorCampo = valoresBancoSelecionado[tipo.id] ?? '';
                               const valorSalvo = valoresSalvosBancoSelecionado[tipo.id] ?? 0;
                               return (
-                                <tr key={tipo.id} className="align-top">
+                                <tr key={`${categoriaSelecionada}-${tipo.id}`} className="align-top">
                                   <td className="px-3 py-2 text-gray-700">
-                                    <div className="font-medium text-gray-900">{tipo.codigo}</div>
-                                    <div className="text-xs text-gray-500">{tipo.nome}</div>
+                                    <div className="text-sm font-semibold text-gray-900">{tipo.nome}</div>
+                                    <div className="text-xs text-gray-500">Código: {tipo.codigo}</div>
                                   </td>
                                   <td className="px-3 py-2">
                                     <Input
@@ -971,7 +960,9 @@ export default function LancamentoCobrancaPage() {
                                         valorCampo
                                           ? (() => {
                                               const resultado = avaliarValor(valorCampo ?? '');
-                                              return resultado !== null ? `Resultado: ${formatCurrency(resultado)}` : undefined;
+                                              return resultado !== null
+                                                ? `Resultado: ${formatCurrency(resultado)}`
+                                                : undefined;
                                             })()
                                           : undefined
                                       }
@@ -1008,12 +999,21 @@ export default function LancamentoCobrancaPage() {
                               );
                             })}
                           </tbody>
+                          <tfoot className="bg-gray-50">
+                            <tr>
+                              <th className="px-3 py-2 text-left font-semibold text-gray-700">Total informado</th>
+                              <td className="px-3 py-2 text-right font-semibold text-gray-900">
+                                {formatCurrency(totalCategoriaSelecionada)}
+                              </td>
+                              <td colSpan={2}></td>
+                            </tr>
+                          </tfoot>
                         </table>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    )}
+                  </div>
+                </div>
+              </>
             )}
 
             <div className="flex justify-end">
