@@ -30,6 +30,20 @@ const RelatoriosHomePage: React.FC = () => {
               </Link>
             </div>
           </Card>
+          <Card
+            title="Saldo Diário"
+            subtitle="Compare valores previstos e realizados de receitas, gastos e saldos bancários de uma data específica."
+            variant="success"
+          >
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Gere um relatório consolidado do dia, com totais por área, categoria de receita e bancos, pronto para exportação em PDF.
+              </p>
+              <Link href="/relatorios/saldo-diario" className="inline-block">
+                <Button variant="primary">Abrir relatório</Button>
+              </Link>
+            </div>
+          </Card>
         </div>
       </div>
     </>

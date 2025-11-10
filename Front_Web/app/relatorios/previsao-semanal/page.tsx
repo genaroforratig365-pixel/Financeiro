@@ -347,31 +347,68 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
     if (!reportRef.current) {
       return;
     }
+
     const html = reportRef.current.innerHTML;
     const titulo = 'Previsão de Pagamentos';
     const janela = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=900');
     if (!janela) {
       return;
     }
+
     const estilos = `
-      * { font-family: 'Segoe UI', Arial, sans-serif; color: #111827; }
-      body { margin: 24px; }
+      * { font-family: 'Segoe UI', Arial, sans-serif; color: #111827; box-sizing: border-box; }
+      body { margin: 24px; background-color: #f8fafc; }
       h1 { font-size: 20px; margin-bottom: 4px; }
       h2 { font-size: 14px; color: #6b7280; margin-bottom: 16px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-      th, td { border: 1px solid #d1d5db; padding: 6px 8px; font-size: 12px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 12px; background-color: #ffffff; }
+      th, td { border: 1px solid #d1d5db; padding: 8px 10px; font-size: 12px; }
       th { background-color: #f3f4f6; text-align: right; font-weight: 600; }
       th:first-child, td:first-child { text-align: left; }
-      .section-header { background-color: #eef2ff; font-weight: 600; }
-      .section-expense { background-color: #fee2e2; font-weight: 600; }
-      .totals-row { background-color: #f9fafb; font-weight: 600; }
       .text-right { text-align: right; }
+      .text-left { text-align: left; }
+      .font-semibold { font-weight: 600; }
+      .uppercase { text-transform: uppercase; }
+      .tracking-wide { letter-spacing: 0.05em; }
+      .bg-white { background-color: #ffffff; }
+      .bg-gray-50 { background-color: #f9fafb; }
+      .bg-gray-100 { background-color: #f3f4f6; }
+      .bg-primary-50 { background-color: #eef2ff; }
+      .bg-primary-50\/70 { background-color: rgba(238, 242, 255, 0.7); }
+      .bg-error-50 { background-color: #fee2e2; }
+      .bg-error-50\/70 { background-color: rgba(254, 226, 226, 0.7); }
+      .text-gray-700 { color: #374151; }
+      .text-gray-900 { color: #111827; }
+      .text-primary-800 { color: #3730a3; }
+      .text-primary-900 { color: #312e81; }
+      .text-error-800 { color: #9b1c1c; }
+      .text-error-900 { color: #7f1d1d; }
+      .px-4 { padding-left: 16px; padding-right: 16px; }
+      .py-3 { padding-top: 12px; padding-bottom: 12px; }
+      .rounded-lg { border-radius: 12px; }
+      .border { border: 1px solid #e5e7eb; }
+      .border-gray-200 { border-color: #e5e7eb; }
+      .divide-y > * + * { border-top: 1px solid #e5e7eb; }
+      .divide-gray-100 > * + * { border-color: #f5f5f5; }
+      .divide-gray-200 > * + * { border-color: #e5e7eb; }
     `;
-    janela.document.write(`<!DOCTYPE html><html><head><title>${titulo}</title><style>${estilos}</style></head><body>${html}</body></html>`);
+
+    const documento = `<!DOCTYPE html><html><head><title>${titulo}</title><style>${estilos}</style></head><body>${html}</body></html>`;
+
+    janela.document.open();
+    janela.document.write(documento);
     janela.document.close();
-    janela.focus();
-    janela.print();
-    janela.close();
+
+    const imprimir = () => {
+      janela.focus();
+      janela.print();
+      janela.close();
+    };
+
+    if (janela.document.readyState === 'complete') {
+      setTimeout(imprimir, 100);
+    } else {
+      janela.onload = () => setTimeout(imprimir, 100);
+    }
   };
 
   if (carregandoUsuario) {

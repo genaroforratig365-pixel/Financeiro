@@ -333,7 +333,7 @@ export default function LancamentoCobrancaPage() {
   );
 
   const carregarLancamentosDia = useCallback(
-    async (usuarioAtual: UsuarioRow, data: string, contasBase: ContaOption[] = contas) => {
+    async (usuarioAtual: UsuarioRow, data: string, contasBase: ContaOption[] = []) => {
       try {
         setCarregandoLancamentos(true);
         const supabase = getSupabaseClient();
@@ -368,7 +368,7 @@ export default function LancamentoCobrancaPage() {
         setCarregandoLancamentos(false);
       }
     },
-    [contas],
+    [],
   );
 
   useEffect(() => {
@@ -458,7 +458,7 @@ export default function LancamentoCobrancaPage() {
     if (contas.length === 0 || tipos.length === 0) {
       return;
     }
-    carregarLancamentosDia(usuario, dataReferencia);
+    carregarLancamentosDia(usuario, dataReferencia, contas);
   }, [usuario, contas, tipos, dataReferencia, carregarLancamentosDia]);
 
   useEffect(() => {
@@ -573,7 +573,7 @@ export default function LancamentoCobrancaPage() {
         texto: 'Lançamentos de cobrança atualizados com sucesso.',
       });
 
-      await carregarLancamentosDia(usuario, dataReferencia);
+      await carregarLancamentosDia(usuario, dataReferencia, contas);
       await carregarHistorico(usuario);
     } catch (error) {
       console.error('Erro ao registrar cobranças:', error);

@@ -689,9 +689,20 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
           throw new Error('Nenhuma data válida foi encontrada na planilha.');
         }
 
-        if (datasDetectadas[0]?.data && datasDetectadas[0].data !== semanaSelecionada) {
-          setSemanaSelecionada(datasDetectadas[0].data);
+        const datasSemanaSelecionada = obterDatasDaSemana(semanaSelecionada);
+        const datasPlanilha = datasDetectadas.map((item) => item.data);
+        const tamanhoEsperado = datasSemanaSelecionada.length;
+        const comparacao = datasSemanaSelecionada.every(
+          (dataEsperada, index) => datasPlanilha[index] === dataEsperada,
+        );
+
+        if (datasPlanilha.length < tamanhoEsperado || !comparacao) {
+          throw new Error(
+            'As datas identificadas na planilha não correspondem à semana selecionada. Verifique o arquivo e tente novamente.',
+          );
         }
+
+        datasDetectadas = datasDetectadas.slice(0, tamanhoEsperado);
 
         const mapaAreas = new Map(areas.map((area) => [area.normalizado, area]));
         const mapaContasCodigo = new Map(contas.map((conta) => [conta.codigo, conta]));
