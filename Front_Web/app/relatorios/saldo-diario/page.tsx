@@ -238,7 +238,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
         if (receitasRes.error) throw receitasRes.error;
         if (saldosRes.error) throw saldosRes.error;
 
-        const previsoes = (previsoesRes.data as MaybeArray<PrevisaoRow>) ?? [];
+        const previsoes = normalizeRelation(previsoesRes.data as MaybeArray<PrevisaoRow>);
         const pagamentosArea = (gastosRes.data as MaybeArray<PagamentoAreaRow>) ?? [];
         const receitas = (receitasRes.data as MaybeArray<ReceitaRow>) ?? [];
         const saldosBancarios = (saldosRes.data as MaybeArray<SaldoBancoRow>) ?? [];
@@ -638,7 +638,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
         )}
 
         {!relatorio && !carregandoDados && !erro && (
-          <Card variant="info" title="Nenhum dado encontrado">
+          <Card variant="default" title="Nenhum dado encontrado">
             <p className="text-sm text-gray-600">
               Não localizamos informações para a data selecionada. Ajuste o filtro de data e tente novamente.
             </p>
