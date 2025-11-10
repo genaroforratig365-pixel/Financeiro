@@ -264,29 +264,35 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
         const saldoInicial = construirLinha(saldoInicialItens, datasOrdenadas, 'Saldo inicial');
         const saldoDiario = construirLinha(saldoDiarioItens, datasOrdenadas, 'Saldo diário previsto');
 
-        // Calcula saldo acumulado corretamente: primeiro dia usa saldo inicial importado,
-        // demais dias usam saldo do dia anterior + (receitas - despesas) do dia atual
+        // Calcula saldo acumulado corretamente:
+        // Primeiro dia: saldo inicial + saldo diário calculado
+        // Demais dias: saldo acumulado anterior + saldo diário calculado
         let saldoAcumulado: ReportRow | null = null;
-        if (saldoInicial) {
+        if (saldoInicial && saldoDiario) {
           const valores: Record<string, number> = {};
           let saldoAnterior = 0;
 
           datasOrdenadas.forEach((data, index) => {
+            const saldoDiarioCalculado = saldoDiario.valores[data] ?? 0;
+
             if (index === 0) {
-              // Primeiro dia: usa o saldo inicial importado
-              valores[data] = Math.round((saldoInicial.valores[data] ?? 0) * 100) / 100;
+              // Primeiro dia: saldo inicial + saldo diário calculado
+              const saldoInicialDia = saldoInicial.valores[data] ?? 0;
+              valores[data] = Math.round((saldoInicialDia + saldoDiarioCalculado) * 100) / 100;
             } else {
-              // Demais dias: saldo anterior + (receitas - despesas) do dia
-              const receitaDia = receitas.reduce((sum, row) => sum + (row.valores[data] ?? 0), 0);
-              const despesaDia = despesas.reduce((sum, row) => sum + (row.valores[data] ?? 0), 0);
-              const saldoDiaDia = receitaDia - despesaDia;
-              valores[data] = Math.round((saldoAnterior + saldoDiaDia) * 100) / 100;
+              // Demais dias: saldo acumulado anterior + saldo diário calculado
+              valores[data] = Math.round((saldoAnterior + saldoDiarioCalculado) * 100) / 100;
             }
             saldoAnterior = valores[data];
           });
 
-          const ultimaData = datasOrdenadas[datasOrdenadas.length - 1];
-          const total = ultimaData ? valores[ultimaData] : 0;
+          // Total: saldo inicial do primeiro registro + soma de todos os saldos diários
+          const primeiraData = datasOrdenadas[0];
+          const saldoInicialPrimeiro = primeiraData ? (saldoInicial.valores[primeiraData] ?? 0) : 0;
+          const somaSaldosDiarios = datasOrdenadas.reduce((sum, data) =>
+            sum + (saldoDiario.valores[data] ?? 0), 0
+          );
+          const total = Math.round((saldoInicialPrimeiro + somaSaldosDiarios) * 100) / 100;
 
           saldoAcumulado = {
             categoria: 'Saldo acumulado previsto',

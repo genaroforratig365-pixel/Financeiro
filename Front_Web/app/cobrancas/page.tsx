@@ -41,6 +41,7 @@ type LancamentoExistente = {
   contaId: number;
   tipoId: number;
   valor: number;
+  usrId: string;
 };
 
 type ValoresTextoPorTipo = Record<number, string>;
@@ -464,7 +465,7 @@ export default function LancamentoCobrancaPage() {
         // Todos os usuários podem visualizar todos os lançamentos
         const { data: registros, error } = await supabase
           .from('cob_cobrancas')
-          .select('cob_id, cob_ban_id, cob_ctr_id, cob_tpr_id, cob_valor')
+          .select('cob_id, cob_ban_id, cob_ctr_id, cob_tpr_id, cob_valor, cob_usr_id')
           .eq('cob_data', data);
 
         if (error) throw error;
@@ -474,6 +475,7 @@ export default function LancamentoCobrancaPage() {
           const bancoId = Number(registro.cob_ban_id);
           const contaId = Number(registro.cob_ctr_id);
           const tipoId = Number(registro.cob_tpr_id);
+          const usrId = String(registro.cob_usr_id ?? '');
           if (!Number.isFinite(bancoId) || !Number.isFinite(contaId) || !Number.isFinite(tipoId)) {
             return;
           }
@@ -484,6 +486,7 @@ export default function LancamentoCobrancaPage() {
             contaId,
             tipoId,
             valor: Number(registro.cob_valor ?? 0),
+            usrId,
           };
         });
 
@@ -623,6 +626,48 @@ export default function LancamentoCobrancaPage() {
     });
   };
 
+  const handleExcluirMovimento = async (bancoId: number, contaId: number, tipoId: number) => {
+    if (!usuario || !podeEditar) {
+      return;
+    }
+
+    try {
+      const chave = gerarChaveLancamento(bancoId, contaId, tipoId);
+      const registroExistente = lancamentosExistentes[chave];
+
+      // Limpa o campo digitado
+      handleValorBancoChange(bancoId, contaId, tipoId, '');
+
+      // Se existe registro salvo, deleta do banco
+      if (registroExistente) {
+        const supabase = getSupabaseClient();
+        const { error } = await supabase
+          .from('cob_cobrancas')
+          .delete()
+          .eq('cob_id', registroExistente.id);
+
+        if (error) throw error;
+
+        setMensagem({
+          tipo: 'sucesso',
+          texto: 'Movimento excluído com sucesso.',
+        });
+
+        // Recarrega os lançamentos
+        await carregarLancamentosDia(usuario, dataReferencia);
+      }
+    } catch (error) {
+      console.error('Erro ao excluir movimento:', error);
+      setMensagem({
+        tipo: 'erro',
+        texto: traduzirErroSupabase(
+          error,
+          'Não foi possível excluir o movimento. Tente novamente.',
+        ),
+      });
+    }
+  };
+
   const handleSalvarLancamentos = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -689,15 +734,30 @@ export default function LancamentoCobrancaPage() {
 
         if (valorCalculado !== null && valorCalculado > 0) {
           if (!registroExistente || Math.abs(valorCalculado - registroExistente.valor) > 0.009) {
-            registrosParaUpsert.push({
-              cob_id: registroExistente?.id,
-              cob_ban_id: bancoSelecionadoId!,
-              cob_ctr_id: conta.id,
-              cob_tpr_id: tipo.id,
-              cob_usr_id: usuarioId,
-              cob_data: dataReferencia,
-              cob_valor: valorCalculado,
-            });
+            // Se registro existe mas é de outro usuário, marca para deletar
+            if (registroExistente && registroExistente.usrId !== usuarioId) {
+              idsParaExcluir.push(registroExistente.id);
+              // Cria novo registro sem cob_id (será insert)
+              registrosParaUpsert.push({
+                cob_ban_id: bancoSelecionadoId!,
+                cob_ctr_id: conta.id,
+                cob_tpr_id: tipo.id,
+                cob_usr_id: usuarioId,
+                cob_data: dataReferencia,
+                cob_valor: valorCalculado,
+              });
+            } else {
+              // Registro do mesmo usuário ou novo - faz upsert normal
+              registrosParaUpsert.push({
+                cob_id: registroExistente?.id,
+                cob_ban_id: bancoSelecionadoId!,
+                cob_ctr_id: conta.id,
+                cob_tpr_id: tipo.id,
+                cob_usr_id: usuarioId,
+                cob_data: dataReferencia,
+                cob_valor: valorCalculado,
+              });
+            }
           }
         } else if (registroExistente && registroExistente.bancoId === bancoSelecionadoId) {
           idsParaExcluir.push(registroExistente.id);
@@ -718,20 +778,22 @@ export default function LancamentoCobrancaPage() {
       setMensagem(null);
       const supabase = getSupabaseClient();
 
+      // IMPORTANTE: Executa exclusões ANTES dos upserts
+      // para evitar conflitos ao substituir registros de outros usuários
+      if (idsParaExcluir.length > 0) {
+        const { error } = await supabase
+          .from('cob_cobrancas')
+          .delete()
+          .in('cob_id', idsParaExcluir);
+        if (error) throw error;
+      }
+
       if (registrosParaUpsert.length > 0) {
         const payload = registrosParaUpsert.map((registro) => {
           const { cob_id, ...restante } = registro;
           return cob_id ? { cob_id, ...restante } : restante;
         });
         const { error } = await supabase.from('cob_cobrancas').upsert(payload, { onConflict: 'cob_id' });
-        if (error) throw error;
-      }
-
-      if (idsParaExcluir.length > 0) {
-        const { error } = await supabase
-          .from('cob_cobrancas')
-          .delete()
-          .in('cob_id', idsParaExcluir);
         if (error) throw error;
       }
 
@@ -1118,9 +1180,9 @@ export default function LancamentoCobrancaPage() {
                                           size="sm"
                                           variant="ghost"
                                           onClick={() =>
-                                            handleValorBancoChange(bancoSelecionado.id, conta.id, tipo.id, '')
+                                            handleExcluirMovimento(bancoSelecionado.id, conta.id, tipo.id)
                                           }
-                                          disabled={valorCampo === '' || !podeEditar}
+                                          disabled={(valorCampo === '' && valorSalvo <= 0) || !podeEditar}
                                         >
                                           Excluir movimento
                                         </Button>
