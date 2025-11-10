@@ -423,17 +423,22 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
 
     const documento = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${titulo}</title><style>${estilos}</style></head><body>${html}</body></html>`;
 
+    // Define o onload ANTES de escrever o documento
+    janela.onload = () => {
+      setTimeout(() => {
+        try {
+          janela.focus();
+          janela.print();
+        } catch (err) {
+          console.error('Erro ao imprimir:', err);
+          alert('Não foi possível abrir a janela de impressão. Verifique se os popups estão habilitados.');
+        }
+      }, 1000);
+    };
+
     janela.document.open();
     janela.document.write(documento);
     janela.document.close();
-
-    // Aguarda a janela carregar completamente antes de imprimir
-    janela.addEventListener('load', () => {
-      setTimeout(() => {
-        janela.focus();
-        janela.print();
-      }, 500);
-    });
   };
 
   if (carregandoUsuario) {
