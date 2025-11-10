@@ -132,11 +132,12 @@ export async function getOrCreateUser(
   const usuarioExistente = existing as UsuarioRow | null;
   if (usuarioExistente) {
     const updates: Partial<Pick<UsuarioRow, "usr_nome" | "usr_email">> = {};
-    if (nome && nome !== usuarioExistente.usr_nome) {
-      updates.usr_nome = nome;
+    // Só atualiza o nome se for fornecido E não for vazio
+    if (nome && nome.trim().length > 0 && nome !== usuarioExistente.usr_nome) {
+      updates.usr_nome = nome.trim();
     }
-    if (email && email !== usuarioExistente.usr_email) {
-      updates.usr_email = email;
+    if (email && email.trim().length > 0 && email !== usuarioExistente.usr_email) {
+      updates.usr_email = email.trim();
     }
 
     if (Object.keys(updates).length > 0) {
@@ -160,12 +161,26 @@ export async function getOrCreateUser(
     return { data: usuarioExistente, error: null };
   }
 
+  // Não permite criar usuário sem nome
+  const nomeValido = nome && nome.trim().length > 0 ? nome.trim() : null;
+  if (!nomeValido) {
+    return {
+      data: null,
+      error: {
+        message: 'Não é possível criar um usuário sem nome. Entre em contato com o administrador (Genaro) para cadastro.',
+        details: '',
+        hint: '',
+        code: 'NOME_OBRIGATORIO'
+      } as PostgrestError
+    };
+  }
+
   const { data: inserted, error: insertErr } = await supabase
     .from("usr_usuarios")
     .insert({
       usr_identificador: identificador,
-      usr_nome: nome ?? null,
-      usr_email: email ?? null,
+      usr_nome: nomeValido,
+      usr_email: email && email.trim().length > 0 ? email.trim() : null,
       usr_ativo: true,
     })
     .select()

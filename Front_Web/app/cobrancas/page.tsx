@@ -669,8 +669,8 @@ export default function LancamentoCobrancaPage() {
     }
 
     const valoresBanco = valoresPorBanco[bancoSelecionadoId] ?? {};
-    const usuarioId = Number(usuario.usr_id);
-    if (!Number.isFinite(usuarioId)) {
+    const usuarioId = usuario.usr_id;
+    if (!usuarioId || usuarioId.trim().length === 0) {
       setMensagem({
         tipo: 'erro',
         texto: 'Não foi possível identificar o usuário responsável pelo lançamento.',
@@ -682,7 +682,7 @@ export default function LancamentoCobrancaPage() {
       cob_ban_id: number;
       cob_ctr_id: number;
       cob_tpr_id: number;
-      cob_usr_id: number;
+      cob_usr_id: string;
       cob_data: string;
       cob_valor: number;
     }> = [];

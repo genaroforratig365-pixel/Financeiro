@@ -258,13 +258,35 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
         const despesasItens = itens.filter((item) => item.tipo === 'gasto');
         const saldoInicialItens = itens.filter((item) => item.tipo === 'saldo_inicial');
         const saldoDiarioItens = itens.filter((item) => item.tipo === 'saldo_diario');
-        const saldoAcumuladoItens = itens.filter((item) => item.tipo === 'saldo_acumulado');
 
         const receitas = agruparPorCategoria(receitasItens, datasOrdenadas);
         const despesas = agruparPorCategoria(despesasItens, datasOrdenadas);
         const saldoInicial = construirLinha(saldoInicialItens, datasOrdenadas, 'Saldo inicial');
         const saldoDiario = construirLinha(saldoDiarioItens, datasOrdenadas, 'Saldo diário previsto');
-        const saldoAcumulado = construirLinha(saldoAcumuladoItens, datasOrdenadas, 'Saldo acumulado previsto');
+
+        // Calcula saldo acumulado corretamente: saldo inicial + acumulado de (receitas - despesas)
+        let saldoAcumulado: ReportRow | null = null;
+        if (saldoInicial) {
+          const valores: Record<string, number> = {};
+          let acumulado = 0;
+
+          datasOrdenadas.forEach((data) => {
+            const receitaDia = receitas.reduce((sum, row) => sum + (row.valores[data] ?? 0), 0);
+            const despesaDia = despesas.reduce((sum, row) => sum + (row.valores[data] ?? 0), 0);
+            const saldoDiaDia = receitaDia - despesaDia;
+            acumulado += saldoDiaDia;
+            valores[data] = Math.round((saldoInicial.valores[data] ?? 0) + acumulado) * 100 / 100;
+          });
+
+          const ultimaData = datasOrdenadas[datasOrdenadas.length - 1];
+          const total = ultimaData ? valores[ultimaData] : 0;
+
+          saldoAcumulado = {
+            categoria: 'Saldo acumulado previsto',
+            valores,
+            total,
+          };
+        }
 
         const totalReceitasPorData = datasOrdenadas.reduce<Record<string, number>>((acc, data) => {
           acc[data] = receitas.reduce((sum, row) => sum + (row.valores[data] ?? 0), 0);
