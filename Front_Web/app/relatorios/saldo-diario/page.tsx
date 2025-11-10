@@ -238,7 +238,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
         if (receitasRes.error) throw receitasRes.error;
         if (saldosRes.error) throw saldosRes.error;
 
-        const previsoes = normalizeRelation(previsoesRes.data as MaybeArray<PrevisaoRow>);
+        const previsoes = (previsoesRes.data as MaybeArray<PrevisaoRow>) ?? [];
         const pagamentosArea = (gastosRes.data as MaybeArray<PagamentoAreaRow>) ?? [];
         const receitas = (receitasRes.data as MaybeArray<ReceitaRow>) ?? [];
         const saldosBancarios = (saldosRes.data as MaybeArray<SaldoBancoRow>) ?? [];
