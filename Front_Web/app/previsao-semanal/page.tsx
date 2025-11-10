@@ -1188,6 +1188,71 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
   const handleRemoverLinha = (linhaId: string) => {
     setLinhas(prev => prev.filter(linha => linha.id !== linhaId));
   };
+
+  const handleBaixarTemplate = async () => {
+    try {
+      const XLSX = await loadSheetJS();
+
+      // Cria dados de exemplo para a semana selecionada
+      const datasSemanaSelecionada = obterDatasDaSemana(semanaSelecionada);
+
+      // Cria cabeçalho com as datas
+      const header = ['Categoria', ...datasSemanaSelecionada.map(data => {
+        const [year, month, day] = data.split('-');
+        return `${day}/${month}`;
+      })];
+
+      // Dados de exemplo
+      const dadosExemplo = [
+        header,
+        ['Saldo Inicial', 50000, '', '', '', ''],
+        [''],
+        ['RECEITAS', '', '', '', '', ''],
+        ['Depósito e PIX', 10000, 8000, 12000, 9000, 11000],
+        ['Boleto', 5000, 4500, 6000, 5500, 5000],
+        ['Cartão Débito', 2000, 1800, 2200, 1900, 2100],
+        [''],
+        ['Gasto - Folha de Pagamento', 15000, '', '', '', ''],
+        ['Gasto - Material e Consumo', 3000, 2500, 3500, 2800, 3200],
+        ['Gasto - Serviços Terceiros', 2000, 1500, 2500, 1800, 2200],
+        ['Gasto - Impostos e Taxas', 1000, 800, 1200, 900, 1100],
+        [''],
+        ['', '', '', '', '', ''],
+        ['INSTRUÇÕES:', '', '', '', '', ''],
+        ['1. Preencha as datas no formato DD/MM ou DD/MM/AAAA', '', '', '', '', ''],
+        ['2. Receitas: use nomes como "Depósito e PIX", "Boleto", "Cartão Débito"', '', '', '', '', ''],
+        ['3. Gastos: comece com "Gasto -" ou "Gastos:" seguido do nome da área', '', '', '', '', ''],
+        ['4. Valores podem usar vírgula ou ponto como separador decimal', '', '', '', '', ''],
+        ['5. Células vazias serão interpretadas como valor zero', '', '', '', '', ''],
+      ];
+
+      // Cria planilha
+      const ws = XLSX.utils.aoa_to_sheet(dadosExemplo);
+
+      // Define larguras das colunas
+      const colWidths = [{ wch: 30 }, ...datasSemanaSelecionada.map(() => ({ wch: 12 }))];
+      ws['!cols'] = colWidths;
+
+      // Cria workbook
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Previsão Semanal');
+
+      // Gera arquivo
+      const nomeArquivo = `template_previsao_${semanaSelecionada}.xlsx`;
+      XLSX.writeFile(wb, nomeArquivo);
+
+      setMensagem({
+        tipo: 'sucesso',
+        texto: `Template baixado: ${nomeArquivo}`,
+      });
+    } catch (error) {
+      console.error('Erro ao gerar template:', error);
+      setMensagem({
+        tipo: 'erro',
+        texto: 'Não foi possível gerar o template. Tente novamente.',
+      });
+    }
+  };
   const handleImportar = async () => {
     if (!usuario) {
       setMensagem({ tipo: 'erro', texto: 'Usuário não identificado para importar a previsão.' });
@@ -1731,6 +1796,27 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
 
             {arquivoNome && (
               <p className="text-xs text-gray-500">Arquivo selecionado: {arquivoNome}</p>
+            )}
+
+            {!modoEdicao && !modoInclusao && (
+              <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-700">Precisa de um template?</p>
+                    <p className="mt-1 text-xs text-gray-600">
+                      Baixe um modelo de planilha pré-formatado com as datas da semana selecionada e exemplos de lançamentos.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleBaixarTemplate}
+                  >
+                    Baixar template
+                  </Button>
+                </div>
+              </div>
             )}
 
             {mensagem && (
