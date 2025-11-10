@@ -90,17 +90,16 @@ export default function DashboardPage() {
 
         const hoje = new Date().toISOString().split('T')[0];
 
+        // Todos os usuários podem visualizar todos os dados
         const [pagamentos, recebimentos] = await Promise.all([
           supabase
             .from('pag_pagamentos_area')
             .select('pag_valor')
-            .eq('pag_usr_id', user.usr_id)
             .gte('pag_data', hoje)
             .limit(1000),
           supabase
             .from('rec_receitas')
             .select('rec_valor')
-            .eq('rec_usr_id', user.usr_id)
             .gte('rec_data', hoje)
             .limit(1000),
         ]);

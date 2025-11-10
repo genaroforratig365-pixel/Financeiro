@@ -461,10 +461,10 @@ export default function LancamentoCobrancaPage() {
       try {
         setCarregandoLancamentos(true);
         const supabase = getSupabaseClient();
+        // Todos os usuários podem visualizar todos os lançamentos
         const { data: registros, error } = await supabase
           .from('cob_cobrancas')
           .select('cob_id, cob_ban_id, cob_ctr_id, cob_tpr_id, cob_valor')
-          .eq('cob_usr_id', usuarioAtual.usr_id)
           .eq('cob_data', data);
 
         if (error) throw error;
