@@ -37,6 +37,7 @@ type BancoOption = {
 
 type LancamentoExistente = {
   id: number;
+  bancoId: number;
   contaId: number;
   tipoId: number;
   valor: number;
@@ -96,7 +97,8 @@ const avaliarValor = (entrada: string): number | null => {
 
 const formatarValorParaInput = (valor: number): string => valor.toFixed(2).replace('.', ',');
 
-const gerarChaveLancamento = (contaId: number, tipoId: number) => `${contaId}-${tipoId}`;
+const gerarChaveLancamento = (bancoId: number, contaId: number, tipoId: number) =>
+  `${bancoId}-${contaId}-${tipoId}`;
 
 const formatarDataPt = (iso: string): string => {
   if (!iso) return '';
@@ -198,6 +200,41 @@ export default function LancamentoCobrancaPage() {
     return mapa;
   }, [contas]);
 
+  const contasRelevantes = useMemo(() => {
+    const filtradas = contas.filter((conta) => {
+      const codigo = normalizarCodigoConta(conta.codigo);
+      return codigo === '200' || codigo === '201';
+    });
+
+    return filtradas.sort((a, b) => {
+      const diffCodigo = normalizarCodigoConta(a.codigo).localeCompare(
+        normalizarCodigoConta(b.codigo),
+        'pt-BR',
+        { numeric: true, sensitivity: 'base' },
+      );
+      if (diffCodigo !== 0) {
+        return diffCodigo;
+      }
+      return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' });
+    });
+  }, [contas]);
+
+  const codigosContasDisponiveis = useMemo(() => {
+    const conjunto = new Set<string>();
+    contasRelevantes.forEach((conta) => {
+      const codigo = normalizarCodigoConta(conta.codigo);
+      if (codigo) {
+        conjunto.add(codigo);
+      }
+    });
+    return conjunto;
+  }, [contasRelevantes]);
+
+  const faltantesObrigatorios = useMemo(() => {
+    const obrigatorios = ['200', '201'];
+    return obrigatorios.filter((codigo) => !codigosContasDisponiveis.has(codigo));
+  }, [codigosContasDisponiveis]);
+
   const tiposMap = useMemo(() => {
     const mapa = new Map<number, TipoOption>();
     tipos.forEach((tipo) => mapa.set(tipo.id, tipo));
@@ -214,8 +251,6 @@ export default function LancamentoCobrancaPage() {
       listaAtual.push(conta);
       mapa.set(conta.bancoId, listaAtual);
     });
-    return mapa;
-  }, [contas]);
 
   const tiposOrdenados = useMemo(() => {
     const filtrados = tipos.filter((tipo) => {
@@ -424,7 +459,7 @@ export default function LancamentoCobrancaPage() {
         const supabase = getSupabaseClient();
         const { data: registros, error } = await supabase
           .from('cob_cobrancas')
-          .select('cob_id, cob_ctr_id, cob_tpr_id, cob_valor')
+          .select('cob_id, cob_ban_id, cob_ctr_id, cob_tpr_id, cob_valor')
           .eq('cob_usr_id', usuarioAtual.usr_id)
           .eq('cob_data', data);
 
@@ -432,11 +467,16 @@ export default function LancamentoCobrancaPage() {
 
         const mapa: Record<string, LancamentoExistente> = {};
         (registros ?? []).forEach((registro) => {
+          const bancoId = Number(registro.cob_ban_id);
           const contaId = Number(registro.cob_ctr_id);
           const tipoId = Number(registro.cob_tpr_id);
-          const chave = gerarChaveLancamento(contaId, tipoId);
+          if (!Number.isFinite(bancoId) || !Number.isFinite(contaId) || !Number.isFinite(tipoId)) {
+            return;
+          }
+          const chave = gerarChaveLancamento(bancoId, contaId, tipoId);
           mapa[chave] = {
             id: Number(registro.cob_id),
+            bancoId,
             contaId,
             tipoId,
             valor: Number(registro.cob_valor ?? 0),
@@ -687,7 +727,7 @@ export default function LancamentoCobrancaPage() {
               cob_valor: valorCalculado,
             });
           }
-        } else if (registroExistente) {
+        } else if (registroExistente && registroExistente.bancoId === bancoSelecionadoId) {
           idsParaExcluir.push(registroExistente.id);
         }
       });
@@ -782,29 +822,126 @@ export default function LancamentoCobrancaPage() {
       <div className="page-content space-y-6">
         <Card>
           <form className="space-y-6" onSubmit={handleSalvarLancamentos}>
-            <div className="grid gap-4 md:grid-cols-[minmax(0,280px)_minmax(0,1fr)] md:items-end">
-              <label className="text-sm font-medium text-gray-700">
-                Data dos lançamentos
-                <input
-                  type="date"
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  min={limiteRetroativo}
-                  max={hojeIso}
-                  value={dataReferencia}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    if (!value) return;
-                    setDataReferencia(value);
-                    setMensagem(null);
-                  }}
-                />
-              </label>
-
-              {!podeEditar && (
-                <div className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-xs text-warning-800">
-                  Edição disponível apenas para os últimos 7 dias úteis. Ajuste a data para atualizar os valores.
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,260px)_repeat(2,minmax(0,1fr))]">
+              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm space-y-3">
+                <label className="block text-sm font-medium text-gray-700">
+                  Data dos lançamentos
+                  <input
+                    type="date"
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    min={limiteRetroativo}
+                    max={hojeIso}
+                    value={dataReferencia}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (!value) return;
+                      setDataReferencia(value);
+                      setMensagem(null);
+                    }}
+                  />
+                </label>
+                {!podeEditar && (
+                  <div className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-xs text-warning-800">
+                    Edição disponível apenas para os últimos 7 dias úteis. Ajuste a data para atualizar os valores.
+                  </div>
+                )}
+                <div className="rounded-md border border-dashed border-primary-200 bg-primary-50 px-3 py-2 text-xs text-primary-700">
+                  <div className="font-medium text-primary-800">Limite de edição</div>
+                  <div className="mt-1">
+                    Os lançamentos podem ser criados ou ajustados até 7 dias retroativos em relação a {formatarDataPt(hojeIso)}.
+                  </div>
+                  <div className="mt-1">
+                    Intervalo permitido: {formatarDataPt(limiteRetroativo)} até {formatarDataPt(hojeIso)}.
+                  </div>
                 </div>
-              )}
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div className="border-b border-gray-200 px-4 py-3">
+                  <h3 className="text-base font-semibold text-gray-900">Resumo por banco (lançamentos salvos)</h3>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Exibe somente os bancos que possuem valores registrados para a data selecionada.
+                  </p>
+                </div>
+                <div className="px-4 py-3">
+                  {resumoLancadoPorBanco.length === 0 ? (
+                    <p className="text-sm text-gray-500">Nenhum lançamento salvo para exibir o resumo por banco.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-semibold text-gray-600">Banco</th>
+                            <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor registrado</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                          {resumoLancadoPorBanco.map((linha) => (
+                            <tr key={`salvo-banco-${linha.bancoId}`}>
+                              <td className="px-3 py-2 text-gray-700">{linha.bancoNome}</td>
+                              <td className="px-3 py-2 text-right font-medium text-gray-900">
+                                {formatCurrency(linha.total)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-semibold text-gray-700">Total</th>
+                            <th className="px-3 py-2 text-right font-semibold text-gray-900">
+                              {formatCurrency(totalLancadoPorBanco)}
+                            </th>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div className="border-b border-gray-200 px-4 py-3">
+                  <h3 className="text-base font-semibold text-gray-900">Resumo por tipo (lançamentos salvos)</h3>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Consolida os valores registrados por código de receita na data selecionada.
+                  </p>
+                </div>
+                <div className="px-4 py-3">
+                  {resumoLancadoPorTipo.length === 0 ? (
+                    <p className="text-sm text-gray-500">Nenhum lançamento salvo para exibir o resumo por tipo.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-semibold text-gray-600">Tipo de receita</th>
+                            <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor registrado</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                          {resumoLancadoPorTipo.map((linha) => (
+                            <tr key={`resumo-salvo-tipo-${linha.tipoId}`}>
+                              <td className="px-3 py-2 text-gray-700">
+                                <div className="font-semibold text-gray-900">{linha.nome}</div>
+                                <div className="text-xs text-gray-500">Código: {linha.codigo}</div>
+                              </td>
+                              <td className="px-3 py-2 text-right font-medium text-gray-900">
+                                {formatCurrency(linha.total)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-semibold text-gray-700">Total geral</th>
+                            <th className="px-3 py-2 text-right font-semibold text-gray-900">
+                              {formatCurrency(totalLancadoPorTipo)}
+                            </th>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             {mensagem && (
@@ -821,13 +958,31 @@ export default function LancamentoCobrancaPage() {
               </div>
             )}
 
-            <div className="rounded-md border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-800">
-              Limite de edição
-              <div className="mt-1 text-xs text-primary-700">
-                Os lançamentos podem ser criados ou ajustados até 7 dias retroativos em relação a {formatarDataPt(hojeIso)}.
-              </div>
-              <div className="mt-1 text-xs text-primary-700">
-                Intervalo permitido: {formatarDataPt(limiteRetroativo)} até {formatarDataPt(hojeIso)}.
+            <div className="grid gap-4 md:grid-cols-[minmax(0,320px)_minmax(0,1fr)] md:items-start">
+              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm space-y-3">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900">Seleção do banco</h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Escolha o banco para informar os valores das contas de receita 200 e 201.
+                  </p>
+                </div>
+                <select
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  value={bancoSelecionadoId ?? ''}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setBancoSelecionadoId(value ? Number(value) : null);
+                    setMensagem(null);
+                  }}
+                  disabled={bancos.length === 0}
+                >
+                  <option value="">Selecione um banco</option>
+                  {bancos.map((banco) => (
+                    <option key={banco.id} value={banco.id}>
+                      {banco.nome}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -866,7 +1021,9 @@ export default function LancamentoCobrancaPage() {
                   </div>
                   <div className="px-4 py-3">
                     {resumoFormularioPorBanco.length === 0 ? (
-                      <p className="text-sm text-gray-500">Nenhum valor informado nas contas bancárias selecionadas.</p>
+                      <p className="text-sm text-gray-500">
+                        Nenhum valor informado nas contas bancárias selecionadas.
+                      </p>
                     ) : (
                       <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -899,7 +1056,6 @@ export default function LancamentoCobrancaPage() {
                     )}
                   </div>
                 </div>
-
                 <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
                   <div className="border-b border-gray-200 px-4 py-3">
                     <h3 className="text-base font-semibold text-gray-900">Resumo por tipo (formulário)</h3>
@@ -1035,9 +1191,9 @@ export default function LancamentoCobrancaPage() {
                           </tfoot>
                         </table>
                       </div>
-                    )}
-                  </div>
-                </div>
+                    </div>
+                  );
+                })}
               </div>
             ) : null}
 
