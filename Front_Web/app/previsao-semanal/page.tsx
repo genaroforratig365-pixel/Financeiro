@@ -690,19 +690,35 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
         }
 
         const datasSemanaSelecionada = obterDatasDaSemana(semanaSelecionada);
-        const datasPlanilha = datasDetectadas.map((item) => item.data);
         const tamanhoEsperado = datasSemanaSelecionada.length;
-        const comparacao = datasSemanaSelecionada.every(
-          (dataEsperada, index) => datasPlanilha[index] === dataEsperada,
-        );
+        const colunasSelecionadas = datasDetectadas.slice(0, tamanhoEsperado);
 
-        if (datasPlanilha.length < tamanhoEsperado || !comparacao) {
+        const datasCompatíveis = datasSemanaSelecionada.every((dataEsperada, index) => {
+          const detectada = colunasSelecionadas[index];
+          if (!detectada) {
+            return false;
+          }
+
+          if (detectada.data === dataEsperada) {
+            return true;
+          }
+
+          const [, mesEsperado, diaEsperado] = dataEsperada.split('-');
+          const [, mesPlanilha, diaPlanilha] = detectada.data.split('-');
+
+          return mesEsperado === mesPlanilha && diaEsperado === diaPlanilha;
+        });
+
+        if (colunasSelecionadas.length < tamanhoEsperado || !datasCompatíveis) {
           throw new Error(
             'As datas identificadas na planilha não correspondem à semana selecionada. Verifique o arquivo e tente novamente.',
           );
         }
 
-        datasDetectadas = datasDetectadas.slice(0, tamanhoEsperado);
+        datasDetectadas = colunasSelecionadas.map((cabecalho, index) => ({
+          coluna: cabecalho.coluna,
+          data: datasSemanaSelecionada[index],
+        }));
 
         const mapaAreas = new Map(areas.map((area) => [area.normalizado, area]));
         const mapaContasCodigo = new Map(contas.map((conta) => [conta.codigo, conta]));
