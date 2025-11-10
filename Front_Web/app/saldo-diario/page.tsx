@@ -18,7 +18,7 @@ type Mensagem = { tipo: 'sucesso' | 'erro' | 'info'; texto: string };
 type Processo = 'area' | 'receita' | 'banco' | 'saldo';
 
 type AreaOption = { id: number; nome: string };
-type ContaOption = { id: number; nome: string };
+type ContaOption = { id: number; nome: string; codigo: string };
 type BancoOption = { id: number; nome: string };
 
 type RegistroMensagem = Record<Processo, Mensagem | null>;
@@ -360,9 +360,9 @@ const SaldoDiarioPage: React.FC = () => {
         .order('are_nome', { ascending: true }),
       supabase
         .from('ctr_contas_receita')
-        .select('ctr_id, ctr_nome')
+        .select('ctr_id, ctr_nome, ctr_codigo')
         .eq('ctr_ativo', true)
-        .order('ctr_nome', { ascending: true }),
+        .order('ctr_codigo, ctr_nome', { ascending: true }),
       supabase
         .from('ban_bancos')
         .select('ban_id, ban_nome')
@@ -382,9 +382,10 @@ const SaldoDiarioPage: React.FC = () => {
     );
 
     setContaOptions(
-      (contasRes.data ?? []).map((conta: { ctr_id: number; ctr_nome: string | null }) => ({
+      (contasRes.data ?? []).map((conta: { ctr_id: number; ctr_nome: string | null; ctr_codigo: string | null }) => ({
         id: Number(conta.ctr_id),
         nome: conta.ctr_nome ?? 'Conta sem nome',
+        codigo: conta.ctr_codigo ?? '',
       }))
     );
 
@@ -1432,6 +1433,37 @@ const SaldoDiarioPage: React.FC = () => {
     const resultado = avaliarEntrada(valor);
     return resultado !== null ? `Resultado: ${formatCurrency(resultado)}` : undefined;
   };
+
+  // Separar contas por código
+  const contasTitulos = useMemo(() => contaOptions.filter(c => c.codigo === '200'), [contaOptions]);
+  const contasDepositosPix = useMemo(() => contaOptions.filter(c => c.codigo === '201'), [contaOptions]);
+  const contasOutras = useMemo(() => contaOptions.filter(c => c.codigo !== '200' && c.codigo !== '201'), [contaOptions]);
+
+  // Resumos
+  const resumoPorBanco = useMemo(() => {
+    const resumo = new Map<number, { banco: string; total: number }>();
+    receitas.forEach(rec => {
+      const conta = contaOptions.find(c => c.id === rec.contaId);
+      if (conta) {
+        // Aqui você precisaria ter o banco_id na conta para agrupar
+        // Por enquanto vamos apenas criar estrutura básica
+      }
+    });
+    return resumo;
+  }, [receitas, contaOptions]);
+
+  const resumoPorTipoReceita = useMemo(() => {
+    const resumo = new Map<string, { tipo: string; total: number }>();
+    receitas.forEach(rec => {
+      const conta = contaOptions.find(c => c.id === rec.contaId);
+      if (conta) {
+        const tipo = conta.codigo === '200' ? 'Títulos (200)' : conta.codigo === '201' ? 'Depósitos e PIX (201)' : 'Outros';
+        const atual = resumo.get(tipo) || { tipo, total: 0 };
+        resumo.set(tipo, { tipo, total: atual.total + rec.valor });
+      }
+    });
+    return Array.from(resumo.values());
+  }, [receitas, contaOptions]);
 
   if (carregando) {
     return (

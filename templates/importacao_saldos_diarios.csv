@@ -1,0 +1,15 @@
+tipo,data,categoria_id,categoria_nome,valor
+# INSTRUÇÕES:
+# - tipo: pode ser "pagamento_area", "receita", "pagamento_banco" ou "saldo_banco"
+# - data: formato YYYY-MM-DD
+# - categoria_id: ID da área/conta/banco conforme o tipo
+# - categoria_nome: nome da categoria (apenas para referência)
+# - valor: valor numérico com 2 casas decimais
+#
+# Exemplos:
+pagamento_area,2025-11-10,1,Administrativo,1500.00
+pagamento_area,2025-11-10,2,Operacional,2300.00
+receita,2025-11-10,1,Boleto (200),5000.00
+receita,2025-11-10,2,Depósito e PIX (201),3200.00
+pagamento_banco,2025-11-10,1,Banco do Brasil,1800.00
+saldo_banco,2025-11-10,1,Banco do Brasil,25300.00

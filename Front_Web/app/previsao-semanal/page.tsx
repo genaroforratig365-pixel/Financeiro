@@ -39,6 +39,11 @@ const TITULO_CORRECOES: Record<string, string> = {
   'com materail e consumo': 'material e consumo',
   'com material e consumo': 'material e consumo',
   'gasto com material e consumo': 'material e consumo',
+  'materail e consumo': 'material e consumo',
+  'materiail e consumo': 'material e consumo',
+  'material consumo': 'material e consumo',
+  'gastos material e consumo': 'material e consumo',
+  'gastos com material e consumo': 'material e consumo',
 };
 
 const TIPO_RECEITA_PREFERENCIAS: Record<string, string> = {
@@ -350,9 +355,17 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
     modificados: number;
     novos: number;
     removidos: number;
+    itensNovosDetalhes: Array<{ data: string; tipo: string; categoria: string; valor: number }>;
+    itensModificadosDetalhes: Array<{ data: string; tipo: string; categoria: string; valorAntigo: number; valorNovo: number }>;
+    itensRemovidosDetalhes: Array<{ data: string; tipo: string; categoria: string; valor: number }>;
     onConfirm: () => Promise<void>;
     onCancel: () => void;
   } | null>(null);
+  const [secoesExpandidas, setSecoesExpandidas] = useState<{ novos: boolean; modificados: boolean; removidos: boolean }>({
+    novos: false,
+    modificados: false,
+    removidos: false
+  });
   const [modoEdicao, setModoEdicao] = useState(false);
   const [modoInclusao, setModoInclusao] = useState(false);
   const arquivoInputRef = useRef<HTMLInputElement | null>(null);
@@ -369,6 +382,21 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
     const atual = new Date(`${currentMondayIso}T00:00:00`);
     return selecionadaData.getTime() > atual.getTime();
   }, [semanaSelecionada]);
+
+  const categoriasExistentes = useMemo(() => {
+    const categs = new Set<string>();
+    // Adiciona nomes de áreas
+    areas.forEach(area => categs.add(area.nome));
+    // Adiciona nomes de contas de receita
+    contas.forEach(conta => categs.add(conta.nome));
+    // Adiciona categorias das linhas existentes
+    linhas.forEach(linha => {
+      if (linha.titulo && linha.titulo.trim()) {
+        categs.add(linha.titulo);
+      }
+    });
+    return Array.from(categs).sort();
+  }, [areas, contas, linhas]);
 
   const totaisReceita = useMemo(
     () =>
@@ -1490,6 +1518,31 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
               modificados: itensModificados.length,
               novos: itensNovos.length,
               removidos: itensRemovidos.length,
+              itensNovosDetalhes: itensNovos.map(item => ({
+                data: item.data,
+                tipo: item.tipo,
+                categoria: item.categoria,
+                valor: item.valor
+              })),
+              itensModificadosDetalhes: itensModificados.map((mod, idx) => {
+                const itemNovo = itensParaInserir.find(it => {
+                  const chave = `${it.data}|${it.tipo}|${it.categoria}`;
+                  return chavesParaInserir.has(chave) && Math.abs(it.valor - mod.novo) < 0.01;
+                });
+                return {
+                  data: itemNovo?.data || '',
+                  tipo: itemNovo?.tipo || '',
+                  categoria: itemNovo?.categoria || '',
+                  valorAntigo: mod.existente,
+                  valorNovo: mod.novo
+                };
+              }),
+              itensRemovidosDetalhes: itensRemovidos.map(item => ({
+                data: item.pvi_data,
+                tipo: item.pvi_tipo,
+                categoria: item.pvi_categoria,
+                valor: Number(item.pvi_valor)
+              })),
               onConfirm: async () => {
                 setModalResumo(null);
                 resolve();
@@ -1891,13 +1944,21 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                             <td className="px-3 py-2 align-top">
                               <div className="flex flex-col">
                                 {modoInclusao ? (
-                                  <input
-                                    type="text"
-                                    className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    placeholder="Nome da categoria..."
-                                    value={linha.titulo}
-                                    onChange={(e) => handleTituloChange(linha.id, e.target.value)}
-                                  />
+                                  <>
+                                    <input
+                                      type="text"
+                                      list={`categorias-${linha.id}`}
+                                      className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                      placeholder="Digite ou selecione uma categoria..."
+                                      value={linha.titulo}
+                                      onChange={(e) => handleTituloChange(linha.id, e.target.value)}
+                                    />
+                                    <datalist id={`categorias-${linha.id}`}>
+                                      {categoriasExistentes.map(cat => (
+                                        <option key={cat} value={cat} />
+                                      ))}
+                                    </datalist>
+                                  </>
                                 ) : (
                                   <span className="font-medium text-gray-900">{linha.titulo}</span>
                                 )}
@@ -2100,8 +2161,8 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
 
       {/* Modal de confirmação de reimportação */}
       {modalResumo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+          <div className="w-full max-w-3xl rounded-lg border border-gray-200 bg-white shadow-xl my-8">
             <div className="border-b border-gray-200 px-6 py-4">
               <h3 className="text-lg font-semibold text-gray-900">Reimportação Detectada</h3>
               <p className="mt-1 text-sm text-gray-500">
@@ -2109,7 +2170,8 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="space-y-3 px-6 py-4">
+            <div className="space-y-3 px-6 py-4 max-h-[60vh] overflow-y-auto">
+              {/* Itens iguais */}
               <div className="flex items-center justify-between rounded-md border border-success-200 bg-success-50/40 px-4 py-3">
                 <div className="flex items-center gap-2">
                   <span className="text-success-700">✓</span>
@@ -2118,33 +2180,130 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                 <span className="text-lg font-bold text-success-700">{modalResumo.iguais}</span>
               </div>
 
+              {/* Itens modificados */}
               {modalResumo.modificados > 0 && (
-                <div className="flex items-center justify-between rounded-md border border-warning-200 bg-warning-50/40 px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-warning-700">⚠</span>
-                    <span className="text-sm font-medium text-warning-900">Itens modificados</span>
+                <div className="space-y-2">
+                  <div
+                    className="flex items-center justify-between rounded-md border border-warning-200 bg-warning-50/40 px-4 py-3 cursor-pointer hover:bg-warning-50"
+                    onClick={() => setSecoesExpandidas(prev => ({ ...prev, modificados: !prev.modificados }))}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-warning-700">⚠</span>
+                      <span className="text-sm font-medium text-warning-900">Itens modificados</span>
+                      <span className="text-xs text-warning-600">(clique para {secoesExpandidas.modificados ? 'ocultar' : 'ver detalhes'})</span>
+                    </div>
+                    <span className="text-lg font-bold text-warning-700">{modalResumo.modificados}</span>
                   </div>
-                  <span className="text-lg font-bold text-warning-700">{modalResumo.modificados}</span>
+                  {secoesExpandidas.modificados && (
+                    <div className="ml-4 rounded border border-warning-200 bg-white p-3">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-2 py-1 text-left font-medium text-gray-600">Data</th>
+                            <th className="px-2 py-1 text-left font-medium text-gray-600">Tipo</th>
+                            <th className="px-2 py-1 text-left font-medium text-gray-600">Categoria</th>
+                            <th className="px-2 py-1 text-right font-medium text-gray-600">Valor Antigo</th>
+                            <th className="px-2 py-1 text-center font-medium text-gray-600">→</th>
+                            <th className="px-2 py-1 text-right font-medium text-gray-600">Valor Novo</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {modalResumo.itensModificadosDetalhes.map((item, idx) => (
+                            <tr key={idx} className="hover:bg-gray-50">
+                              <td className="px-2 py-1 text-gray-700">{formatarDataPt(item.data)}</td>
+                              <td className="px-2 py-1 text-gray-700">{item.tipo}</td>
+                              <td className="px-2 py-1 text-gray-700">{item.categoria}</td>
+                              <td className="px-2 py-1 text-right text-gray-500 line-through">{formatCurrency(item.valorAntigo)}</td>
+                              <td className="px-2 py-1 text-center text-warning-600">→</td>
+                              <td className="px-2 py-1 text-right font-semibold text-warning-700">{formatCurrency(item.valorNovo)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
 
+              {/* Itens novos */}
               {modalResumo.novos > 0 && (
-                <div className="flex items-center justify-between rounded-md border border-primary-200 bg-primary-50/40 px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-primary-700">+</span>
-                    <span className="text-sm font-medium text-primary-900">Itens novos</span>
+                <div className="space-y-2">
+                  <div
+                    className="flex items-center justify-between rounded-md border border-primary-200 bg-primary-50/40 px-4 py-3 cursor-pointer hover:bg-primary-50"
+                    onClick={() => setSecoesExpandidas(prev => ({ ...prev, novos: !prev.novos }))}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-primary-700">+</span>
+                      <span className="text-sm font-medium text-primary-900">Itens novos</span>
+                      <span className="text-xs text-primary-600">(clique para {secoesExpandidas.novos ? 'ocultar' : 'ver detalhes'})</span>
+                    </div>
+                    <span className="text-lg font-bold text-primary-700">{modalResumo.novos}</span>
                   </div>
-                  <span className="text-lg font-bold text-primary-700">{modalResumo.novos}</span>
+                  {secoesExpandidas.novos && (
+                    <div className="ml-4 rounded border border-primary-200 bg-white p-3">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-2 py-1 text-left font-medium text-gray-600">Data</th>
+                            <th className="px-2 py-1 text-left font-medium text-gray-600">Tipo</th>
+                            <th className="px-2 py-1 text-left font-medium text-gray-600">Categoria</th>
+                            <th className="px-2 py-1 text-right font-medium text-gray-600">Valor</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {modalResumo.itensNovosDetalhes.map((item, idx) => (
+                            <tr key={idx} className="hover:bg-gray-50">
+                              <td className="px-2 py-1 text-gray-700">{formatarDataPt(item.data)}</td>
+                              <td className="px-2 py-1 text-gray-700">{item.tipo}</td>
+                              <td className="px-2 py-1 text-gray-700">{item.categoria}</td>
+                              <td className="px-2 py-1 text-right font-semibold text-primary-700">{formatCurrency(item.valor)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
 
+              {/* Itens removidos */}
               {modalResumo.removidos > 0 && (
-                <div className="flex items-center justify-between rounded-md border border-error-200 bg-error-50/40 px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-error-700">−</span>
-                    <span className="text-sm font-medium text-error-900">Itens removidos</span>
+                <div className="space-y-2">
+                  <div
+                    className="flex items-center justify-between rounded-md border border-error-200 bg-error-50/40 px-4 py-3 cursor-pointer hover:bg-error-50"
+                    onClick={() => setSecoesExpandidas(prev => ({ ...prev, removidos: !prev.removidos }))}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-error-700">−</span>
+                      <span className="text-sm font-medium text-error-900">Itens removidos</span>
+                      <span className="text-xs text-error-600">(clique para {secoesExpandidas.removidos ? 'ocultar' : 'ver detalhes'})</span>
+                    </div>
+                    <span className="text-lg font-bold text-error-700">{modalResumo.removidos}</span>
                   </div>
-                  <span className="text-lg font-bold text-error-700">{modalResumo.removidos}</span>
+                  {secoesExpandidas.removidos && (
+                    <div className="ml-4 rounded border border-error-200 bg-white p-3">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-2 py-1 text-left font-medium text-gray-600">Data</th>
+                            <th className="px-2 py-1 text-left font-medium text-gray-600">Tipo</th>
+                            <th className="px-2 py-1 text-left font-medium text-gray-600">Categoria</th>
+                            <th className="px-2 py-1 text-right font-medium text-gray-600">Valor</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {modalResumo.itensRemovidosDetalhes.map((item, idx) => (
+                            <tr key={idx} className="hover:bg-gray-50">
+                              <td className="px-2 py-1 text-gray-700">{formatarDataPt(item.data)}</td>
+                              <td className="px-2 py-1 text-gray-700">{item.tipo}</td>
+                              <td className="px-2 py-1 text-gray-700">{item.categoria}</td>
+                              <td className="px-2 py-1 text-right font-semibold text-error-700">{formatCurrency(item.valor)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
 
