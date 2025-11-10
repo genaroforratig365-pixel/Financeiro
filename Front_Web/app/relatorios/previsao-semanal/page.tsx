@@ -392,23 +392,19 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
       .divide-gray-200 > * + * { border-color: #e5e7eb; }
     `;
 
-    const documento = `<!DOCTYPE html><html><head><title>${titulo}</title><style>${estilos}</style></head><body>${html}</body></html>`;
+    const documento = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${titulo}</title><style>${estilos}</style></head><body>${html}</body></html>`;
 
     janela.document.open();
     janela.document.write(documento);
     janela.document.close();
 
-    const imprimir = () => {
-      janela.focus();
-      janela.print();
-      janela.close();
-    };
-
-    if (janela.document.readyState === 'complete') {
-      setTimeout(imprimir, 100);
-    } else {
-      janela.onload = () => setTimeout(imprimir, 100);
-    }
+    // Aguarda a janela carregar completamente antes de imprimir
+    janela.addEventListener('load', () => {
+      setTimeout(() => {
+        janela.focus();
+        janela.print();
+      }, 500);
+    });
   };
 
   if (carregandoUsuario) {

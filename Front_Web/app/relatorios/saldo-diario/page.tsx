@@ -407,7 +407,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
       body { margin: 24px; background-color: #f8fafc; }
       h1 { font-size: 20px; margin-bottom: 4px; }
       h2 { font-size: 14px; color: #6b7280; margin-bottom: 16px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 12px; background-color: #ffffff; }
+      table { width: 100%; border-collapse: collapse; margin-top: 12px; background-color: #ffffff; page-break-inside: avoid; }
       th, td { border: 1px solid #d1d5db; padding: 8px 10px; font-size: 12px; }
       th { background-color: #f3f4f6; text-align: right; font-weight: 600; }
       th:first-child, td:first-child { text-align: left; }
@@ -434,25 +434,25 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
       .divide-y > * + * { border-top: 1px solid #e5e7eb; }
       .divide-gray-100 > * + * { border-color: #f5f5f5; }
       .grid { display: grid; gap: 16px; }
+      @media print {
+        body { background-color: white; }
+        table { page-break-inside: avoid; }
+      }
     `;
 
-    const documento = `<!DOCTYPE html><html><head><title>${titulo}</title><style>${estilos}</style></head><body>${html}</body></html>`;
+    const documento = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${titulo}</title><style>${estilos}</style></head><body>${html}</body></html>`;
 
     janela.document.open();
     janela.document.write(documento);
     janela.document.close();
 
-    const imprimir = () => {
-      janela.focus();
-      janela.print();
-      janela.close();
-    };
-
-    if (janela.document.readyState === 'complete') {
-      setTimeout(imprimir, 100);
-    } else {
-      janela.onload = () => setTimeout(imprimir, 100);
-    }
+    // Aguarda a janela carregar completamente antes de imprimir
+    janela.addEventListener('load', () => {
+      setTimeout(() => {
+        janela.focus();
+        janela.print();
+      }, 500);
+    });
   };
 
   const renderTabelaComparativa = useCallback(
