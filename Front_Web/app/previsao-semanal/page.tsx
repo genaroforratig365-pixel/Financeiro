@@ -609,6 +609,26 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
           throw new Error('A planilha está vazia.');
         }
 
+        const semanaSelecionadaData = new Date(`${semanaSelecionada}T00:00:00`);
+        const anoReferenciaSemana = semanaSelecionadaData.getFullYear();
+        const mesReferenciaSemana = semanaSelecionadaData.getMonth() + 1;
+
+        const ajustarAnoPorMes = (mes: number, anoPadrao: number): number => {
+          if (!Number.isFinite(mes) || mes < 1 || mes > 12) {
+            return anoPadrao;
+          }
+
+          if (mes < mesReferenciaSemana && mesReferenciaSemana - mes > 6) {
+            return anoPadrao + 1;
+          }
+
+          if (mes > mesReferenciaSemana && mes - mesReferenciaSemana > 6) {
+            return anoPadrao - 1;
+          }
+
+          return anoPadrao;
+        };
+
         const parseData = (valor: any): string | null => {
           if (!valor) {
             return null;
@@ -647,8 +667,8 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
               if (mes < 1 || mes > 12 || dia < 1 || dia > 31) {
                 return null;
               }
-              const anoAtual = new Date().getFullYear();
-              const data = new Date(Date.UTC(anoAtual, mes - 1, dia));
+              const anoAjustado = ajustarAnoPorMes(mes, anoReferenciaSemana);
+              const data = new Date(Date.UTC(anoAjustado, mes - 1, dia));
               return toISODate(data);
             }
 

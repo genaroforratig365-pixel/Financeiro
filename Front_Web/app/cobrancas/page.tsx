@@ -15,20 +15,21 @@ import { traduzirErroSupabase } from '@/lib/supabaseErrors';
 
 type Mensagem = { tipo: 'sucesso' | 'erro' | 'info'; texto: string };
 
-type CategoriaReceita = 'depositos' | 'titulos' | 'outras';
-
 type TipoOption = {
   id: number;
   nome: string;
   codigo: string;
-  categoria: CategoriaReceita;
 };
+
+type CategoriaPrincipal = 'titulos' | 'depositos';
 
 type ContaOption = {
   id: number;
+  codigo: string;
   nome: string;
   bancoId: number | null;
   bancoNome: string | null;
+  categoria: CategoriaPrincipal | null;
 };
 
 type BancoOption = {
@@ -50,15 +51,11 @@ type ResumoTipo = {
   tipoId: number;
   nome: string;
   codigo: string;
-  categoria: CategoriaReceita;
   total: number;
 };
 
-type CategoriaConfig = {
-  chave: CategoriaReceita;
-  titulo: string;
-  descricao: string;
-};
+type ValoresTextoPorCategoria = Record<CategoriaPrincipal, Record<number, string>>;
+type ValoresNumericosPorCategoria = Record<CategoriaPrincipal, Record<number, number>>;
 
 const toISODate = (date: Date): string => date.toISOString().split('T')[0];
 
@@ -105,31 +102,31 @@ const formatarDataPt = (iso: string): string => {
   return `${day}/${month}/${year}`;
 };
 
-const CATEGORIAS_CONFIG: CategoriaConfig[] = [
-  {
-    chave: 'depositos',
-    titulo: 'Depósitos e PIX',
-    descricao: 'Informe aqui os valores recebidos via depósito ou PIX.',
-  },
-  {
-    chave: 'titulos',
-    titulo: 'Títulos',
-    descricao: 'Registre os valores quitados através de boletos e carnês.',
-  },
-  {
-    chave: 'outras',
-    titulo: 'Outras Receitas',
-    descricao: 'Demais recebimentos associados ao banco selecionado.',
-  },
-];
-
-const obterCategoriaPorCodigo = (codigo: string | null): CategoriaReceita => {
+const obterCategoriaConta = (codigo: string | null): CategoriaPrincipal | null => {
   const referencia = (codigo ?? '').trim();
   if (referencia.startsWith('200')) return 'titulos';
   if (referencia.startsWith('201')) return 'depositos';
-  if (referencia.startsWith('202')) return 'outras';
-  return 'outras';
+  return null;
 };
+
+const criarMapaTexto = (): ValoresTextoPorCategoria => ({ titulos: {}, depositos: {} });
+
+const criarMapaNumerico = (): ValoresNumericosPorCategoria => ({ titulos: {}, depositos: {} });
+
+const CATEGORIAS_PRINCIPAIS: { id: CategoriaPrincipal; titulo: string; descricao: string; codigoConta: string }[] = [
+  {
+    id: 'titulos',
+    titulo: 'Receita de títulos',
+    descricao: 'Utilize a conta de receita código 200 para registrar os valores de títulos.',
+    codigoConta: '200',
+  },
+  {
+    id: 'depositos',
+    titulo: 'Receita de depósitos',
+    descricao: 'Informe os valores vinculados à conta de receita código 201.',
+    codigoConta: '201',
+  },
+];
 
 export default function LancamentoCobrancaPage() {
   const [hojeIso] = useState(() => toISODate(new Date()));
@@ -145,7 +142,7 @@ export default function LancamentoCobrancaPage() {
   const [contas, setContas] = useState<ContaOption[]>([]);
   const [bancos, setBancos] = useState<BancoOption[]>([]);
   const [lancamentosExistentes, setLancamentosExistentes] = useState<Record<string, LancamentoExistente>>({});
-  const [valoresPorBanco, setValoresPorBanco] = useState<Record<number, Record<number, string>>>({});
+  const [valoresPorBanco, setValoresPorBanco] = useState<Record<number, ValoresTextoPorCategoria>>({});
 
   const [dataReferencia, setDataReferencia] = useState(() => toISODate(new Date()));
   const [bancoSelecionadoId, setBancoSelecionadoId] = useState<number | null>(null);
@@ -158,153 +155,52 @@ export default function LancamentoCobrancaPage() {
     return mapa;
   }, [contas]);
 
-  const contasPorBanco = useMemo(() => {
-    const mapa = new Map<number, ContaOption[]>();
+  const tiposMap = useMemo(() => {
+    const mapa = new Map<number, TipoOption>();
+    tipos.forEach((tipo) => mapa.set(tipo.id, tipo));
+    return mapa;
+  }, [tipos]);
+
+  const contasCategoriaPorBanco = useMemo(() => {
+    const mapa = new Map<number, Partial<Record<CategoriaPrincipal, ContaOption>>>();
     contas.forEach((conta) => {
-      if (conta.bancoId === null) return;
-      const atual = mapa.get(conta.bancoId) ?? [];
-      atual.push(conta);
+      if (conta.bancoId === null || !conta.categoria) return;
+      const atual = mapa.get(conta.bancoId) ?? {};
+      if (!atual[conta.categoria]) {
+        atual[conta.categoria] = conta;
+      }
       mapa.set(conta.bancoId, atual);
     });
     return mapa;
   }, [contas]);
 
-  const tiposPorCategoria = useMemo(() => {
-    const mapa: Record<CategoriaReceita, TipoOption[]> = {
-      depositos: [],
-      titulos: [],
-      outras: [],
-    };
-
-    tipos.forEach((tipo) => {
-      mapa[tipo.categoria].push(tipo);
+  const tiposOrdenados = useMemo(() => {
+    return [...tipos].sort((a, b) => {
+      const diffCodigo = a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true, sensitivity: 'base' });
+      if (diffCodigo !== 0) return diffCodigo;
+      return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' });
     });
-
-    (Object.keys(mapa) as CategoriaReceita[]).forEach((categoria) => {
-      mapa[categoria] = mapa[categoria].sort((a, b) => {
-        const diffCodigo = a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true, sensitivity: 'base' });
-        if (diffCodigo !== 0) return diffCodigo;
-        return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' });
-      });
-    });
-
-    return mapa;
   }, [tipos]);
 
-  const resumoFormularioPorBanco = useMemo<ResumoBanco[]>(() => {
-    const totais = new Map<number, number>();
 
-    Object.entries(valoresPorBanco).forEach(([bancoIdTexto, valores]) => {
-      const totalCalculado = Object.values(valores).reduce((acc, valorTexto) => {
-        const valor = avaliarValor(valorTexto);
-        if (valor !== null && Number.isFinite(valor)) {
-          return acc + valor;
-        }
-        return acc;
-      }, 0);
-
-      if (totalCalculado <= 0) {
-        return;
-      }
-
-      const bancoId = Number(bancoIdTexto);
-      totais.set(bancoId, Math.round(totalCalculado * 100) / 100);
-    });
-
-    return Array.from(totais.entries())
-      .map(([bancoId, total]) => {
-        const banco = bancos.find((item) => item.id === bancoId);
-        return {
-          bancoId,
-          bancoNome: banco?.nome ?? 'Sem banco vinculado',
-          total,
-        } satisfies ResumoBanco;
-      })
-      .sort((a, b) => a.bancoNome.localeCompare(b.bancoNome, 'pt-BR', { sensitivity: 'base' }));
-  }, [bancos, valoresPorBanco]);
-
-  const totalFormulario = useMemo(() => {
-    return resumoFormularioPorBanco.reduce((acc, item) => acc + item.total, 0);
-  }, [resumoFormularioPorBanco]);
-
-  const categoriasResumo = useMemo(() => {
-    return [...CATEGORIAS_CONFIG].sort((a, b) => {
-      if (a.chave === 'titulos' && b.chave !== 'titulos') return 1;
-      if (b.chave === 'titulos' && a.chave !== 'titulos') return -1;
-      return 0;
-    });
-  }, []);
-
-  const resumoTiposPorCategoria = useMemo<Record<CategoriaReceita, ResumoTipo[]>>(() => {
-    const base: Record<CategoriaReceita, ResumoTipo[]> = {
-      depositos: [],
-      titulos: [],
-      outras: [],
-    };
-
-    tipos.forEach((tipo) => {
-      let total = 0;
-
-      Object.values(valoresPorBanco).forEach((valoresBanco) => {
-        const valorCalculado = avaliarValor(valoresBanco[tipo.id] ?? '');
-        if (valorCalculado !== null && Number.isFinite(valorCalculado)) {
-          total += valorCalculado;
-        }
-      });
-
-      base[tipo.categoria].push({
-        tipoId: tipo.id,
-        nome: tipo.nome,
-        codigo: tipo.codigo,
-        categoria: tipo.categoria,
-        total: Math.round(total * 100) / 100,
-      });
-    });
-
-    (Object.keys(base) as CategoriaReceita[]).forEach((categoria) => {
-      base[categoria] = base[categoria].sort((a, b) => {
-        const codigoDiff = a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true, sensitivity: 'base' });
-        if (codigoDiff !== 0) return codigoDiff;
-        return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' });
-      });
-    });
-
-    return base;
-  }, [tipos, valoresPorBanco]);
-
-  const totaisPorCategoria = useMemo<Record<CategoriaReceita, number>>(() => {
-    const totais: Record<CategoriaReceita, number> = {
-      depositos: 0,
-      titulos: 0,
-      outras: 0,
-    };
-
-    (Object.entries(resumoTiposPorCategoria) as [CategoriaReceita, ResumoTipo[]][]).forEach(
-      ([categoria, linhas]) => {
-        const totalCategoria = linhas.reduce((acc, linha) => acc + linha.total, 0);
-        totais[categoria] = Math.round(totalCategoria * 100) / 100;
-      },
-    );
-
-    return totais;
-  }, [resumoTiposPorCategoria]);
-
-  const valoresSalvosPorBanco = useMemo<Record<number, Record<number, number>>>(() => {
-    const base: Record<number, Record<number, number>> = {};
+  const valoresSalvosPorBanco = useMemo<Record<number, ValoresNumericosPorCategoria>>(() => {
+    const base: Record<number, ValoresNumericosPorCategoria> = {};
 
     Object.values(lancamentosExistentes).forEach((registro) => {
       const conta = contasMap.get(registro.contaId);
       const bancoId = conta?.bancoId;
+      const categoria = conta?.categoria;
 
-      if (bancoId === null || bancoId === undefined) {
+      if (bancoId === null || bancoId === undefined || !categoria) {
         return;
       }
 
       if (!base[bancoId]) {
-        base[bancoId] = {};
+        base[bancoId] = criarMapaNumerico();
       }
 
-      base[bancoId][registro.tipoId] = (base[bancoId][registro.tipoId] ?? 0) + registro.valor;
+      base[bancoId][categoria][registro.tipoId] =
+        (base[bancoId][categoria][registro.tipoId] ?? 0) + registro.valor;
     });
 
     return base;
@@ -313,11 +209,97 @@ export default function LancamentoCobrancaPage() {
   const totaisSalvosPorBanco = useMemo(() => {
     const mapa = new Map<number, number>();
     Object.entries(valoresSalvosPorBanco).forEach(([bancoId, valores]) => {
-      const total = Object.values(valores).reduce((acc, valor) => acc + valor, 0);
+      const total = Object.values(valores).reduce((accBanco, categorias) => {
+        return (
+          accBanco +
+          Object.values(categorias).reduce((accCategoria, valor) => accCategoria + valor, 0)
+        );
+      }, 0);
       mapa.set(Number(bancoId), Math.round(total * 100) / 100);
     });
     return mapa;
   }, [valoresSalvosPorBanco]);
+
+  const resumoLancadoPorBanco = useMemo<ResumoBanco[]>(() => {
+    const linhas: ResumoBanco[] = [];
+
+    Object.entries(valoresSalvosPorBanco).forEach(([bancoIdTexto, valores]) => {
+      const total = Object.values(valores).reduce((accBanco, categoriaValores) => {
+        return (
+          accBanco +
+          Object.values(categoriaValores).reduce((accCategoria, valor) => {
+            if (valor > 0 && Number.isFinite(valor)) {
+              return accCategoria + valor;
+            }
+            return accCategoria;
+          }, 0)
+        );
+      }, 0);
+
+      if (total <= 0) {
+        return;
+      }
+
+      const bancoId = Number(bancoIdTexto);
+      const banco = bancos.find((item) => item.id === bancoId);
+      linhas.push({
+        bancoId,
+        bancoNome: banco?.nome ?? 'Sem banco vinculado',
+        total: Math.round(total * 100) / 100,
+      });
+    });
+
+    return linhas.sort((a, b) => a.bancoNome.localeCompare(b.bancoNome, 'pt-BR', { sensitivity: 'base' }));
+  }, [bancos, valoresSalvosPorBanco]);
+
+  const totalLancadoPorBanco = useMemo(() => {
+    return resumoLancadoPorBanco.reduce((acc, item) => acc + item.total, 0);
+  }, [resumoLancadoPorBanco]);
+
+  const resumoLancadoPorTipo = useMemo<ResumoTipo[]>(() => {
+    const totais = new Map<number, number>();
+
+    Object.values(valoresSalvosPorBanco).forEach((categoriasBanco) => {
+      Object.values(categoriasBanco).forEach((tiposCategoria) => {
+        Object.entries(tiposCategoria).forEach(([tipoIdTexto, valor]) => {
+          if (valor <= 0 || !Number.isFinite(valor)) {
+            return;
+          }
+
+          const tipoId = Number(tipoIdTexto);
+          totais.set(tipoId, (totais.get(tipoId) ?? 0) + valor);
+        });
+      });
+    });
+
+    const linhas: ResumoTipo[] = [];
+
+    totais.forEach((total, tipoId) => {
+      const tipo = tiposMap.get(tipoId);
+      if (!tipo) {
+        return;
+      }
+
+      linhas.push({
+        tipoId,
+        nome: tipo.nome,
+        codigo: tipo.codigo,
+        total: Math.round(total * 100) / 100,
+      });
+    });
+
+    return linhas.sort((a, b) => {
+      const codigoDiff = a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true, sensitivity: 'base' });
+      if (codigoDiff !== 0) {
+        return codigoDiff;
+      }
+      return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' });
+    });
+  }, [tiposMap, valoresSalvosPorBanco]);
+
+  const totalLancadoPorTipo = useMemo(() => {
+    return resumoLancadoPorTipo.reduce((acc, item) => acc + item.total, 0);
+  }, [resumoLancadoPorTipo]);
 
   useEffect(() => {
     if (bancos.length > 0 && bancoSelecionadoId === null) {
@@ -326,22 +308,26 @@ export default function LancamentoCobrancaPage() {
   }, [bancos, bancoSelecionadoId]);
 
   useEffect(() => {
-    if (bancos.length === 0 || tipos.length === 0) {
+    if (bancos.length === 0 || tiposOrdenados.length === 0) {
       return;
     }
 
-    const novoMapa: Record<number, Record<number, string>> = {};
+    const novoMapa: Record<number, ValoresTextoPorCategoria> = {};
     bancos.forEach((banco) => {
-      const salvosBanco = valoresSalvosPorBanco[banco.id] ?? {};
-      const valores = tipos.reduce((acc, tipo) => {
-        const salvo = salvosBanco[tipo.id] ?? 0;
-        acc[tipo.id] = salvo > 0 ? formatarValorParaInput(salvo) : '';
-        return acc;
-      }, {} as Record<number, string>);
+      const salvosBanco = valoresSalvosPorBanco[banco.id] ?? criarMapaNumerico();
+      const valores = criarMapaTexto();
+
+      CATEGORIAS_PRINCIPAIS.forEach(({ id }) => {
+        tiposOrdenados.forEach((tipo) => {
+          const salvo = salvosBanco[id]?.[tipo.id] ?? 0;
+          valores[id][tipo.id] = salvo > 0 ? formatarValorParaInput(salvo) : '';
+        });
+      });
+
       novoMapa[banco.id] = valores;
     });
     setValoresPorBanco(novoMapa);
-  }, [bancos, tipos, valoresSalvosPorBanco]);
+  }, [bancos, tiposOrdenados, valoresSalvosPorBanco]);
 
   const carregarLancamentosDia = useCallback(
     async (usuarioAtual: UsuarioRow, data: string, contasBase: ContaOption[] = []) => {
@@ -413,7 +399,7 @@ export default function LancamentoCobrancaPage() {
             .order('tpr_nome', { ascending: true }),
           supabase
             .from('ctr_contas_receita')
-            .select('ctr_id, ctr_nome, ctr_ban_id, ban_bancos(ban_nome)')
+            .select('ctr_id, ctr_nome, ctr_codigo, ctr_ban_id, ban_bancos(ban_nome)')
             .eq('ctr_ativo', true)
             .order('ctr_nome', { ascending: true }),
           supabase
@@ -431,18 +417,20 @@ export default function LancamentoCobrancaPage() {
           id: Number(tipo.tpr_id),
           nome: tipo.tpr_nome ?? 'Tipo sem nome',
           codigo: tipo.tpr_codigo ?? '',
-          categoria: obterCategoriaPorCodigo(tipo.tpr_codigo ?? ''),
         }));
 
         const contasFormatadas: ContaOption[] = (contasRes.data ?? []).map((conta) => {
           const bancoRelacionado = Array.isArray(conta.ban_bancos)
             ? conta.ban_bancos[0]
             : (conta.ban_bancos as { ban_nome?: string | null } | null);
+          const codigo = typeof conta.ctr_codigo === 'string' ? conta.ctr_codigo : String(conta.ctr_codigo ?? '');
           return {
             id: Number(conta.ctr_id),
+            codigo,
             nome: conta.ctr_nome ?? 'Conta sem nome',
             bancoId: conta.ctr_ban_id !== null ? Number(conta.ctr_ban_id) : null,
             bancoNome: bancoRelacionado?.ban_nome ?? 'Sem banco vinculado',
+            categoria: obterCategoriaConta(codigo),
           } satisfies ContaOption;
         });
 
@@ -482,19 +470,32 @@ export default function LancamentoCobrancaPage() {
     carregarLancamentosDia(usuario, dataReferencia, contas);
   }, [usuario, contas, tipos, dataReferencia, carregarLancamentosDia]);
 
-  const handleValorBancoChange = (bancoId: number, tipoId: number, valor: string) => {
-    setValoresPorBanco((prev) => ({
-      ...prev,
-      [bancoId]: {
-        ...(prev[bancoId] ?? {}),
+  const handleValorBancoChange = (
+    bancoId: number,
+    categoria: CategoriaPrincipal,
+    tipoId: number,
+    valor: string,
+  ) => {
+    setValoresPorBanco((prev) => {
+      const atual = { ...prev };
+      const mapaBanco = { ...(atual[bancoId] ?? criarMapaTexto()) };
+      mapaBanco[categoria] = {
+        ...(mapaBanco[categoria] ?? {}),
         [tipoId]: valor,
-      },
-    }));
+      };
+      atual[bancoId] = mapaBanco;
+      return atual;
+    });
   };
 
-  const handlePreencherValorSalvo = (bancoId: number, tipoId: number) => {
-    const valorSalvo = valoresSalvosPorBanco[bancoId]?.[tipoId] ?? 0;
-    handleValorBancoChange(bancoId, tipoId, valorSalvo > 0 ? formatarValorParaInput(valorSalvo) : '');
+  const handlePreencherValorSalvo = (bancoId: number, categoria: CategoriaPrincipal, tipoId: number) => {
+    const valorSalvo = valoresSalvosPorBanco[bancoId]?.[categoria]?.[tipoId] ?? 0;
+    handleValorBancoChange(
+      bancoId,
+      categoria,
+      tipoId,
+      valorSalvo > 0 ? formatarValorParaInput(valorSalvo) : '',
+    );
   };
 
   const handleSalvarLancamentos = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -524,79 +525,51 @@ export default function LancamentoCobrancaPage() {
       return;
     }
 
-    const contasBanco = contasPorBanco.get(bancoSelecionadoId) ?? [];
-    if (contasBanco.length === 0) {
+    const contasBanco = contasCategoriaPorBanco.get(bancoSelecionadoId) ?? {};
+    const categoriasSemConta = CATEGORIAS_PRINCIPAIS.filter(({ id }) => !contasBanco[id]);
+
+    if (categoriasSemConta.length > 0) {
+      const codigosFaltantes = categoriasSemConta.map((categoria) => categoria.codigoConta).join(' e ');
       setMensagem({
         tipo: 'erro',
-        texto: 'Nenhuma conta de receita está vinculada ao banco selecionado. Associe ao menos uma conta antes de lançar cobranças.',
+        texto: `Associe as contas de receita ${codigosFaltantes} ao banco selecionado antes de registrar as cobranças.`,
       });
       return;
     }
 
-    const valoresBanco = valoresPorBanco[bancoSelecionadoId] ?? {};
+    const valoresBanco = valoresPorBanco[bancoSelecionadoId] ?? criarMapaTexto();
     const registrosParaUpsert: any[] = [];
     const idsParaExcluir: number[] = [];
 
-    tipos.forEach((tipo) => {
-      const valorEntrada = valoresBanco[tipo.id] ?? '';
-      const valorCalculado = avaliarValor(valorEntrada);
-      const registrosExistentes = contasBanco
-        .map((conta) => {
-          const chave = gerarChaveLancamento(conta.id, tipo.id);
-          return lancamentosExistentes[chave];
-        })
-        .filter((registro): registro is LancamentoExistente => Boolean(registro));
+    CATEGORIAS_PRINCIPAIS.forEach(({ id }) => {
+      const contaCategoria = contasBanco[id];
+      if (!contaCategoria) {
+        return;
+      }
 
-      if (valorCalculado && valorCalculado > 0) {
-        const distribuicao: { conta: ContaOption; valor: number; registro?: LancamentoExistente }[] = [];
+      const valoresCategoria = valoresBanco[id] ?? {};
 
-        if (registrosExistentes.length > 0) {
-          const totalExistente = registrosExistentes.reduce((acc, registro) => acc + registro.valor, 0);
-          if (totalExistente > 0) {
-            let acumulado = 0;
-            registrosExistentes.forEach((registro, index) => {
-              const conta = contasBanco.find((item) => item.id === registro.contaId);
-              if (!conta) return;
-              let valorConta = Math.round(valorCalculado * (registro.valor / totalExistente) * 100) / 100;
-              if (index === registrosExistentes.length - 1) {
-                valorConta = Math.round((valorCalculado - acumulado) * 100) / 100;
-              } else {
-                acumulado += valorConta;
-              }
-              distribuicao.push({ conta, valor: valorConta, registro });
-            });
-          }
-        }
+      tiposOrdenados.forEach((tipo) => {
+        const valorEntrada = valoresCategoria[tipo.id] ?? '';
+        const valorCalculado = avaliarValor(valorEntrada);
+        const chave = gerarChaveLancamento(contaCategoria.id, tipo.id);
+        const registroExistente = lancamentosExistentes[chave];
 
-        if (distribuicao.length === 0) {
-          const contaDestino = contasBanco[0];
-          if (!contaDestino) {
-            return;
-          }
-          distribuicao.push({ conta: contaDestino, valor: valorCalculado });
-        }
-
-        distribuicao.forEach(({ conta, valor, registro }) => {
-          if (!registro || Math.abs(valor - registro.valor) > 0.009) {
+        if (valorCalculado !== null && valorCalculado > 0) {
+          if (!registroExistente || Math.abs(valorCalculado - registroExistente.valor) > 0.009) {
             registrosParaUpsert.push({
-              cob_id: registro?.id,
-              cob_ctr_id: conta.id,
+              cob_id: registroExistente?.id,
+              cob_ctr_id: contaCategoria.id,
               cob_tpr_id: tipo.id,
               cob_usr_id: usuario.usr_id,
               cob_data: dataReferencia,
-              cob_valor: valor,
+              cob_valor: valorCalculado,
             });
           }
-        });
-
-        registrosExistentes.forEach((registro) => {
-          if (!distribuicao.some((item) => item.registro?.id === registro.id)) {
-            idsParaExcluir.push(registro.id);
-          }
-        });
-      } else {
-        registrosExistentes.forEach((registro) => idsParaExcluir.push(registro.id));
-      }
+        } else if (registroExistente) {
+          idsParaExcluir.push(registroExistente.id);
+        }
+      });
     });
 
     if (registrosParaUpsert.length === 0 && idsParaExcluir.length === 0) {
@@ -649,6 +622,30 @@ export default function LancamentoCobrancaPage() {
     }
   };
 
+  const totaisPorCategoria = useMemo<Record<CategoriaPrincipal, number>>(() => {
+    const totais: Record<CategoriaPrincipal, number> = { titulos: 0, depositos: 0 };
+
+    if (bancoSelecionadoId === null || bancoSelecionadoId === undefined) {
+      return totais;
+    }
+
+    const valores = valoresPorBanco[bancoSelecionadoId] ?? criarMapaTexto();
+
+    CATEGORIAS_PRINCIPAIS.forEach(({ id }) => {
+      const total = tiposOrdenados.reduce((acc, tipo) => {
+        const resultado = avaliarValor(valores[id]?.[tipo.id] ?? '');
+        if (resultado === null || !Number.isFinite(resultado)) {
+          return acc;
+        }
+        return acc + resultado;
+      }, 0);
+
+      totais[id] = Math.round(total * 100) / 100;
+    });
+
+    return totais;
+  }, [bancoSelecionadoId, tiposOrdenados, valoresPorBanco]);
+
   if (carregando) {
     return (
       <>
@@ -666,12 +663,14 @@ export default function LancamentoCobrancaPage() {
   const bancoSelecionado = bancoSelecionadoId
     ? bancos.find((banco) => banco.id === bancoSelecionadoId)
     : null;
-  let valoresBancoSelecionado: Record<number, string> = {};
-  let valoresSalvosBancoSelecionado: Record<number, number> = {};
+  let valoresBancoSelecionado: ValoresTextoPorCategoria = criarMapaTexto();
+  let valoresSalvosBancoSelecionado: ValoresNumericosPorCategoria = criarMapaNumerico();
+  let contasBancoSelecionado: Partial<Record<CategoriaPrincipal, ContaOption>> = {};
 
   if (bancoSelecionadoId !== null && bancoSelecionadoId !== undefined) {
-    valoresBancoSelecionado = valoresPorBanco[bancoSelecionadoId] ?? {};
-    valoresSalvosBancoSelecionado = valoresSalvosPorBanco[bancoSelecionadoId] ?? {};
+    valoresBancoSelecionado = valoresPorBanco[bancoSelecionadoId] ?? criarMapaTexto();
+    valoresSalvosBancoSelecionado = valoresSalvosPorBanco[bancoSelecionadoId] ?? criarMapaNumerico();
+    contasBancoSelecionado = contasCategoriaPorBanco.get(bancoSelecionadoId) ?? {};
   }
 
   return (
@@ -709,16 +708,6 @@ export default function LancamentoCobrancaPage() {
               )}
             </div>
 
-            <div className="rounded-md border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-800">
-              Limite de edição
-              <div className="mt-1 text-xs text-primary-700">
-                Os lançamentos podem ser criados ou ajustados até 7 dias retroativos em relação a {formatarDataPt(hojeIso)}.
-              </div>
-              <div className="mt-1 text-xs text-primary-700">
-                Intervalo permitido: {formatarDataPt(limiteRetroativo)} até {formatarDataPt(hojeIso)}.
-              </div>
-            </div>
-
             {mensagem && (
               <div
                 className={`rounded-md border px-4 py-3 text-sm ${
@@ -733,159 +722,105 @@ export default function LancamentoCobrancaPage() {
               </div>
             )}
 
-            {contas.length > 0 && tipos.length > 0 && (
-              <div className="grid gap-4 lg:grid-cols-3">
-                <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-                  <div className="border-b border-gray-200 px-4 py-3">
-                    <h3 className="text-base font-semibold text-gray-900">Resumo por banco</h3>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Totais informados no formulário agrupados pelos bancos vinculados.
-                    </p>
-                  </div>
-                  <div className="px-4 py-3">
-                    {resumoFormularioPorBanco.length === 0 ? (
-                      <p className="text-sm text-gray-500">
-                        Nenhum valor informado para os bancos cadastrados.
-                      </p>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-3 py-2 text-left font-semibold text-gray-600">Banco</th>
-                              <th className="px-3 py-2 text-right font-semibold text-gray-600">
-                                Valor informado
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100 bg-white">
-                            {resumoFormularioPorBanco.map((resumo) => (
-                              <tr key={`form-resumo-${resumo.bancoId ?? 'sem-banco'}`}>
-                                <td className="px-3 py-2 text-gray-700">{resumo.bancoNome}</td>
-                                <td className="px-3 py-2 text-right font-medium text-gray-900">
-                                  {formatCurrency(resumo.total)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot className="bg-gray-50">
-                            <tr>
-                              <th className="px-3 py-2 text-left font-semibold text-gray-700">Total</th>
-                              <th className="px-3 py-2 text-right font-semibold text-gray-900">
-                                {formatCurrency(totalFormulario)}
-                              </th>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {categoriasResumo.map((categoria) => {
-                  const linhas = resumoTiposPorCategoria[categoria.chave];
-                  const totalCategoria = totaisPorCategoria[categoria.chave];
-                  const classes = [
-                    'rounded-lg border border-gray-200 bg-white shadow-sm',
-                    categoria.chave === 'titulos' ? 'lg:col-span-3' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ');
-
-                  return (
-                    <div key={`resumo-${categoria.chave}`} className={classes}>
-                      <div className="border-b border-gray-200 px-4 py-3">
-                        <h3 className="text-base font-semibold text-gray-900">{categoria.titulo}</h3>
-                        <p className="mt-1 text-xs text-gray-500">
-                          Dados da tabela de tipos de receita vinculada à categoria selecionada.
-                        </p>
-                      </div>
-                      <div className="px-4 py-3">
-                        {linhas.length === 0 ? (
-                          <p className="text-sm text-gray-500">
-                            Nenhum tipo de receita foi configurado para esta categoria.
-                          </p>
-                        ) : (
-                          <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200 text-sm">
-                              <thead className="bg-gray-50">
-                                <tr>
-                                  <th className="px-3 py-2 text-left font-semibold text-gray-600">
-                                    Código / Tipo
-                                  </th>
-                                  <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-100 bg-white">
-                                {linhas.map((linha) => (
-                                  <tr key={linha.tipoId}>
-                                    <td className="px-3 py-2 text-gray-700">
-                                      <span className="font-medium text-gray-800">{linha.codigo}</span>
-                                      <span className="ml-2 text-gray-500">{linha.nome}</span>
-                                    </td>
-                                    <td className="px-3 py-2 text-right font-medium text-gray-900">
-                                      {formatCurrency(linha.total)}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                              <tfoot className="bg-gray-50">
-                                <tr>
-                                  <th className="px-3 py-2 text-left font-semibold text-gray-700">Total</th>
-                                  <th className="px-3 py-2 text-right font-semibold text-gray-900">
-                                    {formatCurrency(totalCategoria)}
-                                  </th>
-                                </tr>
-                              </tfoot>
-                            </table>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+            <div className="rounded-md border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-800">
+              Limite de edição
+              <div className="mt-1 text-xs text-primary-700">
+                Os lançamentos podem ser criados ou ajustados até 7 dias retroativos em relação a {formatarDataPt(hojeIso)}.
               </div>
-            )}
+              <div className="mt-1 text-xs text-primary-700">
+                Intervalo permitido: {formatarDataPt(limiteRetroativo)} até {formatarDataPt(hojeIso)}.
+              </div>
+            </div>
 
-            <div className="space-y-6">
-              {carregandoLancamentos ? (
-                <div className="py-12">
-                  <Loading text="Carregando lançamentos para a data selecionada..." />
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div className="border-b border-gray-200 px-4 py-3">
+                  <h3 className="text-base font-semibold text-gray-900">Totais lançados por banco</h3>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Visualize apenas os bancos que possuem valores já registrados nas cobranças.
+                  </p>
                 </div>
-              ) : contas.length === 0 || tipos.length === 0 ? (
-                <div className="rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
-                  Cadastre contas de receita e tipos de receita para habilitar os lançamentos de cobrança.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-3 py-2 text-left font-semibold text-gray-600">Banco</th>
-                        <th className="px-3 py-2 text-right font-semibold text-gray-600">Total registrado</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white">
-                      {bancos.map((banco) => {
-                        const total = totaisSalvosPorBanco.get(banco.id) ?? 0;
-                        return (
-                          <tr key={banco.id} className="hover:bg-gray-50">
-                            <td className="px-3 py-2 text-gray-700">
-                              <div className="font-medium text-gray-900">{banco.nome}</div>
-                              {banco.codigo && (
-                                <div className="text-xs text-gray-500">Código: {banco.codigo}</div>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 text-right font-semibold text-gray-900">
-                              {formatCurrency(total)}
-                            </td>
+                <div className="px-4 py-3">
+                  {resumoLancadoPorBanco.length === 0 ? (
+                    <p className="text-sm text-gray-500">Nenhum lançamento registrado para os bancos disponíveis.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-semibold text-gray-600">Banco</th>
+                            <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor lançado</th>
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                          {resumoLancadoPorBanco.map((resumo) => (
+                            <tr key={`resumo-banco-${resumo.bancoId ?? 'sem-banco'}`}>
+                              <td className="px-3 py-2 text-gray-700">{resumo.bancoNome}</td>
+                              <td className="px-3 py-2 text-right font-medium text-gray-900">
+                                {formatCurrency(resumo.total)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-semibold text-gray-700">Total</th>
+                            <th className="px-3 py-2 text-right font-semibold text-gray-900">
+                              {formatCurrency(totalLancadoPorBanco)}
+                            </th>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
+
+              <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div className="border-b border-gray-200 px-4 py-3">
+                  <h3 className="text-base font-semibold text-gray-900">Totais lançados por tipo</h3>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Consulte apenas os tipos de receita que já possuem valores confirmados.
+                  </p>
+                </div>
+                <div className="px-4 py-3">
+                  {resumoLancadoPorTipo.length === 0 ? (
+                    <p className="text-sm text-gray-500">Nenhum tipo de receita possui lançamentos registrados.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-semibold text-gray-600">Tipo de receita</th>
+                            <th className="px-3 py-2 text-right font-semibold text-gray-600">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                          {resumoLancadoPorTipo.map((linha) => (
+                            <tr key={`resumo-tipo-${linha.tipoId}`}>
+                              <td className="px-3 py-2 text-gray-700">
+                                <div className="font-semibold text-gray-900">{linha.nome}</div>
+                                <div className="text-xs text-gray-500">Código: {linha.codigo}</div>
+                              </td>
+                              <td className="px-3 py-2 text-right font-medium text-gray-900">
+                                {formatCurrency(linha.total)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-semibold text-gray-700">Total geral</th>
+                            <th className="px-3 py-2 text-right font-semibold text-gray-900">
+                              {formatCurrency(totalLancadoPorTipo)}
+                            </th>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -916,105 +851,166 @@ export default function LancamentoCobrancaPage() {
               <div className="py-12">
                 <Loading text="Carregando lançamentos para a data selecionada..." />
               </div>
-            ) : bancos.length === 0 || tipos.length === 0 ? (
+            ) : bancos.length === 0 || tiposOrdenados.length === 0 ? (
               <div className="rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
-                Cadastre bancos ativos e tipos de receita para habilitar os lançamentos de cobrança.
+                Cadastre bancos ativos, contas e tipos de receita para habilitar os lançamentos de cobrança.
               </div>
             ) : !bancoSelecionado ? (
               <div className="rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
-                Escolha um banco para visualizar os tipos disponíveis.
+                Escolha um banco para visualizar as contas de receita disponíveis.
               </div>
             ) : (
-              <div className="space-y-5">
-                {CATEGORIAS_CONFIG.map((categoria) => {
-                  const tiposCategoria = tiposPorCategoria[categoria.chave];
-                  if (tiposCategoria.length === 0) {
-                    return null;
-                  }
+              <div className="flex gap-4 overflow-x-auto pb-1">
+                {CATEGORIAS_PRINCIPAIS.map((categoria) => {
+                  const contaCategoria = contasBancoSelecionado[categoria.id] ?? null;
+                  const valoresCategoria = valoresBancoSelecionado[categoria.id] ?? {};
+                  const valoresSalvosCategoria = valoresSalvosBancoSelecionado[categoria.id] ?? {};
+                  const totalCategoria = totaisPorCategoria[categoria.id];
 
                   return (
-                    <div key={categoria.chave} className="space-y-4">
-                      <div>
-                        <h4 className="text-lg font-semibold text-gray-900">{categoria.titulo}</h4>
-                        <p className="text-sm text-gray-500">{categoria.descricao}</p>
+                    <div
+                      key={categoria.id}
+                      className="min-w-[600px] flex-1 rounded-lg border border-gray-200 bg-white shadow-sm"
+                    >
+                      <div className="border-b border-gray-200 px-4 py-3">
+                        <h3 className="text-base font-semibold text-gray-900">{categoria.titulo}</h3>
+                        <p className="mt-1 text-xs text-gray-500">{categoria.descricao}</p>
+                        {contaCategoria ? (
+                          <p className="mt-1 text-xs text-gray-500">
+                            Conta vinculada: {contaCategoria.codigo} - {contaCategoria.nome}
+                          </p>
+                        ) : (
+                          <p className="mt-2 text-xs font-medium text-error-600">
+                            Vincule a conta {categoria.codigoConta} a este banco para habilitar os lançamentos.
+                          </p>
+                        )}
                       </div>
-
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-3 py-2 text-left font-semibold text-gray-600">Código / Conta</th>
-                              <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor</th>
-                              <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor registrado</th>
-                              <th className="px-3 py-2 text-center font-semibold text-gray-600">Editar / Excluir</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100 bg-white">
-                            {tiposCategoria.map((tipo) => {
-                              const valorCampo = valoresBancoSelecionado[tipo.id] ?? '';
-                              const valorSalvo = valoresSalvosBancoSelecionado[tipo.id] ?? 0;
-                              return (
-                                <tr key={tipo.id} className="align-top">
-                                  <td className="px-3 py-2 text-gray-700">
-                                    <div className="font-medium text-gray-900">{tipo.codigo}</div>
-                                    <div className="text-xs text-gray-500">{tipo.nome}</div>
-                                  </td>
-                                  <td className="px-3 py-2">
-                                    <Input
-                                      type="text"
-                                      inputMode="decimal"
-                                      value={valorCampo}
-                                      onChange={(event) =>
-                                        handleValorBancoChange(bancoSelecionado.id, tipo.id, event.target.value)
-                                      }
-                                      helperText={
-                                        valorCampo
-                                          ? (() => {
-                                              const resultado = avaliarValor(valorCampo ?? '');
-                                              return resultado !== null ? `Resultado: ${formatCurrency(resultado)}` : undefined;
-                                            })()
-                                          : undefined
-                                      }
-                                      disabled={!podeEditar}
-                                      fullWidth
-                                    />
-                                  </td>
-                                  <td className="px-3 py-2 text-right font-semibold text-gray-900">
-                                    {valorSalvo > 0 ? formatCurrency(valorSalvo) : '-'}
-                                  </td>
-                                  <td className="px-3 py-2">
-                                    <div className="flex items-center justify-center gap-2">
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="secondary"
-                                        onClick={() => handlePreencherValorSalvo(bancoSelecionado.id, tipo.id)}
-                                        disabled={valorSalvo <= 0 || !podeEditar}
-                                      >
-                                        Editar
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => handleValorBancoChange(bancoSelecionado.id, tipo.id, '')}
-                                        disabled={valorSalvo <= 0 || !podeEditar}
-                                      >
-                                        Excluir
-                                      </Button>
-                                    </div>
-                                  </td>
+                      <div className="px-4 py-3">
+                        {contaCategoria ? (
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full table-fixed divide-y divide-gray-200 text-sm">
+                              <thead className="bg-gray-50">
+                                <tr>
+                                  <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">
+                                    Código / Tipo
+                                  </th>
+                                  <th className="px-3 py-2 text-right font-semibold text-gray-600 whitespace-nowrap">
+                                    Valor informado
+                                  </th>
+                                  <th className="px-3 py-2 text-right font-semibold text-gray-600 whitespace-nowrap">
+                                    Valor registrado
+                                  </th>
+                                  <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">
+                                    Ações
+                                  </th>
                                 </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100 bg-white">
+                                {tiposOrdenados.map((tipo) => {
+                                  const valorCampo = valoresCategoria[tipo.id] ?? '';
+                                  const valorSalvo = valoresSalvosCategoria[tipo.id] ?? 0;
+                                  return (
+                                    <tr key={`${categoria.id}-${tipo.id}`} className="align-middle">
+                                      <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
+                                        <span className="font-semibold text-gray-900">
+                                          {`${tipo.codigo} - ${tipo.nome}`}
+                                        </span>
+                                      </td>
+                                      <td className="px-3 py-2 whitespace-nowrap">
+                                        <div className="w-48">
+                                          <Input
+                                            type="text"
+                                            inputMode="decimal"
+                                            value={valorCampo}
+                                            onChange={(event) =>
+                                              handleValorBancoChange(
+                                                bancoSelecionado.id,
+                                                categoria.id,
+                                                tipo.id,
+                                                event.target.value,
+                                              )
+                                            }
+                                            helperText={
+                                              valorCampo
+                                                ? (() => {
+                                                    const resultado = avaliarValor(valorCampo ?? '');
+                                                    return resultado !== null
+                                                      ? `Resultado: ${formatCurrency(resultado)}`
+                                                      : undefined;
+                                                  })()
+                                                : undefined
+                                            }
+                                            disabled={!podeEditar}
+                                          />
+                                        </div>
+                                      </td>
+                                      <td className="px-3 py-2 text-right font-semibold text-gray-900 whitespace-nowrap">
+                                        {valorSalvo > 0 ? formatCurrency(valorSalvo) : '-'}
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        <div className="flex items-center justify-center gap-2">
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="secondary"
+                                            onClick={() =>
+                                              handlePreencherValorSalvo(
+                                                bancoSelecionado.id,
+                                                categoria.id,
+                                                tipo.id,
+                                              )
+                                            }
+                                            disabled={valorSalvo <= 0 || !podeEditar}
+                                          >
+                                            Editar
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() =>
+                                              handleValorBancoChange(
+                                                bancoSelecionado.id,
+                                                categoria.id,
+                                                tipo.id,
+                                                '',
+                                              )
+                                            }
+                                            disabled={valorSalvo <= 0 || !podeEditar}
+                                          >
+                                            Excluir
+                                          </Button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                              <tfoot className="bg-gray-50">
+                                <tr>
+                                  <th className="px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">
+                                    Total informado
+                                  </th>
+                                  <td className="px-3 py-2 text-right font-semibold text-gray-900 whitespace-nowrap">
+                                    {formatCurrency(totalCategoria)}
+                                  </td>
+                                  <td colSpan={2}></td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        ) : (
+                          <div className="rounded-md border border-dashed border-error-200 bg-error-50 px-4 py-6 text-center text-sm text-error-700">
+                            Cadastre a conta de receita código {categoria.codigoConta} para este banco e recarregue a página.
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
                 })}
               </div>
             )}
+
 
             <div className="flex justify-end">
               <Button
