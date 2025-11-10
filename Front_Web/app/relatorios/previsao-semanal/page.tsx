@@ -391,35 +391,29 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
       const pageWidth = doc.internal.pageSize.getWidth();
 
       // Título
-      doc.setFontSize(16);
+      doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
-      doc.text('Relatório - Previsão Semanal', 14, 15);
+      doc.text('Relatório - Previsão Semanal', 14, 12);
 
       // Período
-      doc.setFontSize(10);
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       if (semanaAtual) {
         const dataInicio = formatarData(semanaAtual.inicio);
         const dataFim = formatarData(semanaAtual.fim);
-        doc.text(`Período: ${dataInicio} a ${dataFim}`, 14, 22);
+        doc.text(`Período: ${dataInicio} a ${dataFim}`, 14, 18);
       }
 
-      let yPos = 30;
+      let yPos = 24;
 
-      // Resumo financeiro
-      doc.setFontSize(12);
+      // Resumo financeiro - TUDO EM UMA LINHA
+      doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
-      doc.text('Resumo Financeiro:', 14, yPos);
-      yPos += 7;
-
-      doc.setFontSize(10);
+      doc.text('Resumo:', 14, yPos);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Total de Receitas: ${formatCurrency(totalReceitas)}`, 14, yPos);
-      doc.text(`Total de Despesas: ${formatCurrency(totalDespesas)}`, 90, yPos);
+      const resumoTexto = `Receitas: ${formatCurrency(totalReceitas)}  |  Despesas: ${formatCurrency(totalDespesas)}  |  Resultado: ${formatCurrency(resultadoSemana)}  |  Saldo Final: ${formatCurrency(saldoFinalPrevisto)}`;
+      doc.text(resumoTexto, 35, yPos);
       yPos += 6;
-      doc.text(`Resultado da Semana: ${formatCurrency(resultadoSemana)}`, 14, yPos);
-      doc.text(`Saldo Final Previsto: ${formatCurrency(saldoFinalPrevisto)}`, 90, yPos);
-      yPos += 10;
 
       // Tabela principal
       const datasOrdenadas = relatorio.datas.sort();
@@ -432,11 +426,33 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
         formatCurrency(row.total)
       ]);
 
+      // Adiciona linha de total de receitas
+      const totalReceitaPorData = datasOrdenadas.map(data =>
+        relatorio.receitas.reduce((sum, row) => sum + (row.valores[data] || 0), 0)
+      );
+      const totalReceitaGeral = relatorio.receitas.reduce((sum, row) => sum + row.total, 0);
+      receitasData.push([
+        'TOTAL RECEITAS',
+        ...totalReceitaPorData.map(v => formatCurrency(v)),
+        formatCurrency(totalReceitaGeral)
+      ]);
+
       // Despesas
       const despesasData = relatorio.despesas.map(row => [
         row.categoria,
         ...datasOrdenadas.map(d => formatCurrency(row.valores[d] || 0)),
         formatCurrency(row.total)
+      ]);
+
+      // Adiciona linha de total de despesas
+      const totalDespesaPorData = datasOrdenadas.map(data =>
+        relatorio.despesas.reduce((sum, row) => sum + (row.valores[data] || 0), 0)
+      );
+      const totalDespesaGeral = relatorio.despesas.reduce((sum, row) => sum + row.total, 0);
+      despesasData.push([
+        'TOTAL DESPESAS',
+        ...totalDespesaPorData.map(v => formatCurrency(v)),
+        formatCurrency(totalDespesaGeral)
       ]);
 
       // Saldos
@@ -463,22 +479,30 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
         ]);
       }
 
-      // Adiciona tabelas
+      // Adiciona tabelas com tamanho menor para caber em uma página
       if (receitasData.length > 0) {
         autoTable(doc, {
           startY: yPos,
           head: [headers],
           body: receitasData,
-          headStyles: { fillColor: [34, 197, 94], textColor: 255, fontStyle: 'bold' },
+          headStyles: { fillColor: [34, 197, 94], textColor: 255, fontStyle: 'bold', fontSize: 7 },
+          bodyStyles: { fontSize: 6 },
           margin: { left: 14, right: 14 },
           theme: 'grid',
-          styles: { fontSize: 8, cellPadding: 2 },
+          styles: { cellPadding: 1.5 },
           columnStyles: {
-            0: { halign: 'left', cellWidth: 50 },
+            0: { halign: 'left', cellWidth: 45 },
             [headers.length - 1]: { fontStyle: 'bold' }
+          },
+          didParseCell: function(data) {
+            // Destaca linha de total
+            if (data.row.index === receitasData.length - 1) {
+              data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.fillColor = [220, 252, 231]; // Verde claro
+            }
           }
         });
-        yPos = (doc as any).lastAutoTable.finalY + 8;
+        yPos = (doc as any).lastAutoTable.finalY + 3;
       }
 
       if (despesasData.length > 0) {
@@ -486,16 +510,24 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
           startY: yPos,
           head: [headers],
           body: despesasData,
-          headStyles: { fillColor: [239, 68, 68], textColor: 255, fontStyle: 'bold' },
+          headStyles: { fillColor: [239, 68, 68], textColor: 255, fontStyle: 'bold', fontSize: 7 },
+          bodyStyles: { fontSize: 6 },
           margin: { left: 14, right: 14 },
           theme: 'grid',
-          styles: { fontSize: 8, cellPadding: 2 },
+          styles: { cellPadding: 1.5 },
           columnStyles: {
-            0: { halign: 'left', cellWidth: 50 },
+            0: { halign: 'left', cellWidth: 45 },
             [headers.length - 1]: { fontStyle: 'bold' }
+          },
+          didParseCell: function(data) {
+            // Destaca linha de total
+            if (data.row.index === despesasData.length - 1) {
+              data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.fillColor = [254, 226, 226]; // Vermelho claro
+            }
           }
         });
-        yPos = (doc as any).lastAutoTable.finalY + 8;
+        yPos = (doc as any).lastAutoTable.finalY + 3;
       }
 
       if (saldosData.length > 0) {
@@ -503,12 +535,13 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
           startY: yPos,
           head: [headers],
           body: saldosData,
-          headStyles: { fillColor: [100, 116, 139], textColor: 255, fontStyle: 'bold' },
+          headStyles: { fillColor: [100, 116, 139], textColor: 255, fontStyle: 'bold', fontSize: 7 },
+          bodyStyles: { fontSize: 6 },
           margin: { left: 14, right: 14 },
           theme: 'grid',
-          styles: { fontSize: 8, cellPadding: 2 },
+          styles: { cellPadding: 1.5 },
           columnStyles: {
-            0: { halign: 'left', cellWidth: 50 },
+            0: { halign: 'left', cellWidth: 45 },
             [headers.length - 1]: { fontStyle: 'bold' }
           }
         });

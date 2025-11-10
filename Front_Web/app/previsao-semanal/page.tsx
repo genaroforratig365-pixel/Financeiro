@@ -1333,37 +1333,71 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                 </select>
               </label>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-                <label className="flex flex-col text-sm font-medium text-gray-700">
-                  Arquivo Excel
-                  <input
-                    type="file"
-                    accept=".xlsx,.xls"
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    ref={arquivoInputRef}
-                    onChange={handleArquivoChange}
-                    disabled={processandoArquivo || !edicaoPermitida}
-                  />
-                </label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={handleCancelarArquivo}
-                  disabled={!arquivoNome || processandoArquivo}
-                >
-                  Cancelar seleção
-                </Button>
-                <Button
-                  type="button"
-                  variant="primary"
-                  onClick={handleImportar}
-                  disabled={
-                    !edicaoPermitida || importando || linhas.length === 0 || processandoArquivo
-                  }
-                  loading={importando}
-                >
-                  Importar previsão
-                </Button>
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                  <label className="flex flex-col text-sm font-medium text-gray-700">
+                    Arquivo Excel
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      ref={arquivoInputRef}
+                      onChange={handleArquivoChange}
+                      disabled={processandoArquivo || !edicaoPermitida}
+                    />
+                  </label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleCancelarArquivo}
+                    disabled={!arquivoNome || processandoArquivo}
+                  >
+                    Cancelar seleção
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    onClick={handleImportar}
+                    disabled={
+                      !edicaoPermitida || importando || linhas.length === 0 || processandoArquivo
+                    }
+                    loading={importando}
+                  >
+                    Importar previsão
+                  </Button>
+                </div>
+
+                {/* Botões de edição e inclusão */}
+                {previsaoExistente && (
+                  <div className="flex flex-col gap-2 rounded-md border border-primary-200 bg-primary-50/30 p-3">
+                    <p className="text-xs font-medium text-primary-800">
+                      Ações sobre a previsão existente:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => alert('Funcionalidade de edição será implementada em breve.\n\nPermitirá editar valores já lançados na previsão semanal.')}
+                        disabled={!edicaoPermitida}
+                      >
+                        Editar lançamentos
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => alert('Funcionalidade de inclusão será implementada em breve.\n\nPermitirá adicionar novas áreas/categorias não previstas.\n\nLimitação: Apenas 1 área por semana pode ser cadastrada.')}
+                        disabled={!edicaoPermitida}
+                      >
+                        Incluir área sem previsão
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-600">
+                      <strong>Importante:</strong> Apenas 1 área pode ser cadastrada por semana.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 

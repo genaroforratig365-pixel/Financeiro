@@ -166,25 +166,9 @@ const gerarMapaTextoInicial = (
   tiposLista: TipoOption[],
   registros: Record<string, LancamentoExistente>,
 ): ValoresTextoPorBanco => {
-  const mapa: ValoresTextoPorBanco = {};
-
-  // Itera sobre os registros existentes para popular o mapa por banco
-  Object.values(registros).forEach((registro) => {
-    const bancoId = registro.bancoId;
-
-    if (!mapa[bancoId]) {
-      mapa[bancoId] = {};
-    }
-
-    if (!mapa[bancoId][registro.contaId]) {
-      mapa[bancoId][registro.contaId] = {};
-    }
-
-    mapa[bancoId][registro.contaId][registro.tipoId] =
-      registro.valor > 0 ? formatarValorParaInput(registro.valor) : '';
-  });
-
-  return mapa;
+  // Retorna sempre vazio - campos devem vir vazios mesmo com valores salvos
+  // Os valores salvos são mostrados apenas na coluna "Salvo"
+  return {};
 };
 
 const arredondar = (valor: number): number => Math.round(valor * 100) / 100;
