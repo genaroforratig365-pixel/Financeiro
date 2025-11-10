@@ -31,28 +31,16 @@ type ContaOption = {
   bancoNome: string | null;
 };
 
-type BancoAgrupado = {
-  id: number | null;
+type BancoOption = {
+  id: number;
   nome: string;
-  contas: ContaOption[];
+  codigo: string | null;
 };
-
-type FormularioValores = Record<number, Record<number, string>>;
 
 type LancamentoExistente = {
   id: number;
   contaId: number;
   tipoId: number;
-  valor: number;
-  bancoId: number | null;
-};
-
-type CobrancaHistorico = {
-  id: number;
-  conta: string;
-  tipo: string;
-  banco: string;
-  data: string;
   valor: number;
 };
 
@@ -117,53 +105,23 @@ const formatarDataPt = (iso: string): string => {
   return `${day}/${month}/${year}`;
 };
 
-type Mensagem = { tipo: 'sucesso' | 'erro' | 'info'; texto: string };
-
-type CategoriaReceita = 'depositos' | 'titulos' | 'outras';
-
-type TipoOption = {
-  id: number;
-  nome: string;
-  codigo: string;
-  categoria: CategoriaReceita;
-};
-
-type ContaOption = {
-  id: number;
-  nome: string;
-  bancoId: number | null;
-  bancoNome: string | null;
-};
-
-type BancoOption = {
-  id: number;
-  nome: string;
-  codigo: string | null;
-};
-
-type LancamentoExistente = {
-  id: number;
-  contaId: number;
-  tipoId: number;
-  valor: number;
-};
-
-type CategoriaConfig = {
-  chave: CategoriaReceita;
-  titulo: string;
-};
-
 const CATEGORIAS_CONFIG: CategoriaConfig[] = [
-  { chave: 'depositos', titulo: 'Depósitos e PIX' },
-  { chave: 'titulos', titulo: 'Títulos' },
-  { chave: 'outras', titulo: 'Outras Receitas' },
+  {
+    chave: 'depositos',
+    titulo: 'Depósitos e PIX',
+    descricao: 'Informe aqui os valores recebidos via depósito ou PIX.',
+  },
+  {
+    chave: 'titulos',
+    titulo: 'Títulos',
+    descricao: 'Registre os valores quitados através de boletos e carnês.',
+  },
+  {
+    chave: 'outras',
+    titulo: 'Outras Receitas',
+    descricao: 'Demais recebimentos associados ao banco selecionado.',
+  },
 ];
-
-const categoriaDescricao: Record<CategoriaReceita, string> = {
-  depositos: 'Informe aqui os valores recebidos via depósito ou PIX.',
-  titulos: 'Registre os valores quitados através de boletos e carnês.',
-  outras: 'Demais recebimentos associados ao banco selecionado.',
-};
 
 const obterCategoriaPorCodigo = (codigo: string | null): CategoriaReceita => {
   const referencia = (codigo ?? '').trim();
@@ -233,18 +191,41 @@ export default function LancamentoCobrancaPage() {
     return mapa;
   }, [tipos]);
 
-    return Array.from(mapa.entries())
-      .filter(([, total]) => total > 0)
+  const resumoFormularioPorBanco = useMemo<ResumoBanco[]>(() => {
+    const totais = new Map<number, number>();
+
+    Object.entries(valoresPorBanco).forEach(([bancoIdTexto, valores]) => {
+      const totalCalculado = Object.values(valores).reduce((acc, valorTexto) => {
+        const valor = avaliarValor(valorTexto);
+        if (valor !== null && Number.isFinite(valor)) {
+          return acc + valor;
+        }
+        return acc;
+      }, 0);
+
+      if (totalCalculado <= 0) {
+        return;
+      }
+
+      const bancoId = Number(bancoIdTexto);
+      totais.set(bancoId, Math.round(totalCalculado * 100) / 100);
+    });
+
+    return Array.from(totais.entries())
       .map(([bancoId, total]) => {
-        const contaExemplo = contas.find((conta) => (conta.bancoId ?? null) === bancoId);
+        const banco = bancos.find((item) => item.id === bancoId);
         return {
           bancoId,
-          bancoNome: contaExemplo?.bancoNome ?? 'Sem banco vinculado',
+          bancoNome: banco?.nome ?? 'Sem banco vinculado',
           total,
         } satisfies ResumoBanco;
       })
       .sort((a, b) => a.bancoNome.localeCompare(b.bancoNome, 'pt-BR', { sensitivity: 'base' }));
-  }, [contas, formulario, tipos]);
+  }, [bancos, valoresPorBanco]);
+
+  const totalFormulario = useMemo(() => {
+    return resumoFormularioPorBanco.reduce((acc, item) => acc + item.total, 0);
+  }, [resumoFormularioPorBanco]);
 
   const categoriasResumo = useMemo(() => {
     return [...CATEGORIAS_CONFIG].sort((a, b) => {
@@ -264,10 +245,9 @@ export default function LancamentoCobrancaPage() {
     tipos.forEach((tipo) => {
       let total = 0;
 
-      contas.forEach((conta) => {
-        const valoresConta = formulario[conta.id] ?? {};
-        const valorCalculado = avaliarValor(valoresConta[tipo.id] ?? '');
-        if (valorCalculado && Number.isFinite(valorCalculado)) {
+      Object.values(valoresPorBanco).forEach((valoresBanco) => {
+        const valorCalculado = avaliarValor(valoresBanco[tipo.id] ?? '');
+        if (valorCalculado !== null && Number.isFinite(valorCalculado)) {
           total += valorCalculado;
         }
       });
@@ -290,25 +270,45 @@ export default function LancamentoCobrancaPage() {
     });
 
     return base;
-  }, [tipos, contas, formulario]);
+  }, [tipos, valoresPorBanco]);
 
-  const resumoSalvoPorBanco = useMemo<ResumoBanco[]>(() => {
-    const mapa = new Map<number | null, number>();
+  const totaisPorCategoria = useMemo<Record<CategoriaReceita, number>>(() => {
+    const totais: Record<CategoriaReceita, number> = {
+      depositos: 0,
+      titulos: 0,
+      outras: 0,
+    };
+
+    (Object.entries(resumoTiposPorCategoria) as [CategoriaReceita, ResumoTipo[]][]).forEach(
+      ([categoria, linhas]) => {
+        const totalCategoria = linhas.reduce((acc, linha) => acc + linha.total, 0);
+        totais[categoria] = Math.round(totalCategoria * 100) / 100;
+      },
+    );
+
+    return totais;
+  }, [resumoTiposPorCategoria]);
+
+  const valoresSalvosPorBanco = useMemo<Record<number, Record<number, number>>>(() => {
+    const base: Record<number, Record<number, number>> = {};
 
     Object.values(lancamentosExistentes).forEach((registro) => {
       const conta = contasMap.get(registro.contaId);
-      if (!conta?.bancoId) {
+      const bancoId = conta?.bancoId;
+
+      if (bancoId === null || bancoId === undefined) {
         return;
       }
-      if (!mapa[conta.bancoId]) {
-        mapa[conta.bancoId] = {};
+
+      if (!base[bancoId]) {
+        base[bancoId] = {};
       }
-      mapa[conta.bancoId][registro.tipoId] =
-        (mapa[conta.bancoId][registro.tipoId] ?? 0) + registro.valor;
+
+      base[bancoId][registro.tipoId] = (base[bancoId][registro.tipoId] ?? 0) + registro.valor;
     });
 
-    return mapa;
-  }, [lancamentosExistentes, contasMap]);
+    return base;
+  }, [contasMap, lancamentosExistentes]);
 
   const totaisSalvosPorBanco = useMemo(() => {
     const mapa = new Map<number, number>();
@@ -666,10 +666,13 @@ export default function LancamentoCobrancaPage() {
   const bancoSelecionado = bancoSelecionadoId
     ? bancos.find((banco) => banco.id === bancoSelecionadoId)
     : null;
-  const valoresBancoSelecionado = bancoSelecionadoId ? valoresPorBanco[bancoSelecionadoId] ?? {} : {};
-  const valoresSalvosBancoSelecionado = bancoSelecionadoId
-    ? valoresSalvosPorBanco[bancoSelecionadoId] ?? {}
-    : {};
+  let valoresBancoSelecionado: Record<number, string> = {};
+  let valoresSalvosBancoSelecionado: Record<number, number> = {};
+
+  if (bancoSelecionadoId !== null && bancoSelecionadoId !== undefined) {
+    valoresBancoSelecionado = valoresPorBanco[bancoSelecionadoId] ?? {};
+    valoresSalvosBancoSelecionado = valoresSalvosPorBanco[bancoSelecionadoId] ?? {};
+  }
 
   return (
     <>
@@ -844,32 +847,7 @@ export default function LancamentoCobrancaPage() {
               </div>
             )}
 
-            <form className="space-y-6" onSubmit={handleSalvarLancamentos}>
-              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(220px,240px)] md:items-end">
-                <label className="text-sm font-medium text-gray-700">
-                  Data dos lançamentos
-                  <input
-                    type="date"
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    min={limiteRetroativo}
-                    max={hojeIso}
-                    value={dataReferencia}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      if (!value) return;
-                      setDataReferencia(value);
-                      setMensagem(null);
-                    }}
-                  />
-                </label>
-
-                {!podeEditar && (
-                  <div className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-xs text-warning-800">
-                    Edição disponível apenas para os últimos 7 dias úteis. Ajuste a data para atualizar os valores.
-                  </div>
-                )}
-              </div>
-
+            <div className="space-y-6">
               {carregandoLancamentos ? (
                 <div className="py-12">
                   <Loading text="Carregando lançamentos para a data selecionada..." />
@@ -958,7 +936,7 @@ export default function LancamentoCobrancaPage() {
                     <div key={categoria.chave} className="space-y-4">
                       <div>
                         <h4 className="text-lg font-semibold text-gray-900">{categoria.titulo}</h4>
-                        <p className="text-sm text-gray-500">{categoriaDescricao[categoria.chave]}</p>
+                        <p className="text-sm text-gray-500">{categoria.descricao}</p>
                       </div>
 
                       <div className="overflow-x-auto">
@@ -1008,7 +986,7 @@ export default function LancamentoCobrancaPage() {
                                     <div className="flex items-center justify-center gap-2">
                                       <Button
                                         type="button"
-                                        size="xs"
+                                        size="sm"
                                         variant="secondary"
                                         onClick={() => handlePreencherValorSalvo(bancoSelecionado.id, tipo.id)}
                                         disabled={valorSalvo <= 0 || !podeEditar}
@@ -1017,7 +995,7 @@ export default function LancamentoCobrancaPage() {
                                       </Button>
                                       <Button
                                         type="button"
-                                        size="xs"
+                                        size="sm"
                                         variant="ghost"
                                         onClick={() => handleValorBancoChange(bancoSelecionado.id, tipo.id, '')}
                                         disabled={valorSalvo <= 0 || !podeEditar}
