@@ -1932,21 +1932,19 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
             {/* Bloco: Receitas */}
             {linhas.some((l) => l.tipo === 'receita' || l.tipo === 'saldo_inicial') && (
               <Card
-                title={
-                  <div className="flex items-center justify-between">
-                    <span>Receitas</span>
-                    {modoInclusao && (
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => handleAdicionarLinha('receita')}
-                        disabled={importando}
-                      >
-                        + Receita
-                      </Button>
-                    )}
-                  </div>
+                title="Receitas"
+                headerAction={
+                  modoInclusao ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleAdicionarLinha('receita')}
+                      disabled={importando}
+                    >
+                      + Receita
+                    </Button>
+                  ) : undefined
                 }
               >
                 <div className="overflow-x-auto">
@@ -2111,21 +2109,19 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
           {/* Bloco: Despesas */}
           {linhas.some((l) => l.tipo === 'gasto') && (
             <Card
-              title={
-                <div className="flex items-center justify-between">
-                  <span>Despesas</span>
-                  {modoInclusao && (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => handleAdicionarLinha('gasto')}
-                      disabled={importando}
-                    >
-                      + Gasto
-                    </Button>
-                  )}
-                </div>
+              title="Despesas"
+              headerAction={
+                modoInclusao ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleAdicionarLinha('gasto')}
+                    disabled={importando}
+                  >
+                    + Gasto
+                  </Button>
+                ) : undefined
               }
             >
               <div className="overflow-x-auto">
