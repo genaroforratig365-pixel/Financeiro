@@ -320,13 +320,13 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
         normalizeRelation(receitas).forEach((item) => {
           const contaRel = normalizeRelation(item.ctr_contas_receita)[0];
           const codigo = contaRel?.ctr_codigo ? toString(contaRel.ctr_codigo) : null;
-        const categoria = obterCategoriaReceita(codigo);
-        const titulo = categoriaRotulos[categoria];
-        const chave = categoria;
-        const existente = mapaReceitas.get(chave) ?? { titulo, previsto: 0, realizado: 0 };
-        existente.realizado += arredondar(toNumber(item.rec_valor));
-        mapaReceitas.set(chave, existente);
-      });
+          const categoria = obterCategoriaReceita(codigo);
+          const titulo = categoriaRotulos[categoria];
+          const chave = categoria;
+          const existente = mapaReceitas.get(chave) ?? { titulo, previsto: 0, realizado: 0 };
+          existente.realizado += arredondar(toNumber(item.rec_valor));
+          mapaReceitas.set(chave, existente);
+        });
 
         normalizeRelation(saldosBancarios).forEach((item) => {
           const bancoRel = normalizeRelation(item.ban_bancos)[0];
