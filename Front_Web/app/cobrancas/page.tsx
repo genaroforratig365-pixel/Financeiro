@@ -444,6 +444,13 @@ export default function LancamentoCobrancaPage() {
     return resumoLancadoPorTipo.reduce((acc, item) => acc + item.total, 0);
   }, [resumoLancadoPorTipo]);
 
+  // Total apenas de código 301 (Receita Prevista) para o card de comparação
+  const totalLancadoPorTipo301 = useMemo(() => {
+    return resumoLancadoPorTipo
+      .filter(item => item.codigo.startsWith('301'))
+      .reduce((acc, item) => acc + item.total, 0);
+  }, [resumoLancadoPorTipo]);
+
   const carregarLancamentosDia = useCallback(
     async (
       usuarioAtual: UsuarioRow,
@@ -1138,28 +1145,28 @@ export default function LancamentoCobrancaPage() {
                   <div className="space-y-2">
                     <p className="text-xs font-medium text-gray-600 uppercase">Realizado</p>
                     <p className="text-2xl font-bold text-success-700">
-                      {formatCurrency(totalLancadoPorTipo)}
+                      {formatCurrency(totalLancadoPorTipo301)}
                     </p>
-                    <p className="text-xs text-gray-500">Receitas realizadas</p>
+                    <p className="text-xs text-gray-500">Receitas realizadas (código 301)</p>
                   </div>
 
                   {/* Coluna 3: Percentual */}
                   <div className="space-y-2">
                     <p className="text-xs font-medium text-gray-600 uppercase">% Realizado</p>
                     <p className={`text-2xl font-bold ${
-                      previsaoDia.previstoReceitas > 0 && totalLancadoPorTipo >= previsaoDia.previstoReceitas
+                      previsaoDia.previstoReceitas > 0 && totalLancadoPorTipo301 >= previsaoDia.previstoReceitas
                         ? 'text-success-700'
                         : 'text-warning-700'
                     }`}>
                       {previsaoDia.previstoReceitas > 0
-                        ? `${((totalLancadoPorTipo / previsaoDia.previstoReceitas) * 100).toFixed(1)}%`
+                        ? `${((totalLancadoPorTipo301 / previsaoDia.previstoReceitas) * 100).toFixed(1)}%`
                         : '-'}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {previsaoDia.previstoReceitas > 0 && totalLancadoPorTipo < previsaoDia.previstoReceitas
-                        ? `Faltam ${formatCurrency(previsaoDia.previstoReceitas - totalLancadoPorTipo)}`
-                        : previsaoDia.previstoReceitas > 0 && totalLancadoPorTipo > previsaoDia.previstoReceitas
-                        ? `Excedeu ${formatCurrency(totalLancadoPorTipo - previsaoDia.previstoReceitas)}`
+                      {previsaoDia.previstoReceitas > 0 && totalLancadoPorTipo301 < previsaoDia.previstoReceitas
+                        ? `Faltam ${formatCurrency(previsaoDia.previstoReceitas - totalLancadoPorTipo301)}`
+                        : previsaoDia.previstoReceitas > 0 && totalLancadoPorTipo301 > previsaoDia.previstoReceitas
+                        ? `Excedeu ${formatCurrency(totalLancadoPorTipo301 - previsaoDia.previstoReceitas)}`
                         : 'Meta atingida'}
                     </p>
                   </div>
