@@ -1395,7 +1395,39 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
       });
     });
 
-    // Saldos não são salvos no banco - são calculados na exibição
+    // Adicionar saldo diário e saldo acumulado (1 registro por dia)
+    datasTabela.forEach((data, index) => {
+      const saldoDia = saldoDiarioPrevisto[index] ?? 0;
+      const saldoAcum = saldoAcumuladoPrevisto[index] ?? 0;
+
+      // Saldo do dia (apenas se diferente de zero)
+      if (saldoDia !== 0) {
+        itensParaInserir.push({
+          tipo: 'saldo_diario',
+          data,
+          categoria: 'Saldo diário calculado',
+          valor: Math.round(saldoDia * 100) / 100,
+          areaId: null,
+          contaId: null,
+          tipoReceitaId: null,
+          bancoId: null,
+          ordem: 9000 + index, // Ordem alta para aparecer após receitas e gastos
+        });
+      }
+
+      // Saldo acumulado
+      itensParaInserir.push({
+        tipo: 'saldo_acumulado',
+        data,
+        categoria: 'Saldo acumulado calculado',
+        valor: Math.round(saldoAcum * 100) / 100,
+        areaId: null,
+        contaId: null,
+        tipoReceitaId: null,
+        bancoId: null,
+        ordem: 9500 + index, // Ordem ainda maior
+      });
+    });
 
     if (itensParaInserir.length === 0) {
       setMensagem({ tipo: 'erro', texto: 'Nenhum valor válido foi encontrado para importação.' });
@@ -2261,6 +2293,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
 
               datas.forEach(data => {
                 const itensData = itensPorData[data];
+                // Não considerar saldo_diario e saldo_acumulado nos totais
                 const totalReceitas = itensData.filter(i => i.tipo === 'receita').reduce((sum, i) => sum + i.valor, 0);
                 const totalGastos = itensData.filter(i => i.tipo === 'gasto').reduce((sum, i) => sum + i.valor, 0);
                 saldoAcumulado += (totalReceitas - totalGastos);

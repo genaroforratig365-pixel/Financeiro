@@ -95,20 +95,21 @@ export default function PrevistoRealizadoPage() {
       try {
         const supabase = getSupabaseClient();
 
-        // Buscar previsões do período
+        // Buscar previsões do período (da tabela pvi_previsao_itens)
         const { data: previsoesData, error: erroPrevisoes } = await supabase
-          .from('fpre_itens')
+          .from('pvi_previsao_itens')
           .select(`
-            fpre_data,
-            fpre_tipo,
-            fpre_categoria,
-            fpre_valor,
-            fpre_are_id,
-            are_areas!fpre_are_id (are_nome)
+            pvi_data,
+            pvi_tipo,
+            pvi_categoria,
+            pvi_valor,
+            pvi_are_id,
+            are_areas!pvi_are_id (are_nome)
           `)
-          .gte('fpre_data', periodoInicio)
-          .lte('fpre_data', periodoFim)
-          .order('fpre_data');
+          .gte('pvi_data', periodoInicio)
+          .lte('pvi_data', periodoFim)
+          .in('pvi_tipo', ['receita', 'gasto'])
+          .order('pvi_data');
 
         if (erroPrevisoes) throw erroPrevisoes;
 
@@ -116,11 +117,11 @@ export default function PrevistoRealizadoPage() {
         const previsoesFormatadas = (previsoesData || []).map((item: any) => {
           const area = Array.isArray(item.are_areas) ? item.are_areas[0] : item.are_areas;
           return {
-            data: item.fpre_data,
-            tipo: item.fpre_tipo,
-            categoria: item.fpre_categoria,
-            valor: item.fpre_valor,
-            areaId: item.fpre_are_id,
+            data: item.pvi_data,
+            tipo: item.pvi_tipo,
+            categoria: item.pvi_categoria,
+            valor: Number(item.pvi_valor) || 0,
+            areaId: item.pvi_are_id,
             area_nome: area?.are_nome || null
           };
         });
