@@ -693,8 +693,7 @@ export default function LancamentoCobrancaPage() {
       return;
     }
 
-    const registrosParaUpsert: Array<{
-      cob_id?: number;
+    const registrosParaInserir: Array<{
       cob_ban_id: number;
       cob_ctr_id: number;
       cob_tpr_id: number;
@@ -702,9 +701,8 @@ export default function LancamentoCobrancaPage() {
       cob_data: string;
       cob_valor: number;
     }> = [];
-    const idsParaExcluir: number[] = [];
 
-    // Iterar sobre TODOS os bancos que têm valores digitados
+    // Iterar sobre TODOS os bancos, mas APENAS inserir valores NOVOS (sem registro existente)
     Object.keys(valoresPorBanco).forEach((bancoIdStr) => {
       const bancoId = Number(bancoIdStr);
       const valoresBanco = valoresPorBanco[bancoId];
@@ -718,44 +716,30 @@ export default function LancamentoCobrancaPage() {
           const chave = gerarChaveLancamento(bancoId, conta.id, tipo.id);
           const registroExistente = lancamentosExistentes[chave];
 
-          if (valorCalculado !== null && valorCalculado > 0) {
-            if (!registroExistente || Math.abs(valorCalculado - registroExistente.valor) > 0.009) {
-              // Se registro existe mas é de outro usuário, marca para deletar
-              if (registroExistente && registroExistente.usrId !== usuarioId) {
-                idsParaExcluir.push(registroExistente.id);
-                // Cria novo registro sem cob_id (será insert)
-                registrosParaUpsert.push({
-                  cob_ban_id: bancoId,
-                  cob_ctr_id: conta.id,
-                  cob_tpr_id: tipo.id,
-                  cob_usr_id: usuarioId,
-                  cob_data: dataReferencia,
-                  cob_valor: valorCalculado,
-                });
-              } else {
-                // Registro do mesmo usuário ou novo - faz upsert normal
-                registrosParaUpsert.push({
-                  cob_id: registroExistente?.id,
-                  cob_ban_id: bancoId,
-                  cob_ctr_id: conta.id,
-                  cob_tpr_id: tipo.id,
-                  cob_usr_id: usuarioId,
-                  cob_data: dataReferencia,
-                  cob_valor: valorCalculado,
-                });
-              }
-            }
-          } else if (registroExistente && registroExistente.bancoId === bancoId) {
-            idsParaExcluir.push(registroExistente.id);
+          // APENAS inserir se: tem valor digitado E não existe registro salvo E não está editando
+          if (
+            valorCalculado !== null &&
+            valorCalculado > 0 &&
+            !registroExistente &&
+            !camposEditando.has(chave)
+          ) {
+            registrosParaInserir.push({
+              cob_ban_id: bancoId,
+              cob_ctr_id: conta.id,
+              cob_tpr_id: tipo.id,
+              cob_usr_id: usuarioId,
+              cob_data: dataReferencia,
+              cob_valor: valorCalculado,
+            });
           }
         });
       });
     });
 
-    if (registrosParaUpsert.length === 0 && idsParaExcluir.length === 0) {
+    if (registrosParaInserir.length === 0) {
       setMensagem({
         tipo: 'info',
-        texto: 'Nenhuma alteração foi identificada para salvar.',
+        texto: 'Nenhum novo lançamento para salvar.',
       });
       return;
     }
@@ -765,36 +749,18 @@ export default function LancamentoCobrancaPage() {
       setMensagem(null);
       const supabase = getSupabaseClient();
 
-      // IMPORTANTE: Executa exclusões ANTES dos upserts
-      // para evitar conflitos ao substituir registros de outros usuários
-      if (idsParaExcluir.length > 0) {
-        const { error } = await supabase
-          .from('cob_cobrancas')
-          .delete()
-          .in('cob_id', idsParaExcluir);
-        if (error) throw error;
-      }
-
-      if (registrosParaUpsert.length > 0) {
-        const payload = registrosParaUpsert.map((registro) => {
-          const { cob_id, ...restante } = registro;
-          return cob_id ? { cob_id, ...restante } : restante;
-        });
-        const { error } = await supabase.from('cob_cobrancas').upsert(payload, { onConflict: 'cob_id' });
-        if (error) throw error;
-      }
+      const { error } = await supabase.from('cob_cobrancas').insert(registrosParaInserir);
+      if (error) throw error;
 
       setMensagem({
         tipo: 'sucesso',
-        texto: 'Lançamentos de cobrança atualizados com sucesso.',
+        texto: `${registrosParaInserir.length} novo(s) lançamento(s) salvo(s) com sucesso.`,
       });
 
-      // Limpa os campos do formulário após salvar
-      setValoresPorBanco({});
-
+      // Recarrega lançamentos do dia
       await carregarLancamentosDia(usuario, dataReferencia);
     } catch (error) {
-      console.error('Erro ao registrar cobranças:', error);
+      console.error('Erro ao salvar lançamentos:', error);
       setMensagem({
         tipo: 'erro',
         texto: traduzirErroSupabase(
@@ -802,6 +768,103 @@ export default function LancamentoCobrancaPage() {
           'Não foi possível salvar os lançamentos de cobrança. Verifique os dados e tente novamente.',
         ),
       });
+    } finally {
+      setRegistrando(false);
+    }
+  };
+
+  const handleSalvarEdicao = async (bancoId: number, contaId: number, tipoId: number) => {
+    if (!usuario || !podeEditar) return;
+
+    const valorEntrada = valoresPorBanco[bancoId]?.[contaId]?.[tipoId] ?? '';
+    const valorCalculado = avaliarValor(valorEntrada);
+    const chave = gerarChaveLancamento(bancoId, contaId, tipoId);
+    const registroExistente = lancamentosExistentes[chave];
+
+    if (!registroExistente) {
+      setMensagem({ tipo: 'erro', texto: 'Registro não encontrado.' });
+      return;
+    }
+
+    if (valorCalculado === null || valorCalculado <= 0) {
+      setMensagem({ tipo: 'erro', texto: 'Informe um valor válido.' });
+      return;
+    }
+
+    try {
+      setRegistrando(true);
+      setMensagem(null);
+      const supabase = getSupabaseClient();
+
+      const { error } = await supabase
+        .from('cob_cobrancas')
+        .update({ cob_valor: valorCalculado })
+        .eq('cob_id', registroExistente.id);
+
+      if (error) throw error;
+
+      setMensagem({ tipo: 'sucesso', texto: 'Valor atualizado com sucesso.' });
+
+      // Remove do modo edição
+      const novoSet = new Set(camposEditando);
+      novoSet.delete(chave);
+      setCamposEditando(novoSet);
+
+      // Recarrega
+      await carregarLancamentosDia(usuario, dataReferencia);
+    } catch (erro) {
+      console.error('Erro ao atualizar:', erro);
+      setMensagem({ tipo: 'erro', texto: 'Erro ao atualizar valor.' });
+    } finally {
+      setRegistrando(false);
+    }
+  };
+
+  const handleExcluirSelecionados = async () => {
+    if (!usuario || !podeEditar || itensMarcadosExclusao.size === 0) return;
+
+    if (!confirm(`Confirma a exclusão de ${itensMarcadosExclusao.size} lançamento(s)?`)) {
+      return;
+    }
+
+    try {
+      setRegistrando(true);
+      setMensagem(null);
+      const supabase = getSupabaseClient();
+      const idsParaExcluir: number[] = [];
+
+      itensMarcadosExclusao.forEach((chave) => {
+        const registro = lancamentosExistentes[chave];
+        if (registro) {
+          idsParaExcluir.push(registro.id);
+        }
+      });
+
+      if (idsParaExcluir.length === 0) {
+        setMensagem({ tipo: 'info', texto: 'Nenhum registro para excluir.' });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('cob_cobrancas')
+        .delete()
+        .in('cob_id', idsParaExcluir);
+
+      if (error) throw error;
+
+      setMensagem({
+        tipo: 'sucesso',
+        texto: `${idsParaExcluir.length} lançamento(s) excluído(s) com sucesso.`,
+      });
+
+      // Limpa seleção
+      setItensMarcadosExclusao(new Set());
+
+      // Recarrega
+      await carregarLancamentosDia(usuario, dataReferencia);
+    } catch (erro) {
+      console.error('Erro ao excluir:', erro);
+      setMensagem({ tipo: 'erro', texto: 'Erro ao excluir lançamentos.' });
     } finally {
       setRegistrando(false);
     }
@@ -1097,11 +1160,10 @@ export default function LancamentoCobrancaPage() {
                             <table className="min-w-full divide-y divide-gray-200 text-sm">
                               <thead className="bg-gray-50">
                                 <tr>
-                                  <th className="px-3 py-2 w-8"></th>
                                   <th className="px-3 py-2 text-left font-semibold text-gray-600">Tipo de receita</th>
                                   <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor</th>
                                   <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor registrado</th>
-                                  <th className="px-3 py-2 text-center font-semibold text-gray-600">Ações</th>
+                                  <th className="px-3 py-2 text-center font-semibold text-gray-600">Excluir / Editar</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-gray-100 bg-white">
@@ -1115,25 +1177,6 @@ export default function LancamentoCobrancaPage() {
 
                                   return (
                                     <tr key={`conta-${conta.id}-tipo-${tipo.id}`} className="align-top">
-                                      <td className="px-3 py-2 text-center">
-                                        {valorSalvo > 0 && (
-                                          <input
-                                            type="checkbox"
-                                            checked={estaMarcadoExclusao}
-                                            onChange={(e) => {
-                                              const novoSet = new Set(itensMarcadosExclusao);
-                                              if (e.target.checked) {
-                                                novoSet.add(chave);
-                                              } else {
-                                                novoSet.delete(chave);
-                                              }
-                                              setItensMarcadosExclusao(novoSet);
-                                            }}
-                                            disabled={!podeEditar}
-                                            className="rounded border-gray-300"
-                                          />
-                                        )}
-                                      </td>
                                       <td className="px-3 py-2 text-gray-700">
                                         <div className="text-sm font-semibold text-gray-900">{tipo.nome}</div>
                                         <div className="text-xs text-gray-500">Código: {tipo.codigo}</div>
@@ -1188,36 +1231,75 @@ export default function LancamentoCobrancaPage() {
                                           <span className="text-gray-400">-</span>
                                         )}
                                       </td>
-                                      <td className="px-3 py-2 text-center">
-                                        {valorSalvo > 0 && !estaEditando && (
-                                          <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => {
-                                              const novoSet = new Set(camposEditando);
-                                              novoSet.add(chave);
-                                              setCamposEditando(novoSet);
-                                            }}
-                                            disabled={!podeEditar}
-                                          >
-                                            Editar
-                                          </Button>
-                                        )}
-                                        {estaEditando && (
-                                          <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => {
-                                              const novoSet = new Set(camposEditando);
-                                              novoSet.delete(chave);
-                                              setCamposEditando(novoSet);
-                                            }}
-                                          >
-                                            Cancelar
-                                          </Button>
-                                        )}
+                                      <td className="px-3 py-2">
+                                        <div className="flex items-center justify-center gap-2">
+                                          {/* Checkbox de exclusão */}
+                                          {valorSalvo > 0 && !estaEditando && (
+                                            <input
+                                              type="checkbox"
+                                              checked={estaMarcadoExclusao}
+                                              onChange={(e) => {
+                                                const novoSet = new Set(itensMarcadosExclusao);
+                                                if (e.target.checked) {
+                                                  novoSet.add(chave);
+                                                } else {
+                                                  novoSet.delete(chave);
+                                                }
+                                                setItensMarcadosExclusao(novoSet);
+                                              }}
+                                              disabled={!podeEditar}
+                                              className="rounded border-gray-300"
+                                              title="Marcar para exclusão"
+                                            />
+                                          )}
+
+                                          {/* Botão Editar */}
+                                          {valorSalvo > 0 && !estaEditando && (
+                                            <Button
+                                              type="button"
+                                              size="sm"
+                                              variant="ghost"
+                                              onClick={() => {
+                                                const novoSet = new Set(camposEditando);
+                                                novoSet.add(chave);
+                                                setCamposEditando(novoSet);
+                                              }}
+                                              disabled={!podeEditar}
+                                            >
+                                              Editar
+                                            </Button>
+                                          )}
+
+                                          {/* Botões Salvar/Cancelar quando editando */}
+                                          {estaEditando && (
+                                            <>
+                                              <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="primary"
+                                                onClick={() =>
+                                                  handleSalvarEdicao(bancoSelecionado.id, conta.id, tipo.id)
+                                                }
+                                                disabled={registrando}
+                                              >
+                                                Salvar
+                                              </Button>
+                                              <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => {
+                                                  const novoSet = new Set(camposEditando);
+                                                  novoSet.delete(chave);
+                                                  setCamposEditando(novoSet);
+                                                }}
+                                                disabled={registrando}
+                                              >
+                                                Cancelar
+                                              </Button>
+                                            </>
+                                          )}
+                                        </div>
                                       </td>
                                     </tr>
                                   );
@@ -1229,7 +1311,20 @@ export default function LancamentoCobrancaPage() {
                                   <td className="px-3 py-2 text-right font-semibold text-gray-900">
                                     {formatCurrency(totalContaArredondado)}
                                   </td>
-                                  <td colSpan={2}></td>
+                                  <td className="px-3 py-2"></td>
+                                  <td className="px-3 py-2 text-center">
+                                    {itensMarcadosExclusao.size > 0 && (
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="danger"
+                                        onClick={handleExcluirSelecionados}
+                                        disabled={!podeEditar || registrando}
+                                      >
+                                        Excluir {itensMarcadosExclusao.size} selecionado(s)
+                                      </Button>
+                                    )}
+                                  </td>
                                 </tr>
                               </tfoot>
                             </table>
@@ -1248,7 +1343,7 @@ export default function LancamentoCobrancaPage() {
                 loading={registrando}
                 disabled={!podeEditar || !bancoSelecionado || tiposOrdenados.length === 0}
               >
-                Salvar lançamentos do dia
+                Salvar novos lançamentos
               </Button>
             </div>
           </form>
