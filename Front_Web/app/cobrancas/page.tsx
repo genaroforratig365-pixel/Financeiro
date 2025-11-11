@@ -878,9 +878,9 @@ export default function LancamentoCobrancaPage() {
             {(resumoFormularioPorBanco.length > 0 || resumoTiposFormulario.length > 0 || resumoLancadoPorBanco.length > 0 || resumoLancadoPorTipo.length > 0) && (
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-                  <div className="border-b border-gray-200 px-4 py-3">
-                    <h3 className="text-base font-semibold text-gray-900">Resumo por banco</h3>
-                    <p className="mt-1 text-xs text-gray-500">
+                  <div className="border-b border-red-200 bg-red-50 px-4 py-3">
+                    <h3 className="text-base font-semibold text-red-800">🔴 Resumo por banco</h3>
+                    <p className="mt-1 text-xs text-red-600">
                       Valores digitados e salvos por banco
                     </p>
                   </div>
@@ -936,9 +936,9 @@ export default function LancamentoCobrancaPage() {
                 </div>
 
                 <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-                  <div className="border-b border-gray-200 px-4 py-3">
-                    <h3 className="text-base font-semibold text-gray-900">Resumo por tipo de receita</h3>
-                    <p className="mt-1 text-xs text-gray-500">
+                  <div className="border-b border-red-200 bg-red-50 px-4 py-3">
+                    <h3 className="text-base font-semibold text-red-800">🔴 Resumo por tipo de receita</h3>
+                    <p className="mt-1 text-xs text-red-600">
                       Valores digitados e salvos por tipo de receita
                     </p>
                   </div>

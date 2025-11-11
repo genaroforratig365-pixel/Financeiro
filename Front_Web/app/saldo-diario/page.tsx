@@ -1846,6 +1846,101 @@ const SaldoDiarioPage: React.FC = () => {
           </Card>
           <Card title="Receitas" subtitle={`Total registrado: ${formatCurrency(totalReceitas)}`} variant="success">
             <div className="space-y-5">
+              {/* Seção Títulos (Conta 200) */}
+              {contasTitulos.length > 0 && (
+                <div className="bg-red-50 rounded-lg p-3 border border-red-200">
+                  <h3 className="text-sm font-semibold text-red-800 mb-3">
+                    🔴 Títulos (Conta 200)
+                  </h3>
+                  <div className="space-y-2">
+                    {contasTitulos.map(conta => {
+                      const registro = receitasPorContaId.get(conta.id);
+                      return (
+                        <div key={conta.id} className="text-sm bg-white/50 p-2 rounded">
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium text-gray-700">{conta.nome}</span>
+                            {registro && (
+                              <span className="text-success-700 font-semibold">
+                                {formatCurrency(registro.valor)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Seção Depósitos e PIX (Conta 201) */}
+              {contasDepositosPix.length > 0 && (
+                <div className="bg-red-50 rounded-lg p-3 border border-red-200">
+                  <h3 className="text-sm font-semibold text-red-800 mb-3">
+                    🔴 Depósitos e PIX (Conta 201)
+                  </h3>
+                  <div className="space-y-2">
+                    {contasDepositosPix.map(conta => {
+                      const registro = receitasPorContaId.get(conta.id);
+                      return (
+                        <div key={conta.id} className="text-sm bg-white/50 p-2 rounded">
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium text-gray-700">{conta.nome}</span>
+                            {registro && (
+                              <span className="text-success-700 font-semibold">
+                                {formatCurrency(registro.valor)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Resumo por Banco */}
+              {receitas.length > 0 && (
+                <div className="bg-red-50 rounded-lg p-3 border border-red-200">
+                  <h3 className="text-sm font-semibold text-red-800 mb-3">
+                    🔴 Resumo por Banco
+                  </h3>
+                  <div className="space-y-2">
+                    {Array.from(new Set(receitas.map(r => {
+                      const conta = contaOptions.find(c => c.id === r.contaId);
+                      return conta ? `Banco ${r.contaId}` : 'Sem banco';
+                    }))).map((banco, idx) => (
+                      <div key={idx} className="text-sm bg-white/50 p-2 rounded">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-gray-700">{banco}</span>
+                          <span className="text-success-700 font-semibold">-</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Resumo por Tipo de Receita */}
+              {resumoPorTipoReceita.length > 0 && (
+                <div className="bg-red-50 rounded-lg p-3 border border-red-200">
+                  <h3 className="text-sm font-semibold text-red-800 mb-3">
+                    🔴 Resumo por Tipo de Receita
+                  </h3>
+                  <div className="space-y-2">
+                    {resumoPorTipoReceita.map((item, idx) => (
+                      <div key={idx} className="text-sm bg-white/50 p-2 rounded">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-gray-700">{item.tipo}</span>
+                          <span className="text-success-700 font-semibold">
+                            {formatCurrency(item.total)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <form className="space-y-4" onSubmit={handleRegistrarReceitas}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex flex-wrap gap-2">

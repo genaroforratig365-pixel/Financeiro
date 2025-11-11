@@ -40,8 +40,6 @@ export default function PrevistoRealizadoPage() {
   const [periodoInicio, setPeriodoInicio] = useState('');
   const [periodoFim, setPeriodoFim] = useState('');
 
-  const supabase = getSupabaseClient();
-
   useEffect(() => {
     // Define período padrão: semana atual
     const hoje = new Date();
@@ -61,6 +59,8 @@ export default function PrevistoRealizadoPage() {
     const carregarDados = async () => {
       setCarregando(true);
       try {
+        const supabase = getSupabaseClient();
+
         // Buscar previsões do período
         const { data: previsoesData, error: erroPrevisoes } = await supabase
           .from('fpre_itens')
@@ -90,7 +90,7 @@ export default function PrevistoRealizadoPage() {
     };
 
     carregarDados();
-  }, [periodoInicio, periodoFim, supabase]);
+  }, [periodoInicio, periodoFim]);
 
   const dadosComparativos = useMemo((): ComparativoData[] => {
     const todasDatas = new Set<string>();
