@@ -592,22 +592,6 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
           bancoId: item.pvi_ban_id !== null ? Number(item.pvi_ban_id) : null,
         }));
 
-        // Verificar se as datas dos itens correspondem à semana selecionada
-        if (itensFormatados.length > 0) {
-          const datasEsperadas = obterDatasDaSemana(semanaInicio);
-          const datasReais = Array.from(new Set(itensFormatados.map(item => item.data))).sort();
-          const datasNaoCorrespondem = datasReais.some(data => !datasEsperadas.includes(data));
-
-          if (datasNaoCorrespondem) {
-            const datasEsperadasFormatadas = datasEsperadas.map(d => formatarDataPt(d)).join(', ');
-            const datasReaisFormatadas = datasReais.map(d => formatarDataPt(d)).join(', ');
-            setMensagem({
-              tipo: 'info',
-              texto: `Atenção: Os dados registrados contêm datas (${datasReaisFormatadas}) que não correspondem ao período selecionado (${datasEsperadasFormatadas}). Isso pode indicar dados importados incorretamente.`
-            });
-          }
-        }
-
         setPrevisaoExistente({
           id: Number(semana.pvs_id),
           status: semana.pvs_status ?? 'rascunho',
@@ -1125,16 +1109,13 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
 
     // Converte grupos em LinhaImportada
     const linhasEditaveis: LinhaImportada[] = [];
-
-    // Usa as datas reais dos dados ao invés das datas esperadas da semana
-    const datasReais = Array.from(new Set(previsaoExistente.itens.map(item => item.data))).sort();
-    const datasParaUsar = datasReais.length > 0 ? datasReais : obterDatasDaSemana(semanaSelecionada);
+    const datasSemanaSelecionada = obterDatasDaSemana(semanaSelecionada);
 
     itensPorCategoria.forEach((itens, chave) => {
       const primeiroItem = itens[0];
 
-      // Cria valores para cada data existente nos dados
-      const valores = datasParaUsar.map(data => {
+      // Cria valores para cada data da semana
+      const valores = datasSemanaSelecionada.map(data => {
         const itemNaData = itens.find(i => i.data === data);
         const valor = itemNaData?.valor ?? 0;
         return criarDiaValor(data, valor);

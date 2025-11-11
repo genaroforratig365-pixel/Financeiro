@@ -237,7 +237,7 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
 
         if (error) throw error;
 
-        const itens: PrevisaoItem[] = (data ?? []).map((item) => ({
+        const itensBrutos: PrevisaoItem[] = (data ?? []).map((item) => ({
           id: Number(item.pvi_id),
           data: String(item.pvi_data ?? ''),
           tipo: String(item.pvi_tipo ?? ''),
@@ -246,9 +246,17 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
           ordem: item.pvi_ordem !== null ? Number(item.pvi_ordem) : 0,
         }));
 
+        // Filtra apenas itens com datas dentro do período da semana selecionada
+        const dataInicio = new Date(`${semana.inicio}T00:00:00`);
+        const dataFim = new Date(`${semana.fim}T00:00:00`);
+        const itens = itensBrutos.filter((item) => {
+          const dataItem = new Date(`${item.data}T00:00:00`);
+          return dataItem >= dataInicio && dataItem <= dataFim;
+        });
+
         if (itens.length === 0) {
           setRelatorio(null);
-          setAviso('Não existem lançamentos importados para a semana selecionada.');
+          setAviso('Não existem lançamentos importados para a semana selecionada dentro do período correto.');
           return;
         }
 
