@@ -366,6 +366,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
     modificados: false,
     removidos: false
   });
+  const [datasExpandidas, setDatasExpandidas] = useState<Set<string>>(new Set());
   const [modoEdicao, setModoEdicao] = useState(false);
   const [modoInclusao, setModoInclusao] = useState(false);
   const arquivoInputRef = useRef<HTMLInputElement | null>(null);
@@ -2266,52 +2267,128 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
             <p className="text-sm text-gray-500">
               A semana selecionada está cadastrada, mas ainda não possui itens importados.
             </p>
-          ) : (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-500">
-                Status atual: <span className="font-semibold text-gray-900">{previsaoExistente.status}</span>
-              </p>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-semibold text-gray-600">Data</th>
-                      <th className="px-3 py-2 text-left font-semibold text-gray-600">Tipo</th>
-                      <th className="px-3 py-2 text-left font-semibold text-gray-600">Categoria</th>
-                      <th className="px-3 py-2 text-left font-semibold text-gray-600">Associação</th>
-                      <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white/80">
-                    {previsaoExistente.itens.map((item) => {
-                      const conta = encontrarContaPorId(contas, item.contaId);
-                      const area = encontrarAreaPorId(areas, item.areaId);
-                      const banco = bancos.find((b) => b.id === item.bancoId) ?? null;
-                      return (
-                        <tr key={item.id}>
-                          <td className="px-3 py-2 text-gray-700">{formatarDataPt(item.data)}</td>
-                          <td className="px-3 py-2 text-gray-700">{item.tipo}</td>
-                          <td className="px-3 py-2 text-gray-700">{item.categoria}</td>
-                          <td className="px-3 py-2 text-gray-500">
-                            {item.tipo === 'receita' && conta
-                              ? `${conta.nome}${conta.bancoNome ? ` • ${conta.bancoNome}` : ''}`
-                              : item.tipo === 'gasto' && area
-                              ? area.nome
-                              : banco
-                              ? banco.nome
-                              : '—'}
-                          </td>
-                          <td className="px-3 py-2 text-right font-semibold text-gray-900">
-                            {formatCurrency(item.valor)}
-                          </td>
+          ) : (() => {
+              // Agrupar itens por data
+              const itensPorData = previsaoExistente.itens.reduce((acc, item) => {
+                if (!acc[item.data]) {
+                  acc[item.data] = [];
+                }
+                acc[item.data].push(item);
+                return acc;
+              }, {} as Record<string, typeof previsaoExistente.itens>);
+
+              // Calcular saldo acumulado
+              const datas = Object.keys(itensPorData).sort();
+              let saldoAcumulado = 0;
+              const saldosPorData: Record<string, number> = {};
+
+              datas.forEach(data => {
+                const itensData = itensPorData[data];
+                const totalReceitas = itensData.filter(i => i.tipo === 'receita').reduce((sum, i) => sum + i.valor, 0);
+                const totalGastos = itensData.filter(i => i.tipo === 'gasto').reduce((sum, i) => sum + i.valor, 0);
+                saldoAcumulado += (totalReceitas - totalGastos);
+                saldosPorData[data] = saldoAcumulado;
+              });
+
+              const toggleData = (data: string) => {
+                setDatasExpandidas(prev => {
+                  const novo = new Set(prev);
+                  if (novo.has(data)) {
+                    novo.delete(data);
+                  } else {
+                    novo.add(data);
+                  }
+                  return novo;
+                });
+              };
+
+              return (
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-500">
+                    Status atual: <span className="font-semibold text-gray-900">{previsaoExistente.status}</span>
+                  </p>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-600 w-8"></th>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-600">Data</th>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-600">Tipo</th>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-600">Categoria</th>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-600">Associação</th>
+                          <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor</th>
+                          <th className="px-3 py-2 text-right font-semibold text-gray-600">Saldo Acum.</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white/80">
+                        {datas.map((data) => {
+                          const itensData = itensPorData[data];
+                          const expandido = datasExpandidas.has(data);
+                          const totalReceitas = itensData.filter(i => i.tipo === 'receita').reduce((sum, i) => sum + i.valor, 0);
+                          const totalGastos = itensData.filter(i => i.tipo === 'gasto').reduce((sum, i) => sum + i.valor, 0);
+                          const saldoDia = totalReceitas - totalGastos;
+
+                          return (
+                            <React.Fragment key={data}>
+                              {/* Linha de resumo da data */}
+                              <tr className="bg-primary-50/50 hover:bg-primary-50 cursor-pointer font-medium" onClick={() => toggleData(data)}>
+                                <td className="px-3 py-2 text-center text-primary-600">
+                                  <span className="inline-block w-4">{expandido ? '−' : '+'}</span>
+                                </td>
+                                <td className="px-3 py-2 text-gray-900">{formatarDataPt(data)}</td>
+                                <td className="px-3 py-2 text-gray-600" colSpan={2}>
+                                  {itensData.length} {itensData.length === 1 ? 'lançamento' : 'lançamentos'}
+                                </td>
+                                <td className="px-3 py-2 text-right text-gray-700">
+                                  <span className="text-xs text-gray-500">Dia: </span>
+                                  <span className={saldoDia >= 0 ? 'text-success-700' : 'text-error-700'}>
+                                    {formatCurrency(saldoDia)}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                  <span className="text-xs text-gray-500">Receitas: </span>
+                                  <span className="text-success-700">{formatCurrency(totalReceitas)}</span>
+                                </td>
+                                <td className="px-3 py-2 text-right font-bold text-gray-900">
+                                  {formatCurrency(saldosPorData[data])}
+                                </td>
+                              </tr>
+
+                              {/* Itens expandidos */}
+                              {expandido && itensData.map((item) => {
+                                const conta = encontrarContaPorId(contas, item.contaId);
+                                const area = encontrarAreaPorId(areas, item.areaId);
+                                const banco = bancos.find((b) => b.id === item.bancoId) ?? null;
+                                return (
+                                  <tr key={item.id} className="bg-white/60">
+                                    <td className="px-3 py-2"></td>
+                                    <td className="px-3 py-2 text-gray-400 text-xs">↳</td>
+                                    <td className="px-3 py-2 text-gray-700">{item.tipo}</td>
+                                    <td className="px-3 py-2 text-gray-700">{item.categoria}</td>
+                                    <td className="px-3 py-2 text-gray-500">
+                                      {item.tipo === 'receita' && conta
+                                        ? `${conta.nome}${conta.bancoNome ? ` • ${conta.bancoNome}` : ''}`
+                                        : item.tipo === 'gasto' && area
+                                        ? area.nome
+                                        : banco
+                                        ? banco.nome
+                                        : '—'}
+                                    </td>
+                                    <td className="px-3 py-2 text-right font-semibold text-gray-900" colSpan={2}>
+                                      {formatCurrency(item.valor)}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </React.Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
         </Card>
       </div>
 
