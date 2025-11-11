@@ -283,6 +283,11 @@ export default function PrevistoRealizadoPage() {
     );
   }, [dadosComparativos]);
 
+  const formatarData = (data: string) => {
+    const [ano, mes, dia] = data.split('-');
+    return `${dia}/${mes}`;
+  };
+
   const dadosGraficoReceitas = useMemo(() => {
     return dadosComparativos.map(d => ({
       data: formatarData(d.data),
@@ -298,11 +303,6 @@ export default function PrevistoRealizadoPage() {
       realizado: d.realizado_despesas
     }));
   }, [dadosComparativos]);
-
-  const formatarData = (data: string) => {
-    const [ano, mes, dia] = data.split('-');
-    return `${dia}/${mes}`;
-  };
 
   const renderVariacao = (variacao: number) => {
     const cor = variacao >= 0 ? 'text-success-700' : 'text-error-700';

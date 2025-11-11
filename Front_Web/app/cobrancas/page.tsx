@@ -98,6 +98,25 @@ const avaliarValor = (entrada: string): number | null => {
 
 const formatarValorParaInput = (valor: number): string => valor.toFixed(2).replace('.', ',');
 
+const formatarNumeroEmTempoReal = (valor: string): string => {
+  // Remove tudo que não é número
+  const apenasNumeros = valor.replace(/\D/g, '');
+
+  if (!apenasNumeros) return '';
+
+  // Converte para número (em centavos)
+  const numero = parseInt(apenasNumeros, 10);
+
+  // Divide por 100 para ter centavos
+  const valorDecimal = numero / 100;
+
+  // Formata com separadores
+  return valorDecimal.toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
 const gerarChaveLancamento = (bancoId: number, contaId: number, tipoId: number) =>
   `${bancoId}-${contaId}-${tipoId}`;
 
@@ -172,6 +191,8 @@ export default function LancamentoCobrancaPage() {
   const [dataReferencia, setDataReferencia] = useState(() => toISODate(new Date()));
   const [bancoSelecionadoId, setBancoSelecionadoId] = useState<number | null>(null);
   const [previsaoDia, setPrevisaoDia] = useState<{ previstoReceitas: number; previstoTitulos: number } | null>(null);
+  const [camposEditando, setCamposEditando] = useState<Set<string>>(new Set());
+  const [itensMarcadosExclusao, setItensMarcadosExclusao] = useState<Set<string>>(new Set());
 
   const podeEditar = dataReferencia >= limiteRetroativo && dataReferencia <= hojeIso;
 
@@ -580,11 +601,14 @@ export default function LancamentoCobrancaPage() {
     tipoId: number,
     valor: string,
   ) => {
+    // Aplica formatação em tempo real
+    const valorFormatado = formatarNumeroEmTempoReal(valor);
+
     setValoresPorBanco((prev) => {
       const proximo: ValoresTextoPorBanco = { ...prev };
       const mapaBanco = { ...(proximo[bancoId] ?? {}) };
       const mapaConta = { ...(mapaBanco[contaId] ?? {}) };
-      mapaConta[tipoId] = valor;
+      mapaConta[tipoId] = valorFormatado;
       mapaBanco[contaId] = mapaConta;
       proximo[bancoId] = mapaBanco;
       return proximo;
@@ -1073,6 +1097,7 @@ export default function LancamentoCobrancaPage() {
                             <table className="min-w-full divide-y divide-gray-200 text-sm">
                               <thead className="bg-gray-50">
                                 <tr>
+                                  <th className="px-3 py-2 w-8"></th>
                                   <th className="px-3 py-2 text-left font-semibold text-gray-600">Tipo de receita</th>
                                   <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor</th>
                                   <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor registrado</th>
@@ -1083,8 +1108,32 @@ export default function LancamentoCobrancaPage() {
                                 {tiposOrdenados.map((tipo) => {
                                   const valorCampo = valoresContaSelecionada[tipo.id] ?? '';
                                   const valorSalvo = valoresSalvosBancoSelecionado[conta.id]?.[tipo.id] ?? 0;
+                                  const chave = gerarChaveLancamento(bancoSelecionado.id, conta.id, tipo.id);
+                                  const estaEditando = camposEditando.has(chave);
+                                  const estaMarcadoExclusao = itensMarcadosExclusao.has(chave);
+                                  const campoDesabilitado = !podeEditar || (valorSalvo > 0 && !estaEditando);
+
                                   return (
                                     <tr key={`conta-${conta.id}-tipo-${tipo.id}`} className="align-top">
+                                      <td className="px-3 py-2 text-center">
+                                        {valorSalvo > 0 && (
+                                          <input
+                                            type="checkbox"
+                                            checked={estaMarcadoExclusao}
+                                            onChange={(e) => {
+                                              const novoSet = new Set(itensMarcadosExclusao);
+                                              if (e.target.checked) {
+                                                novoSet.add(chave);
+                                              } else {
+                                                novoSet.delete(chave);
+                                              }
+                                              setItensMarcadosExclusao(novoSet);
+                                            }}
+                                            disabled={!podeEditar}
+                                            className="rounded border-gray-300"
+                                          />
+                                        )}
+                                      </td>
                                       <td className="px-3 py-2 text-gray-700">
                                         <div className="text-sm font-semibold text-gray-900">{tipo.nome}</div>
                                         <div className="text-xs text-gray-500">Código: {tipo.codigo}</div>
@@ -1126,35 +1175,49 @@ export default function LancamentoCobrancaPage() {
                                               }
                                             }
                                           }}
-                                          helperText={
-                                            valorCampo
-                                              ? (() => {
-                                                  const resultado = avaliarValor(valorCampo ?? '');
-                                                  return resultado !== null
-                                                    ? `Resultado: ${formatCurrency(resultado)}`
-                                                    : undefined;
-                                                })()
-                                              : undefined
-                                          }
-                                          disabled={!podeEditar}
+                                          disabled={campoDesabilitado}
                                           fullWidth
                                         />
                                       </td>
-                                      <td className="px-3 py-2 text-right font-semibold text-gray-900">
-                                        {valorSalvo > 0 ? formatCurrency(valorSalvo) : '-'}
+                                      <td className="px-3 py-2 text-right">
+                                        {valorSalvo > 0 ? (
+                                          <div className="flex items-center justify-end gap-2">
+                                            <span className="font-semibold text-gray-900">{formatCurrency(valorSalvo)}</span>
+                                          </div>
+                                        ) : (
+                                          <span className="text-gray-400">-</span>
+                                        )}
                                       </td>
                                       <td className="px-3 py-2 text-center">
-                                        <Button
-                                          type="button"
-                                          size="sm"
-                                          variant="ghost"
-                                          onClick={() =>
-                                            handleExcluirMovimento(bancoSelecionado.id, conta.id, tipo.id)
-                                          }
-                                          disabled={(valorCampo === '' && valorSalvo <= 0) || !podeEditar}
-                                        >
-                                          Excluir movimento
-                                        </Button>
+                                        {valorSalvo > 0 && !estaEditando && (
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => {
+                                              const novoSet = new Set(camposEditando);
+                                              novoSet.add(chave);
+                                              setCamposEditando(novoSet);
+                                            }}
+                                            disabled={!podeEditar}
+                                          >
+                                            Editar
+                                          </Button>
+                                        )}
+                                        {estaEditando && (
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => {
+                                              const novoSet = new Set(camposEditando);
+                                              novoSet.delete(chave);
+                                              setCamposEditando(novoSet);
+                                            }}
+                                          >
+                                            Cancelar
+                                          </Button>
+                                        )}
                                       </td>
                                     </tr>
                                   );
