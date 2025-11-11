@@ -601,6 +601,37 @@ export default function LancamentoCobrancaPage() {
     }
   }, [bancos, bancoSelecionadoId]);
 
+  // Buscar valores previstos do dia
+  useEffect(() => {
+    if (!dataReferencia) return;
+
+    const buscarPrevisaoDia = async () => {
+      try {
+        const supabase = getSupabaseClient();
+
+        // Buscar previsões de receita do dia
+        const { data, error } = await supabase
+          .from('pvi_previsao_itens')
+          .select('pvi_tipo, pvi_valor')
+          .eq('pvi_data', dataReferencia)
+          .eq('pvi_tipo', 'receita');
+
+        if (error) throw error;
+
+        const totalPrevisto = (data || []).reduce((sum, item) => sum + (Number(item.pvi_valor) || 0), 0);
+
+        setPrevisaoDia({
+          previstoReceitas: totalPrevisto,
+          previstoTitulos: totalPrevisto // Por enquanto, mesmo valor
+        });
+      } catch (erro) {
+        console.error('Erro ao buscar previsão do dia:', erro);
+      }
+    };
+
+    buscarPrevisaoDia();
+  }, [dataReferencia]);
+
   const handleValorBancoChange = (
     bancoId: number,
     contaId: number,
@@ -1084,6 +1115,55 @@ export default function LancamentoCobrancaPage() {
                 }`}
               >
                 {mensagem.texto}
+              </div>
+            )}
+
+            {/* Card Previsto vs Realizado do Dia */}
+            {previsaoDia && (
+              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                <h3 className="text-base font-semibold text-gray-900 mb-4">
+                  Previsão vs Realização do Dia
+                </h3>
+                <div className="grid grid-cols-3 gap-4">
+                  {/* Coluna 1: Previsto */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-gray-600 uppercase">Previsto</p>
+                    <p className="text-2xl font-bold text-primary-700">
+                      {formatCurrency(previsaoDia.previstoReceitas)}
+                    </p>
+                    <p className="text-xs text-gray-500">Receitas previstas</p>
+                  </div>
+
+                  {/* Coluna 2: Realizado */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-gray-600 uppercase">Realizado</p>
+                    <p className="text-2xl font-bold text-success-700">
+                      {formatCurrency(totalLancadoPorTipo)}
+                    </p>
+                    <p className="text-xs text-gray-500">Receitas realizadas</p>
+                  </div>
+
+                  {/* Coluna 3: Percentual */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-gray-600 uppercase">% Realizado</p>
+                    <p className={`text-2xl font-bold ${
+                      previsaoDia.previstoReceitas > 0 && totalLancadoPorTipo >= previsaoDia.previstoReceitas
+                        ? 'text-success-700'
+                        : 'text-warning-700'
+                    }`}>
+                      {previsaoDia.previstoReceitas > 0
+                        ? `${((totalLancadoPorTipo / previsaoDia.previstoReceitas) * 100).toFixed(1)}%`
+                        : '-'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {previsaoDia.previstoReceitas > 0 && totalLancadoPorTipo < previsaoDia.previstoReceitas
+                        ? `Faltam ${formatCurrency(previsaoDia.previstoReceitas - totalLancadoPorTipo)}`
+                        : previsaoDia.previstoReceitas > 0 && totalLancadoPorTipo > previsaoDia.previstoReceitas
+                        ? `Excedeu ${formatCurrency(totalLancadoPorTipo - previsaoDia.previstoReceitas)}`
+                        : 'Meta atingida'}
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 
