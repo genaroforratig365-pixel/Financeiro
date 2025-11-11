@@ -142,7 +142,7 @@ export default function PrevistoRealizadoPage() {
         console.log('Previsões formatadas:', previsoesFormatadas);
 
         // Buscar saldos realizados - calculando diretamente das tabelas
-        // Buscar receitas
+        // Buscar receitas de rec_receitas
         const { data: receitasData, error: erroReceitas } = await supabase
           .from('rec_receitas')
           .select('rec_data, rec_valor')
@@ -151,7 +151,7 @@ export default function PrevistoRealizadoPage() {
 
         if (erroReceitas) throw erroReceitas;
 
-        // Buscar cobranças (despesas)
+        // Buscar cobranças (TAMBÉM SÃO RECEITAS - lançamento de cobrança)
         const { data: cobrancasData, error: erroCobrancas } = await supabase
           .from('cob_cobrancas')
           .select('cob_data, cob_valor')
@@ -160,9 +160,10 @@ export default function PrevistoRealizadoPage() {
 
         if (erroCobrancas) throw erroCobrancas;
 
-        // Agrupar por data
+        // Agrupar por data (cob_cobrancas = RECEITAS, não despesas!)
         const saldosPorData = new Map<string, { receitas: number; despesas: number }>();
 
+        // rec_receitas → RECEITAS
         (receitasData || []).forEach((rec: any) => {
           const data = rec.rec_data;
           if (!saldosPorData.has(data)) {
@@ -171,12 +172,13 @@ export default function PrevistoRealizadoPage() {
           saldosPorData.get(data)!.receitas += Number(rec.rec_valor) || 0;
         });
 
+        // cob_cobrancas → RECEITAS (lançamento de cobrança)
         (cobrancasData || []).forEach((cob: any) => {
           const data = cob.cob_data;
           if (!saldosPorData.has(data)) {
             saldosPorData.set(data, { receitas: 0, despesas: 0 });
           }
-          saldosPorData.get(data)!.despesas += Number(cob.cob_valor) || 0;
+          saldosPorData.get(data)!.receitas += Number(cob.cob_valor) || 0;
         });
 
         // Converter para array no formato esperado

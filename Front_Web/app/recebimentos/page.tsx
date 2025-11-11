@@ -78,16 +78,7 @@ export default function RecebimentosPage() {
               ctr_nome,
               ctr_codigo,
               ctr_tpr_id,
-              tpr_tipos_receita!ctr_tpr_id (
-                tpr_id,
-                tpr_nome,
-                tpr_codigo
-              ),
-              ctr_ban_id,
-              ban_bancos!ctr_ban_id (
-                ban_id,
-                ban_nome
-              )
+              ctr_ban_id
             )
           `)
           .gte('rec_data', periodoInicio)
@@ -101,19 +92,42 @@ export default function RecebimentosPage() {
           throw error;
         }
 
+        // Buscar tipos de receita e bancos separadamente
+        const tiposIds = new Set<number>();
+        const bancosIds = new Set<number>();
+
+        (data || []).forEach((rec: any) => {
+          const conta = Array.isArray(rec.ctr_contas_receita)
+            ? rec.ctr_contas_receita[0]
+            : rec.ctr_contas_receita;
+          if (conta?.ctr_tpr_id) tiposIds.add(conta.ctr_tpr_id);
+          if (conta?.ctr_ban_id) bancosIds.add(conta.ctr_ban_id);
+        });
+
+        // Buscar tipos
+        const { data: tiposData } = await supabase
+          .from('tpr_tipos_receita')
+          .select('tpr_id, tpr_nome, tpr_codigo')
+          .in('tpr_id', Array.from(tiposIds));
+
+        const tiposMap = new Map((tiposData || []).map((t: any) => [t.tpr_id, t]));
+
+        // Buscar bancos
+        const { data: bancosData } = await supabase
+          .from('ban_bancos')
+          .select('ban_id, ban_nome')
+          .in('ban_id', Array.from(bancosIds));
+
+        const bancosMap = new Map((bancosData || []).map((b: any) => [b.ban_id, b]));
+
         // Transformar dados para estrutura mais limpa
         const receitasFormatadas = (data || []).map((rec: any) => {
           const conta = Array.isArray(rec.ctr_contas_receita)
             ? rec.ctr_contas_receita[0]
             : rec.ctr_contas_receita;
 
-          const tipo = conta?.tpr_tipos_receita
-            ? (Array.isArray(conta.tpr_tipos_receita) ? conta.tpr_tipos_receita[0] : conta.tpr_tipos_receita)
-            : null;
-
-          const banco = conta?.ban_bancos
-            ? (Array.isArray(conta.ban_bancos) ? conta.ban_bancos[0] : conta.ban_bancos)
-            : null;
+          const tipo = conta?.ctr_tpr_id ? tiposMap.get(conta.ctr_tpr_id) : null;
+          const banco = conta?.ctr_ban_id ? bancosMap.get(conta.ctr_ban_id) : null;
 
           return {
             rec_id: rec.rec_id,
