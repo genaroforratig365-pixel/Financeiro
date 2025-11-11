@@ -99,6 +99,11 @@ const avaliarValor = (entrada: string): number | null => {
 const formatarValorParaInput = (valor: number): string => valor.toFixed(2).replace('.', ',');
 
 const formatarNumeroEmTempoReal = (valor: string): string => {
+  // Se contém operadores matemáticos, mantém como está para permitir cálculos
+  if (/[+\-*/()]/.test(valor)) {
+    return valor;
+  }
+
   // Remove tudo que não é número
   const apenasNumeros = valor.replace(/\D/g, '');
 
@@ -193,6 +198,7 @@ export default function LancamentoCobrancaPage() {
   const [previsaoDia, setPrevisaoDia] = useState<{ previstoReceitas: number; previstoTitulos: number } | null>(null);
   const [camposEditando, setCamposEditando] = useState<Set<string>>(new Set());
   const [itensMarcadosExclusao, setItensMarcadosExclusao] = useState<Set<string>>(new Set());
+  const [mostrarModalExclusao, setMostrarModalExclusao] = useState(false);
 
   const podeEditar = dataReferencia >= limiteRetroativo && dataReferencia <= hojeIso;
 
@@ -820,16 +826,18 @@ export default function LancamentoCobrancaPage() {
     }
   };
 
-  const handleExcluirSelecionados = async () => {
+  const handleAbrirModalExclusao = () => {
     if (!usuario || !podeEditar || itensMarcadosExclusao.size === 0) return;
+    setMostrarModalExclusao(true);
+  };
 
-    if (!confirm(`Confirma a exclusão de ${itensMarcadosExclusao.size} lançamento(s)?`)) {
-      return;
-    }
+  const handleConfirmarExclusao = async () => {
+    if (!usuario || !podeEditar) return;
 
     try {
       setRegistrando(true);
       setMensagem(null);
+      setMostrarModalExclusao(false);
       const supabase = getSupabaseClient();
       const idsParaExcluir: number[] = [];
 
@@ -1307,24 +1315,11 @@ export default function LancamentoCobrancaPage() {
                               </tbody>
                               <tfoot className="bg-gray-50">
                                 <tr>
-                                  <th className="px-3 py-2 text-left font-semibold text-gray-700">Total informado</th>
+                                  <th className="px-3 py-2 text-left font-semibold text-gray-700" colSpan={2}>Total informado</th>
                                   <td className="px-3 py-2 text-right font-semibold text-gray-900">
                                     {formatCurrency(totalContaArredondado)}
                                   </td>
                                   <td className="px-3 py-2"></td>
-                                  <td className="px-3 py-2 text-center">
-                                    {itensMarcadosExclusao.size > 0 && (
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="danger"
-                                        onClick={handleExcluirSelecionados}
-                                        disabled={!podeEditar || registrando}
-                                      >
-                                        Excluir {itensMarcadosExclusao.size} selecionado(s)
-                                      </Button>
-                                    )}
-                                  </td>
                                 </tr>
                               </tfoot>
                             </table>
@@ -1333,6 +1328,20 @@ export default function LancamentoCobrancaPage() {
                       </div>
                     );
                   })}
+              </div>
+            )}
+
+            {/* Botão excluir selecionados - único para todos os cards */}
+            {itensMarcadosExclusao.size > 0 && (
+              <div className="flex justify-start">
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={handleAbrirModalExclusao}
+                  disabled={!podeEditar || registrando}
+                >
+                  Excluir {itensMarcadosExclusao.size} selecionado(s)
+                </Button>
               </div>
             )}
 
@@ -1348,6 +1357,39 @@ export default function LancamentoCobrancaPage() {
             </div>
           </form>
         </Card>
+
+        {/* Modal de confirmação de exclusão */}
+        {mostrarModalExclusao && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="rounded-lg bg-white p-6 shadow-xl max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Confirmar exclusão
+              </h3>
+              <p className="text-sm text-gray-600 mb-6">
+                Tem certeza que deseja excluir {itensMarcadosExclusao.size} lançamento(s)?
+                Esta ação não pode ser desfeita.
+              </p>
+              <div className="flex justify-end gap-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setMostrarModalExclusao(false)}
+                  disabled={registrando}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={handleConfirmarExclusao}
+                  loading={registrando}
+                >
+                  Excluir
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
