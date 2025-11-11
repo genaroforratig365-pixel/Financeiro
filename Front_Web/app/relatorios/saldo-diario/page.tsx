@@ -65,6 +65,14 @@ type LinhaComparativa = {
   percentual: number | null;
 };
 
+type TabelaAccent = 'azul' | 'verde' | 'amarelo' | 'laranja' | 'cinza';
+
+type RenderTabelaOptions = {
+  accent?: TabelaAccent;
+  totalLabel?: string;
+  showTotals?: boolean;
+};
+
 type RelatorioSaldoDiario = {
   data: string;
   gastos: LinhaComparativa[];
@@ -123,6 +131,14 @@ const categoriaRotulos: Record<CategoriaReceita, string> = {
   depositos: 'Receitas - Depósitos e PIX',
   titulos: 'Receitas - Títulos (Boletos)',
   outras: 'Receitas - Outras Entradas',
+};
+
+const tabelaAccentClassNames: Record<TabelaAccent, string> = {
+  azul: 'report-section report-section--azul',
+  verde: 'report-section report-section--verde',
+  amarelo: 'report-section report-section--amarelo',
+  laranja: 'report-section report-section--laranja',
+  cinza: 'report-section report-section--cinza',
 };
 
 const calcularPercentual = (previsto: number, realizado: number): number | null => {
@@ -400,40 +416,199 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
     }
 
     const estilos = `
-      * { font-family: 'Segoe UI', Arial, sans-serif; color: #111827; box-sizing: border-box; }
-      body { margin: 24px; background-color: #f8fafc; }
-      h1 { font-size: 20px; margin-bottom: 4px; }
-      h2 { font-size: 14px; color: #6b7280; margin-bottom: 16px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 12px; background-color: #ffffff; page-break-inside: avoid; }
-      th, td { border: 1px solid #d1d5db; padding: 8px 10px; font-size: 12px; }
-      th { background-color: #f3f4f6; text-align: right; font-weight: 600; }
-      th:first-child, td:first-child { text-align: left; }
-      .text-right { text-align: right; }
-      .font-semibold { font-weight: 600; }
-      .uppercase { text-transform: uppercase; }
-      .tracking-wide { letter-spacing: 0.05em; }
-      .bg-white { background-color: #ffffff; }
-      .bg-gray-50 { background-color: #f9fafb; }
-      .bg-gray-100 { background-color: #f3f4f6; }
-      .bg-primary-50 { background-color: #eef2ff; }
-      .bg-success-50 { background-color: #ecfdf5; }
-      .bg-error-50 { background-color: #fee2e2; }
-      .text-gray-600 { color: #4b5563; }
-      .text-gray-700 { color: #374151; }
-      .text-gray-900 { color: #111827; }
-      .text-success-700 { color: #047857; }
-      .text-error-700 { color: #b91c1c; }
-      .px-4 { padding-left: 16px; padding-right: 16px; }
-      .py-3 { padding-top: 12px; padding-bottom: 12px; }
-      .rounded-lg { border-radius: 12px; }
-      .border { border: 1px solid #e5e7eb; }
-      .border-gray-200 { border-color: #e5e7eb; }
-      .divide-y > * + * { border-top: 1px solid #e5e7eb; }
-      .divide-gray-100 > * + * { border-color: #f5f5f5; }
-      .grid { display: grid; gap: 16px; }
+      * {
+        font-family: 'Segoe UI', Arial, sans-serif;
+        color: #111827;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 24px;
+        background-color: #f8fafc;
+      }
+      h1, h2, h3 {
+        margin: 0;
+      }
+      .report-wrapper {
+        max-width: 960px;
+        margin: 0 auto;
+        background: #ffffff;
+        border: 1px solid #d1d5db;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+      .report-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        border-bottom: 2px solid #1f497d;
+        padding-bottom: 16px;
+        margin-bottom: 20px;
+      }
+      .report-header__title {
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #1f2937;
+      }
+      .report-header__subtitle {
+        margin-top: 6px;
+        font-size: 13px;
+        color: #374151;
+      }
+      .report-header__meta {
+        text-align: right;
+        font-size: 12px;
+        color: #4b5563;
+      }
+      .report-header__meta strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 16px;
+        font-weight: 700;
+        color: #111827;
+      }
+      .report-grid {
+        display: grid;
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+      .report-grid--two {
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      }
+      .report-section {
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #ffffff;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+      }
+      .report-section__header {
+        padding: 12px 16px;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #ffffff;
+      }
+      .report-section__table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .report-section__table thead th {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 10px 12px;
+        text-align: right;
+      }
+      .report-section__table tbody td,
+      .report-section__table tfoot td {
+        padding: 10px 12px;
+        font-size: 12px;
+        text-align: right;
+        border-top: 1px solid #e5e7eb;
+      }
+      .report-section__table thead th:first-child,
+      .report-section__table tbody td:first-child,
+      .report-section__table tfoot td:first-child {
+        text-align: left;
+      }
+      .report-section__table tbody tr:nth-child(even) {
+        background: #f9fafb;
+      }
+      .report-section__table tbody tr:hover {
+        background: #edf2f7;
+      }
+      .report-section__table tfoot td {
+        font-weight: 700;
+      }
+      .report-section__empty-cell {
+        padding: 24px 16px;
+        text-align: center;
+        font-size: 12px;
+        color: #6b7280;
+      }
+      .report-value--positivo {
+        color: #047857;
+        font-weight: 600;
+      }
+      .report-value--negativo {
+        color: #b91c1c;
+        font-weight: 600;
+      }
+      .report-section--azul .report-section__header {
+        background: #1f497d;
+      }
+      .report-section--azul .report-section__table thead {
+        background: #dbe5f1;
+        color: #1f497d;
+      }
+      .report-section--azul .report-section__table tfoot {
+        background: #eef3fb;
+        color: #1f497d;
+      }
+      .report-section--verde .report-section__header {
+        background: #1b5e20;
+      }
+      .report-section--verde .report-section__table thead {
+        background: #d7f2e3;
+        color: #1b5e20;
+      }
+      .report-section--verde .report-section__table tfoot {
+        background: #ebf7ef;
+        color: #1b5e20;
+      }
+      .report-section--amarelo .report-section__header {
+        background: #b7791f;
+      }
+      .report-section--amarelo .report-section__table thead {
+        background: #fcefc7;
+        color: #92400e;
+      }
+      .report-section--amarelo .report-section__table tfoot {
+        background: #fef3c7;
+        color: #92400e;
+      }
+      .report-section--laranja .report-section__header {
+        background: #9c4221;
+      }
+      .report-section--laranja .report-section__table thead {
+        background: #fde6d9;
+        color: #9c4221;
+      }
+      .report-section--laranja .report-section__table tfoot {
+        background: #fce9dc;
+        color: #9c4221;
+      }
+      .report-section--cinza .report-section__header {
+        background: #4b5563;
+      }
+      .report-section--cinza .report-section__table thead {
+        background: #e5e7eb;
+        color: #111827;
+      }
+      .report-section--cinza .report-section__table tfoot {
+        background: #f3f4f6;
+        color: #111827;
+      }
       @media print {
-        body { background-color: white; }
-        table { page-break-inside: avoid; }
+        body {
+          margin: 10mm;
+          background: #ffffff;
+        }
+        .report-wrapper {
+          box-shadow: none;
+          page-break-after: avoid;
+          page-break-inside: avoid;
+        }
+        .report-grid {
+          break-inside: avoid;
+        }
       }
     `;
 
@@ -458,98 +633,123 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
   };
 
   const renderTabelaComparativa = useCallback(
-    (titulo: string, linhas: LinhaComparativa[]) => {
+    (titulo: string, linhas: LinhaComparativa[], options: RenderTabelaOptions = {}) => {
       const totalPrevisto = somarPrevisto(linhas);
       const totalRealizado = somarRealizado(linhas);
       const totalDesvio = arredondar(totalRealizado - totalPrevisto);
       const totalPercentual = calcularPercentual(totalPrevisto, totalRealizado);
 
+      const accent = options.accent ?? 'azul';
+      const totalLabel = options.totalLabel ?? 'Totais';
+      const showTotals = options.showTotals ?? true;
+      const sectionClass = tabelaAccentClassNames[accent] ?? tabelaAccentClassNames.azul;
+
       return (
-        <Card title={titulo} variant="default">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+        <div className={sectionClass}>
+          <div className="report-section__header">
+            <span>{titulo}</span>
+          </div>
+          <table className="report-section__table">
+            <thead>
+              <tr>
+                <th>Categoria</th>
+                <th>Previsto</th>
+                <th>Realizado</th>
+                <th>Desvio</th>
+                <th>% Desvio</th>
+              </tr>
+            </thead>
+            <tbody>
+              {linhas.length === 0 ? (
                 <tr>
-                  <th className="px-4 py-3 text-left font-semibold">Categoria</th>
-                  <th className="px-4 py-3 text-right font-semibold">Previsão</th>
-                  <th className="px-4 py-3 text-right font-semibold">Realizado</th>
-                  <th className="px-4 py-3 text-right font-semibold">Desvio</th>
-                  <th className="px-4 py-3 text-right font-semibold">% Desvio</th>
+                  <td colSpan={5} className="report-section__empty-cell">
+                    Nenhuma informação encontrada para esta seção.
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 bg-white">
-                {linhas.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-6 text-center text-sm text-gray-600">
-                      Nenhuma informação encontrada para esta seção.
+              ) : (
+                linhas.map((linha) => (
+                  <tr key={linha.chave}>
+                    <td>{linha.titulo}</td>
+                    <td>{formatCurrency(linha.previsto)}</td>
+                    <td>{formatCurrency(linha.realizado)}</td>
+                    <td className={linha.desvio >= 0 ? 'report-value--positivo' : 'report-value--negativo'}>
+                      {formatCurrency(linha.desvio)}
                     </td>
+                    <td>{formatarPercentual(linha.percentual)}</td>
                   </tr>
-                ) : (
-                  linhas.map((linha) => (
-                    <tr key={linha.chave}>
-                      <td className="px-4 py-3 text-gray-700">{linha.titulo}</td>
-                      <td className="px-4 py-3 text-right text-gray-700">{formatCurrency(linha.previsto)}</td>
-                      <td className="px-4 py-3 text-right text-gray-700">{formatCurrency(linha.realizado)}</td>
-                      <td className={`px-4 py-3 text-right ${linha.desvio >= 0 ? 'text-success-700' : 'text-error-700'}`}>
-                        {formatCurrency(linha.desvio)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-700">{formatarPercentual(linha.percentual)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-              <tfoot className="bg-gray-100 text-gray-900">
-                <tr className="font-semibold">
-                  <td className="px-4 py-3">Totais</td>
-                  <td className="px-4 py-3 text-right">{formatCurrency(totalPrevisto)}</td>
-                  <td className="px-4 py-3 text-right">{formatCurrency(totalRealizado)}</td>
-                  <td className={`px-4 py-3 text-right ${totalDesvio >= 0 ? 'text-success-700' : 'text-error-700'}`}>
+                ))
+              )}
+            </tbody>
+            {showTotals && (
+              <tfoot>
+                <tr>
+                  <td>{totalLabel}</td>
+                  <td>{formatCurrency(totalPrevisto)}</td>
+                  <td>{formatCurrency(totalRealizado)}</td>
+                  <td className={totalDesvio >= 0 ? 'report-value--positivo' : 'report-value--negativo'}>
                     {formatCurrency(totalDesvio)}
                   </td>
-                  <td className="px-4 py-3 text-right">{formatarPercentual(totalPercentual)}</td>
+                  <td>{formatarPercentual(totalPercentual)}</td>
                 </tr>
               </tfoot>
-            </table>
-          </div>
-        </Card>
+            )}
+          </table>
+        </div>
       );
     },
     [],
   );
 
-  const linhasResumo = useMemo(() => {
+  const linhasResultadoCaixa = useMemo(() => {
     if (!relatorio) {
       return [];
     }
     const { resumo } = relatorio;
-    const linhas: LinhaComparativa[] = [
+    return [
       {
-        chave: 'saldo-inicial',
-        titulo: 'Saldo Inicial',
-        previsto: resumo.saldoInicialPrevisto,
-        realizado: resumo.saldoInicialRealizado,
-        desvio: arredondar(resumo.saldoInicialRealizado - resumo.saldoInicialPrevisto),
-        percentual: calcularPercentual(resumo.saldoInicialPrevisto, resumo.saldoInicialRealizado),
-      },
-      {
-        chave: 'receitas',
-        titulo: 'Receitas',
+        chave: 'receitas-dia',
+        titulo: 'Entradas do Dia (Receitas)',
         previsto: resumo.totalReceitasPrevistas,
         realizado: resumo.totalReceitasRealizadas,
         desvio: arredondar(resumo.totalReceitasRealizadas - resumo.totalReceitasPrevistas),
         percentual: calcularPercentual(resumo.totalReceitasPrevistas, resumo.totalReceitasRealizadas),
       },
       {
-        chave: 'despesas',
-        titulo: 'Despesas',
+        chave: 'despesas-dia',
+        titulo: 'Saídas do Dia (Despesas)',
         previsto: resumo.totalDespesasPrevistas,
         realizado: resumo.totalDespesasRealizadas,
         desvio: arredondar(resumo.totalDespesasRealizadas - resumo.totalDespesasPrevistas),
         percentual: calcularPercentual(resumo.totalDespesasPrevistas, resumo.totalDespesasRealizadas),
       },
       {
+        chave: 'resultado-dia',
+        titulo: 'Saldo Operacional do Dia',
+        previsto: resumo.resultadoPrevisto,
+        realizado: resumo.resultadoRealizado,
+        desvio: arredondar(resumo.resultadoRealizado - resumo.resultadoPrevisto),
+        percentual: calcularPercentual(resumo.resultadoPrevisto, resumo.resultadoRealizado),
+      },
+    ];
+  }, [relatorio]);
+
+  const linhasResumoGeral = useMemo(() => {
+    if (!relatorio) {
+      return [];
+    }
+    const { resumo } = relatorio;
+    return [
+      {
+        chave: 'saldo-anterior',
+        titulo: 'Saldo do Dia Anterior',
+        previsto: resumo.saldoInicialPrevisto,
+        realizado: resumo.saldoInicialRealizado,
+        desvio: arredondar(resumo.saldoInicialRealizado - resumo.saldoInicialPrevisto),
+        percentual: calcularPercentual(resumo.saldoInicialPrevisto, resumo.saldoInicialRealizado),
+      },
+      {
         chave: 'resultado',
-        titulo: 'Resultado (Receitas - Despesas)',
+        titulo: 'Resultado do Dia (Receitas - Despesas)',
         previsto: resumo.resultadoPrevisto,
         realizado: resumo.resultadoRealizado,
         desvio: arredondar(resumo.resultadoRealizado - resumo.resultadoPrevisto),
@@ -557,7 +757,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
       },
       {
         chave: 'saldo-final',
-        titulo: 'Saldo Final',
+        titulo: 'Saldo Final do Dia',
         previsto: resumo.saldoFinalPrevisto,
         realizado: resumo.saldoFinalRealizado,
         desvio: arredondar(resumo.saldoFinalRealizado - resumo.saldoFinalPrevisto),
@@ -572,8 +772,26 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
         percentual: calcularPercentual(resumo.bancosPrevistos, resumo.bancosRealizados),
       },
     ];
-    return linhas;
   }, [relatorio]);
+
+  const dataEmissao = useMemo(() => formatarDataPt(toISODate(new Date())), []);
+
+  const nomeEmpresa = useMemo(() => {
+    if (!usuario) {
+      return 'EMPRESA';
+    }
+    const nome = usuario.usr_nome?.trim();
+    if (nome && nome.length > 0) {
+      return nome.toUpperCase();
+    }
+    if (usuario.usr_email) {
+      const prefixo = usuario.usr_email.split('@')[0];
+      if (prefixo) {
+        return prefixo.toUpperCase();
+      }
+    }
+    return 'EMPRESA';
+  }, [usuario]);
 
   if (carregandoUsuario) {
     return (
@@ -620,22 +838,45 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
         )}
 
         {relatorio && !carregandoDados && (
-          <div ref={reportRef} className="space-y-6">
-            <Card variant="default">
-              <div className="flex flex-col gap-2">
-                <h1 className="text-xl font-semibold text-gray-900">Saldo Diário</h1>
-                <p className="text-sm text-gray-600">Data de referência: {formatarDataPt(relatorio.data)}</p>
+          <div ref={reportRef} className="report-wrapper">
+            <div className="report-header">
+              <div>
+                <p className="report-header__title">
+                  Saldo Diário - {nomeEmpresa}
+                </p>
+                <p className="report-header__subtitle">Data de referência: {formatarDataPt(relatorio.data)}</p>
               </div>
-            </Card>
-
-            {renderTabelaComparativa('Resumo Geral', linhasResumo)}
-
-            <div className="grid gap-6 lg:grid-cols-2">
-              {renderTabelaComparativa('Gastos por Área', relatorio.gastos)}
-              {renderTabelaComparativa('Receitas por Categoria', relatorio.receitas)}
+              <div className="report-header__meta">
+                <span>Emitido em</span>
+                <strong>{dataEmissao}</strong>
+              </div>
             </div>
 
-            {renderTabelaComparativa('Saldos por Banco', relatorio.bancos)}
+            <div className="report-grid report-grid--two">
+              {renderTabelaComparativa('Gastos por Área', relatorio.gastos, {
+                accent: 'amarelo',
+                totalLabel: 'Total de Gastos',
+              })}
+              {renderTabelaComparativa('Receitas por Categoria', relatorio.receitas, {
+                accent: 'verde',
+                totalLabel: 'Total de Receitas',
+              })}
+            </div>
+
+            {renderTabelaComparativa('Resultado de Saldo de Caixa do Dia', linhasResultadoCaixa, {
+              accent: 'laranja',
+              showTotals: false,
+            })}
+
+            <div className="report-grid report-grid--two">
+              {renderTabelaComparativa('Resumo Geral', linhasResumoGeral, {
+                accent: 'azul',
+              })}
+              {renderTabelaComparativa('Saldos Bancários', relatorio.bancos, {
+                accent: 'cinza',
+                totalLabel: 'Total em Bancos',
+              })}
+            </div>
           </div>
         )}
 

@@ -163,6 +163,222 @@ select {
   }
 }
 
+/* --------- Estilos específicos do relatório de saldo diário --------- */
+.report-wrapper {
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: 12px;
+  padding: 1.75rem;
+  margin: 0 auto;
+  max-width: 960px;
+  box-shadow: var(--shadow-lg);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.report-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-bottom: 2px solid #1f497d;
+  padding-bottom: 1rem;
+}
+
+.report-header__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-gray-900);
+}
+
+.report-header__subtitle {
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--color-gray-700);
+}
+
+.report-header__meta {
+  text-align: right;
+  font-size: 0.75rem;
+  color: var(--color-gray-500);
+}
+
+.report-header__meta strong {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-gray-900);
+}
+
+.report-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.report-grid--two {
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+}
+
+.report-section {
+  border: 1px solid var(--color-gray-200);
+  border-radius: 10px;
+  background: var(--color-white);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.report-section__header {
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #ffffff;
+}
+
+.report-section__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.report-section__table thead th {
+  padding: 0.6rem 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: right;
+}
+
+.report-section__table tbody td,
+.report-section__table tfoot td {
+  padding: 0.65rem 0.75rem;
+  font-size: 0.75rem;
+  text-align: right;
+  border-top: 1px solid var(--color-gray-200);
+}
+
+.report-section__table thead th:first-child,
+.report-section__table tbody td:first-child,
+.report-section__table tfoot td:first-child {
+  text-align: left;
+}
+
+.report-section__table tbody tr:nth-child(even) {
+  background: var(--color-gray-50);
+}
+
+.report-section__table tbody tr:hover {
+  background: #edf2f7;
+}
+
+.report-section__table tfoot td {
+  font-weight: 700;
+}
+
+.report-section__empty-cell {
+  padding: 1.5rem 1rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--color-gray-500);
+}
+
+.report-value--positivo {
+  color: #047857;
+  font-weight: 600;
+}
+
+.report-value--negativo {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.report-section--azul .report-section__header {
+  background: #1f497d;
+}
+
+.report-section--azul .report-section__table thead {
+  background: #dbe5f1;
+  color: #1f497d;
+}
+
+.report-section--azul .report-section__table tfoot {
+  background: #eef3fb;
+  color: #1f497d;
+}
+
+.report-section--verde .report-section__header {
+  background: #1b5e20;
+}
+
+.report-section--verde .report-section__table thead {
+  background: #d7f2e3;
+  color: #1b5e20;
+}
+
+.report-section--verde .report-section__table tfoot {
+  background: #ebf7ef;
+  color: #1b5e20;
+}
+
+.report-section--amarelo .report-section__header {
+  background: #b7791f;
+}
+
+.report-section--amarelo .report-section__table thead {
+  background: #fcefc7;
+  color: #92400e;
+}
+
+.report-section--amarelo .report-section__table tfoot {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.report-section--laranja .report-section__header {
+  background: #9c4221;
+}
+
+.report-section--laranja .report-section__table thead {
+  background: #fde6d9;
+  color: #9c4221;
+}
+
+.report-section--laranja .report-section__table tfoot {
+  background: #fce9dc;
+  color: #9c4221;
+}
+
+.report-section--cinza .report-section__header {
+  background: #4b5563;
+}
+
+.report-section--cinza .report-section__table thead {
+  background: #e5e7eb;
+  color: var(--color-gray-900);
+}
+
+.report-section--cinza .report-section__table tfoot {
+  background: #f3f4f6;
+  color: var(--color-gray-900);
+}
+
+@media print {
+  .report-wrapper {
+    box-shadow: none;
+    page-break-inside: avoid;
+  }
+
+  .report-grid {
+    break-inside: avoid;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
