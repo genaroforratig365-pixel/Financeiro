@@ -141,17 +141,58 @@ export default function PrevistoRealizadoPage() {
 
         console.log('Previsões formatadas:', previsoesFormatadas);
 
-        // Buscar saldos realizados
-        const { data: saldosData, error: erroSaldos } = await supabase
-          .rpc('obter_saldo_diario_periodo', {
-            p_data_inicio: periodoInicio,
-            p_data_fim: periodoFim
-          });
+        // Buscar saldos realizados - calculando diretamente das tabelas
+        // Buscar receitas
+        const { data: receitasData, error: erroReceitas } = await supabase
+          .from('rec_receitas')
+          .select('rec_data, rec_valor')
+          .gte('rec_data', periodoInicio)
+          .lte('rec_data', periodoFim);
 
-        if (erroSaldos) throw erroSaldos;
+        if (erroReceitas) throw erroReceitas;
+
+        // Buscar cobranças (despesas)
+        const { data: cobrancasData, error: erroCobrancas } = await supabase
+          .from('cob_cobrancas')
+          .select('cob_data, cob_valor')
+          .gte('cob_data', periodoInicio)
+          .lte('cob_data', periodoFim);
+
+        if (erroCobrancas) throw erroCobrancas;
+
+        // Agrupar por data
+        const saldosPorData = new Map<string, { receitas: number; despesas: number }>();
+
+        (receitasData || []).forEach((rec: any) => {
+          const data = rec.rec_data;
+          if (!saldosPorData.has(data)) {
+            saldosPorData.set(data, { receitas: 0, despesas: 0 });
+          }
+          saldosPorData.get(data)!.receitas += Number(rec.rec_valor) || 0;
+        });
+
+        (cobrancasData || []).forEach((cob: any) => {
+          const data = cob.cob_data;
+          if (!saldosPorData.has(data)) {
+            saldosPorData.set(data, { receitas: 0, despesas: 0 });
+          }
+          saldosPorData.get(data)!.despesas += Number(cob.cob_valor) || 0;
+        });
+
+        // Converter para array no formato esperado
+        const saldosCalculados: SaldoRealizado[] = Array.from(saldosPorData.entries()).map(
+          ([data, valores]) => ({
+            data,
+            receitas: valores.receitas,
+            despesas: valores.despesas,
+            saldo: valores.receitas - valores.despesas
+          })
+        );
+
+        console.log('Saldos realizados calculados:', saldosCalculados);
 
         setPrevisoes(previsoesFormatadas);
-        setSaldos(saldosData || []);
+        setSaldos(saldosCalculados);
       } catch (erro) {
         console.error('Erro ao carregar dados:', erro);
       } finally {

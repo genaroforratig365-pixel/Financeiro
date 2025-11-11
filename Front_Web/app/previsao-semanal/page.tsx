@@ -2327,7 +2327,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                           <th className="px-3 py-2 text-left font-semibold text-gray-600">Categoria</th>
                           <th className="px-3 py-2 text-left font-semibold text-gray-600">Associação</th>
                           <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor</th>
-                          <th className="px-3 py-2 text-right font-semibold text-gray-600">Saldo Acum.</th>
+                          <th className="px-3 py-2 text-right font-semibold text-gray-600">Saldo</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 bg-white/80">
@@ -2357,8 +2357,8 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                                   <span className="text-xs text-gray-500">Despesas: </span>
                                   <span className="text-error-700">{formatCurrency(totalGastos)}</span>
                                 </td>
-                                <td className="px-3 py-2 text-right font-bold text-gray-900">
-                                  {formatCurrency(saldosPorData[data])}
+                                <td className={`px-3 py-2 text-right font-bold ${saldoDia >= 0 ? 'text-success-700' : 'text-error-700'}`}>
+                                  {formatCurrency(saldoDia)}
                                 </td>
                               </tr>
 

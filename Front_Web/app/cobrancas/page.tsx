@@ -120,27 +120,13 @@ const normalizarCodigoConta = (codigo: string): string => {
 
 const INFORMACOES_CONTA: Record<
   string,
-  { titulo: string; subtitulo: string; topicos: string[] }
+  { titulo: string }
 > = {
   '200': {
     titulo: 'Títulos — registrar como conta de receita 200',
-    subtitulo:
-      'Utilize esta seção para distribuir os valores recebidos por boletos e títulos entre os tipos de receita configurados.',
-    topicos: [
-      'Confirme se o banco selecionado corresponde ao extrato utilizado para registrar a cobrança.',
-      'Some os valores de boletos liquidados no dia e informe o total no tipo de receita adequado.',
-      'Revise o total informado antes de salvar para evitar diferenças com a previsão.',
-    ],
   },
   '201': {
     titulo: 'Depósitos e PIX — registrar como conta de receita 201',
-    subtitulo:
-      'Informe depósitos, PIX e recebimentos com cartões vinculados ao banco selecionado na conta de receita 201.',
-    topicos: [
-      'Verifique se o banco escolhido é o responsável pelo crédito da movimentação.',
-      'Distribua os valores por tipo de receita conforme a origem do recebimento (PIX, cartão, depósito).',
-      'Garanta que os valores informados correspondam ao extrato bancário do dia.',
-    ],
   },
 };
 
@@ -151,13 +137,7 @@ const obterDescricaoConta = (conta: ContaOption) => {
     return info;
   }
   return {
-    titulo: `Conta de receita ${conta.codigo}`,
-    subtitulo: `Registre os valores lançados para a conta ${conta.nome}.`,
-    topicos: [
-      'Selecione o banco onde o lançamento foi realizado.',
-      'Informe o valor total correspondente ao tipo de receita.',
-      'Confira os totais calculados antes de concluir o registro.',
-    ],
+    titulo: `Conta de receita ${conta.codigo} — ${conta.nome}`,
   };
 };
 
@@ -191,6 +171,7 @@ export default function LancamentoCobrancaPage() {
 
   const [dataReferencia, setDataReferencia] = useState(() => toISODate(new Date()));
   const [bancoSelecionadoId, setBancoSelecionadoId] = useState<number | null>(null);
+  const [previsaoDia, setPrevisaoDia] = useState<{ previstoReceitas: number; previstoTitulos: number } | null>(null);
 
   const podeEditar = dataReferencia >= limiteRetroativo && dataReferencia <= hojeIso;
 
@@ -671,14 +652,6 @@ export default function LancamentoCobrancaPage() {
       return;
     }
 
-    if (!bancoSelecionadoId) {
-      setMensagem({
-        tipo: 'erro',
-        texto: 'Selecione um banco para registrar os valores.',
-      });
-      return;
-    }
-
     if (contasRelevantes.length === 0) {
       setMensagem({
         tipo: 'erro',
@@ -687,7 +660,6 @@ export default function LancamentoCobrancaPage() {
       return;
     }
 
-    const valoresBanco = valoresPorBanco[bancoSelecionadoId] ?? {};
     const usuarioId = usuario.usr_id;
     if (!usuarioId || usuarioId.trim().length === 0) {
       setMensagem({
@@ -696,6 +668,7 @@ export default function LancamentoCobrancaPage() {
       });
       return;
     }
+
     const registrosParaUpsert: Array<{
       cob_id?: number;
       cob_ban_id: number;
@@ -707,45 +680,51 @@ export default function LancamentoCobrancaPage() {
     }> = [];
     const idsParaExcluir: number[] = [];
 
-    contasRelevantes.forEach((conta) => {
-      const valoresConta = valoresBanco[conta.id] ?? {};
+    // Iterar sobre TODOS os bancos que têm valores digitados
+    Object.keys(valoresPorBanco).forEach((bancoIdStr) => {
+      const bancoId = Number(bancoIdStr);
+      const valoresBanco = valoresPorBanco[bancoId];
+
+      contasRelevantes.forEach((conta) => {
+        const valoresConta = valoresBanco[conta.id] ?? {};
 
         tiposOrdenados.forEach((tipo) => {
           const valorEntrada = valoresConta[tipo.id] ?? '';
           const valorCalculado = avaliarValor(valorEntrada);
-          const chave = gerarChaveLancamento(bancoSelecionadoId!, conta.id, tipo.id);
-        const registroExistente = lancamentosExistentes[chave];
+          const chave = gerarChaveLancamento(bancoId, conta.id, tipo.id);
+          const registroExistente = lancamentosExistentes[chave];
 
-        if (valorCalculado !== null && valorCalculado > 0) {
-          if (!registroExistente || Math.abs(valorCalculado - registroExistente.valor) > 0.009) {
-            // Se registro existe mas é de outro usuário, marca para deletar
-            if (registroExistente && registroExistente.usrId !== usuarioId) {
-              idsParaExcluir.push(registroExistente.id);
-              // Cria novo registro sem cob_id (será insert)
-              registrosParaUpsert.push({
-                cob_ban_id: bancoSelecionadoId!,
-                cob_ctr_id: conta.id,
-                cob_tpr_id: tipo.id,
-                cob_usr_id: usuarioId,
-                cob_data: dataReferencia,
-                cob_valor: valorCalculado,
-              });
-            } else {
-              // Registro do mesmo usuário ou novo - faz upsert normal
-              registrosParaUpsert.push({
-                cob_id: registroExistente?.id,
-                cob_ban_id: bancoSelecionadoId!,
-                cob_ctr_id: conta.id,
-                cob_tpr_id: tipo.id,
-                cob_usr_id: usuarioId,
-                cob_data: dataReferencia,
-                cob_valor: valorCalculado,
-              });
+          if (valorCalculado !== null && valorCalculado > 0) {
+            if (!registroExistente || Math.abs(valorCalculado - registroExistente.valor) > 0.009) {
+              // Se registro existe mas é de outro usuário, marca para deletar
+              if (registroExistente && registroExistente.usrId !== usuarioId) {
+                idsParaExcluir.push(registroExistente.id);
+                // Cria novo registro sem cob_id (será insert)
+                registrosParaUpsert.push({
+                  cob_ban_id: bancoId,
+                  cob_ctr_id: conta.id,
+                  cob_tpr_id: tipo.id,
+                  cob_usr_id: usuarioId,
+                  cob_data: dataReferencia,
+                  cob_valor: valorCalculado,
+                });
+              } else {
+                // Registro do mesmo usuário ou novo - faz upsert normal
+                registrosParaUpsert.push({
+                  cob_id: registroExistente?.id,
+                  cob_ban_id: bancoId,
+                  cob_ctr_id: conta.id,
+                  cob_tpr_id: tipo.id,
+                  cob_usr_id: usuarioId,
+                  cob_data: dataReferencia,
+                  cob_valor: valorCalculado,
+                });
+              }
             }
+          } else if (registroExistente && registroExistente.bancoId === bancoId) {
+            idsParaExcluir.push(registroExistente.id);
           }
-        } else if (registroExistente && registroExistente.bancoId === bancoSelecionadoId) {
-          idsParaExcluir.push(registroExistente.id);
-        }
+        });
       });
     });
 
@@ -1062,7 +1041,7 @@ export default function LancamentoCobrancaPage() {
                 Cadastre as contas de receita 200 e 201 para habilitar os lançamentos de cobrança.
               </div>
             ) : (
-              <div className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {contasRelevantes.map((conta) => {
                     const descricaoConta = obterDescricaoConta(conta);
                     const valoresContaSelecionada = valoresBancoSelecionado[conta.id] ?? {};
@@ -1080,16 +1059,8 @@ export default function LancamentoCobrancaPage() {
                       <div key={`conta-${conta.id}`} className="rounded-lg border border-gray-200 bg-white shadow-sm">
                         <div className="border-b border-gray-200 px-4 py-3">
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="space-y-2">
-                              <div>
-                                <h3 className="text-base font-semibold text-gray-900">{descricaoConta.titulo}</h3>
-                                <p className="mt-1 text-xs text-gray-500">{descricaoConta.subtitulo}</p>
-                              </div>
-                              <ul className="list-disc space-y-1 pl-5 text-xs text-gray-500">
-                                {descricaoConta.topicos.map((topico, index) => (
-                                  <li key={`topico-${conta.id}-${index}`}>{topico}</li>
-                                ))}
-                              </ul>
+                            <div>
+                              <h3 className="text-base font-semibold text-gray-900">{descricaoConta.titulo}</h3>
                             </div>
                             <div className="text-right text-xs text-gray-500">
                               <div>Conta: {conta.nome}</div>
