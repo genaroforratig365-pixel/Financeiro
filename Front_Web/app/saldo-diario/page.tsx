@@ -1661,7 +1661,7 @@ const SaldoDiarioPage: React.FC = () => {
                                 <Input
                                   type="text"
                                   inputMode="decimal"
-                                  placeholder="Ex.: 10+20+30"
+                                  placeholder={registro ? "Clique em editar" : "Ex.: 10+20+30"}
                                   value={pagamentosAreaForm[area.id] ?? ''}
                                   onChange={(event) =>
                                     setPagamentosAreaForm((prev) => ({
@@ -1670,23 +1670,15 @@ const SaldoDiarioPage: React.FC = () => {
                                     }))
                                   }
                                   disabled={processando.area || !edicaoLiberada || !!registro}
-                                  helperText={registro ? "Campo desabilitado - valor já registrado" : helperValor(pagamentosAreaForm[area.id])}
+                                  helperText={!registro ? helperValor(pagamentosAreaForm[area.id]) : undefined}
                                   fullWidth
                                 />
                               </td>
                               <td className="px-4 py-3 align-top">
                                 {registro ? (
                                   <div className="space-y-2">
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                      <span className="font-semibold text-primary-700">
-                                        {formatCurrency(registro.valor)}
-                                      </span>
-                                      <span className="text-xs text-gray-400">
-                                        {formatarData(registro.data)}
-                                      </span>
-                                    </div>
                                     {emEdicaoArea.has(registro.id) ? (
-                                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                                         <Input
                                           type="text"
                                           inputMode="decimal"
@@ -1739,7 +1731,10 @@ const SaldoDiarioPage: React.FC = () => {
                                         </div>
                                       </div>
                                     ) : (
-                                      <div className="flex gap-2">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <span className="font-semibold text-primary-700">
+                                          {formatCurrency(registro.valor)}
+                                        </span>
                                         <Button
                                           type="button"
                                           variant="secondary"
@@ -1856,7 +1851,7 @@ const SaldoDiarioPage: React.FC = () => {
                                 <Input
                                   type="text"
                                   inputMode="decimal"
-                                  placeholder="Ex.: 1200/3"
+                                  placeholder={registro ? "Clique em editar" : "Ex.: 1200/3"}
                                   value={pagamentosBancoForm[banco.id] ?? ''}
                                   onChange={(event) =>
                                     setPagamentosBancoForm((prev) => ({
@@ -1864,49 +1859,86 @@ const SaldoDiarioPage: React.FC = () => {
                                       [banco.id]: event.target.value,
                                     }))
                                   }
-                                  disabled={processando.banco || !edicaoLiberada}
-                                  helperText={helperValor(pagamentosBancoForm[banco.id])}
+                                  disabled={processando.banco || !edicaoLiberada || !!registro}
+                                  helperText={!registro ? helperValor(pagamentosBancoForm[banco.id]) : undefined}
                                   fullWidth
                                 />
                               </td>
                               <td className="px-4 py-3 align-top">
                                 {registro ? (
                                   <div className="space-y-2">
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                      <span className="font-semibold text-error-700">
-                                        {formatCurrency(registro.valor)}
-                                      </span>
-                                      <span className="text-xs text-gray-400">{formatarData(registro.data)}</span>
-                                    </div>
-                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-                                      <Input
-                                        type="text"
-                                        inputMode="decimal"
-                                        value={pagamentosBancoEdicao[registro.id] ?? ''}
-                                        onChange={(event) =>
-                                          setPagamentosBancoEdicao((prev) => ({
-                                            ...prev,
-                                            [registro.id]: event.target.value,
-                                          }))
-                                        }
-                                        disabled={
-                                          !edicaoLiberada ||
-                                          registroEditando.banco === registro.id ||
-                                          registroExcluindo.banco === registro.id
-                                        }
-                                        helperText={helperValor(pagamentosBancoEdicao[registro.id])}
-                                        className="sm:w-44"
-                                      />
-                                      <div className="flex gap-2">
+                                    {emEdicaoPagamentoBanco.has(registro.id) ? (
+                                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                        <Input
+                                          type="text"
+                                          inputMode="decimal"
+                                          value={pagamentosBancoEdicao[registro.id] ?? ''}
+                                          onChange={(event) =>
+                                            setPagamentosBancoEdicao((prev) => ({
+                                              ...prev,
+                                              [registro.id]: event.target.value,
+                                            }))
+                                          }
+                                          disabled={
+                                            !edicaoLiberada ||
+                                            registroEditando.banco === registro.id ||
+                                            registroExcluindo.banco === registro.id
+                                          }
+                                          helperText={helperValor(pagamentosBancoEdicao[registro.id])}
+                                          className="sm:w-44"
+                                        />
+                                        <div className="flex gap-2">
+                                          <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => handleAtualizarPagamentoBancoExistente(registro)}
+                                            disabled={!edicaoLiberada}
+                                            loading={registroEditando.banco === registro.id}
+                                          >
+                                            Salvar edição
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                              setEmEdicaoPagamentoBanco(prev => {
+                                                const novo = new Set(prev);
+                                                novo.delete(registro.id);
+                                                return novo;
+                                              });
+                                              setPagamentosBancoEdicao((prev) => {
+                                                const novo = { ...prev };
+                                                delete novo[registro.id];
+                                                return novo;
+                                              });
+                                            }}
+                                            disabled={registroEditando.banco === registro.id}
+                                          >
+                                            Cancelar
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <span className="font-semibold text-error-700">
+                                          {formatCurrency(registro.valor)}
+                                        </span>
                                         <Button
                                           type="button"
                                           variant="secondary"
                                           size="sm"
-                                          onClick={() => handleAtualizarPagamentoBancoExistente(registro)}
+                                          onClick={() => {
+                                            setEmEdicaoPagamentoBanco(prev => new Set(prev).add(registro.id));
+                                            setPagamentosBancoEdicao((prev) => ({
+                                              ...prev,
+                                              [registro.id]: formatarValorParaInput(registro.valor),
+                                            }));
+                                          }}
                                           disabled={!edicaoLiberada}
-                                          loading={registroEditando.banco === registro.id}
                                         >
-                                          Salvar
+                                          Editar
                                         </Button>
                                         <Button
                                           type="button"
@@ -1919,7 +1951,7 @@ const SaldoDiarioPage: React.FC = () => {
                                           Excluir
                                         </Button>
                                       </div>
-                                    </div>
+                                    )}
                                   </div>
                                 ) : (
                                   <span className="text-sm text-gray-400">Nenhum valor registrado</span>
@@ -2009,7 +2041,7 @@ const SaldoDiarioPage: React.FC = () => {
                                 <Input
                                   type="text"
                                   inputMode="decimal"
-                                  placeholder="Ex.: 500-125"
+                                  placeholder={registro ? "Clique em editar" : "Ex.: 500-125"}
                                   value={receitasForm[conta.id] ?? ''}
                                   onChange={(event) =>
                                     setReceitasForm((prev) => ({
@@ -2017,49 +2049,86 @@ const SaldoDiarioPage: React.FC = () => {
                                       [conta.id]: event.target.value,
                                     }))
                                   }
-                                  disabled={processando.receita || !edicaoLiberada}
-                                  helperText={helperValor(receitasForm[conta.id])}
+                                  disabled={processando.receita || !edicaoLiberada || !!registro}
+                                  helperText={!registro ? helperValor(receitasForm[conta.id]) : undefined}
                                   fullWidth
                                 />
                               </td>
                               <td className="px-4 py-3 align-top">
                                 {registro ? (
                                   <div className="space-y-2">
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                      <span className="font-semibold text-success-700">
-                                        {formatCurrency(registro.valor)}
-                                      </span>
-                                      <span className="text-xs text-gray-400">{formatarData(registro.data)}</span>
-                                    </div>
-                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-                                      <Input
-                                        type="text"
-                                        inputMode="decimal"
-                                        value={receitasEdicao[registro.id] ?? ''}
-                                        onChange={(event) =>
-                                          setReceitasEdicao((prev) => ({
-                                            ...prev,
-                                            [registro.id]: event.target.value,
-                                          }))
-                                        }
-                                        disabled={
-                                          !edicaoLiberada ||
-                                          registroEditando.receita === registro.id ||
-                                          registroExcluindo.receita === registro.id
-                                        }
-                                        helperText={helperValor(receitasEdicao[registro.id])}
-                                        className="sm:w-44"
-                                      />
-                                      <div className="flex gap-2">
+                                    {emEdicaoReceita.has(registro.id) ? (
+                                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                        <Input
+                                          type="text"
+                                          inputMode="decimal"
+                                          value={receitasEdicao[registro.id] ?? ''}
+                                          onChange={(event) =>
+                                            setReceitasEdicao((prev) => ({
+                                              ...prev,
+                                              [registro.id]: event.target.value,
+                                            }))
+                                          }
+                                          disabled={
+                                            !edicaoLiberada ||
+                                            registroEditando.receita === registro.id ||
+                                            registroExcluindo.receita === registro.id
+                                          }
+                                          helperText={helperValor(receitasEdicao[registro.id])}
+                                          className="sm:w-44"
+                                        />
+                                        <div className="flex gap-2">
+                                          <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => handleAtualizarReceitaExistente(registro)}
+                                            disabled={!edicaoLiberada}
+                                            loading={registroEditando.receita === registro.id}
+                                          >
+                                            Salvar edição
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                              setEmEdicaoReceita(prev => {
+                                                const novo = new Set(prev);
+                                                novo.delete(registro.id);
+                                                return novo;
+                                              });
+                                              setReceitasEdicao((prev) => {
+                                                const novo = { ...prev };
+                                                delete novo[registro.id];
+                                                return novo;
+                                              });
+                                            }}
+                                            disabled={registroEditando.receita === registro.id}
+                                          >
+                                            Cancelar
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <span className="font-semibold text-success-700">
+                                          {formatCurrency(registro.valor)}
+                                        </span>
                                         <Button
                                           type="button"
                                           variant="secondary"
                                           size="sm"
-                                          onClick={() => handleAtualizarReceitaExistente(registro)}
+                                          onClick={() => {
+                                            setEmEdicaoReceita(prev => new Set(prev).add(registro.id));
+                                            setReceitasEdicao((prev) => ({
+                                              ...prev,
+                                              [registro.id]: formatarValorParaInput(registro.valor),
+                                            }));
+                                          }}
                                           disabled={!edicaoLiberada}
-                                          loading={registroEditando.receita === registro.id}
                                         >
-                                          Salvar
+                                          Editar
                                         </Button>
                                         <Button
                                           type="button"
@@ -2072,7 +2141,7 @@ const SaldoDiarioPage: React.FC = () => {
                                           Excluir
                                         </Button>
                                       </div>
-                                    </div>
+                                    )}
                                   </div>
                                 ) : (
                                   <span className="text-sm text-gray-400">Nenhum valor registrado</span>
@@ -2163,7 +2232,7 @@ const SaldoDiarioPage: React.FC = () => {
                                 <Input
                                   type="text"
                                   inputMode="decimal"
-                                  placeholder="Ex.: 1000-250"
+                                  placeholder={registro ? "Clique em editar" : "Ex.: 1000-250"}
                                   value={saldosBancoForm[banco.id] ?? ''}
                                   onChange={(event) =>
                                     setSaldosBancoForm((prev) => ({
@@ -2171,53 +2240,90 @@ const SaldoDiarioPage: React.FC = () => {
                                       [banco.id]: event.target.value,
                                     }))
                                   }
-                                  disabled={processando.saldo || !edicaoLiberada}
-                                  helperText={helperValor(saldosBancoForm[banco.id])}
+                                  disabled={processando.saldo || !edicaoLiberada || !!registro}
+                                  helperText={!registro ? helperValor(saldosBancoForm[banco.id]) : undefined}
                                   fullWidth
                                 />
                               </td>
                               <td className="px-4 py-3 align-top">
                                 {registro ? (
                                   <div className="space-y-2">
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                      <span
-                                        className={`font-semibold ${
-                                          registro.valor >= 0 ? 'text-success-700' : 'text-error-700'
-                                        }`}
-                                      >
-                                        {formatCurrency(registro.valor)}
-                                      </span>
-                                      <span className="text-xs text-gray-400">{formatarData(registro.data)}</span>
-                                    </div>
-                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-                                      <Input
-                                        type="text"
-                                        inputMode="decimal"
-                                        value={saldosBancoEdicao[registro.id] ?? ''}
-                                        onChange={(event) =>
-                                          setSaldosBancoEdicao((prev) => ({
-                                            ...prev,
-                                            [registro.id]: event.target.value,
-                                          }))
-                                        }
-                                        disabled={
-                                          !edicaoLiberada ||
-                                          registroEditando.saldo === registro.id ||
-                                          registroExcluindo.saldo === registro.id
-                                        }
-                                        helperText={helperValor(saldosBancoEdicao[registro.id])}
-                                        className="sm:w-44"
-                                      />
-                                      <div className="flex gap-2">
+                                    {emEdicaoSaldoBanco.has(registro.id) ? (
+                                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                        <Input
+                                          type="text"
+                                          inputMode="decimal"
+                                          value={saldosBancoEdicao[registro.id] ?? ''}
+                                          onChange={(event) =>
+                                            setSaldosBancoEdicao((prev) => ({
+                                              ...prev,
+                                              [registro.id]: event.target.value,
+                                            }))
+                                          }
+                                          disabled={
+                                            !edicaoLiberada ||
+                                            registroEditando.saldo === registro.id ||
+                                            registroExcluindo.saldo === registro.id
+                                          }
+                                          helperText={helperValor(saldosBancoEdicao[registro.id])}
+                                          className="sm:w-44"
+                                        />
+                                        <div className="flex gap-2">
+                                          <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => handleAtualizarSaldoBancoExistente(registro)}
+                                            disabled={!edicaoLiberada}
+                                            loading={registroEditando.saldo === registro.id}
+                                          >
+                                            Salvar edição
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                              setEmEdicaoSaldoBanco(prev => {
+                                                const novo = new Set(prev);
+                                                novo.delete(registro.id);
+                                                return novo;
+                                              });
+                                              setSaldosBancoEdicao((prev) => {
+                                                const novo = { ...prev };
+                                                delete novo[registro.id];
+                                                return novo;
+                                              });
+                                            }}
+                                            disabled={registroEditando.saldo === registro.id}
+                                          >
+                                            Cancelar
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <span
+                                          className={`font-semibold ${
+                                            registro.valor >= 0 ? 'text-success-700' : 'text-error-700'
+                                          }`}
+                                        >
+                                          {formatCurrency(registro.valor)}
+                                        </span>
                                         <Button
                                           type="button"
                                           variant="secondary"
                                           size="sm"
-                                          onClick={() => handleAtualizarSaldoBancoExistente(registro)}
+                                          onClick={() => {
+                                            setEmEdicaoSaldoBanco(prev => new Set(prev).add(registro.id));
+                                            setSaldosBancoEdicao((prev) => ({
+                                              ...prev,
+                                              [registro.id]: formatarValorParaInput(registro.valor),
+                                            }));
+                                          }}
                                           disabled={!edicaoLiberada}
-                                          loading={registroEditando.saldo === registro.id}
                                         >
-                                          Salvar
+                                          Editar
                                         </Button>
                                         <Button
                                           type="button"
@@ -2230,7 +2336,7 @@ const SaldoDiarioPage: React.FC = () => {
                                           Excluir
                                         </Button>
                                       </div>
-                                    </div>
+                                    )}
                                   </div>
                                 ) : (
                                   <span className="text-sm text-gray-400">Nenhum saldo registrado</span>

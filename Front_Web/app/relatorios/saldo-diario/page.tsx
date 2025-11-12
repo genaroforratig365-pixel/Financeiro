@@ -131,23 +131,42 @@ const obterOrdemArea = (nomeArea: string): number => {
   const nomeNormalizado = nomeArea.trim().toUpperCase();
   const ordemAreas: Record<string, number> = {
     'GASTO COM MATERIAL E CONSUMO': 1,
+    'MATERIAL E CONSUMO': 1,
     'GASTO RH': 2,
+    'RH': 2,
     'GASTO FINANCEIRO E FISCAL': 3,
+    'FINANCEIRO E FISCAL': 3,
     'GASTO LOGISTICA': 4,
+    'LOGISTICA': 4,
     'GASTO COMERCIAL': 5,
+    'COMERCIAL': 5,
     'GASTO MARKETING': 6,
+    'MARKETING': 6,
     'GASTO LOJA DE FABRICA': 7,
+    'LOJA DE FABRICA': 7,
     'GASTO TI': 8,
+    'TI': 8,
     'GASTO DIRETORIA': 9,
+    'DIRETORIA': 9,
     'GASTO COMPRAS': 10,
+    'COMPRAS': 10,
     'GASTO INVESTIMENTO': 11,
+    'INVESTIMENTO': 11,
     'GASTO DALLAS': 12,
+    'DALLAS': 12,
     'TRANSFERÊNCIA PARA APLICAÇÃO': 13,
+    'TRANSFERENCIA PARA APLICACAO': 13,
+    'APLICACAO': 13,
   };
 
-  // Procura pela chave exata ou que contenha o texto
+  // Procura pela chave exata
+  if (ordemAreas[nomeNormalizado] !== undefined) {
+    return ordemAreas[nomeNormalizado];
+  }
+
+  // Procura se contém alguma das palavras-chave
   for (const [chave, ordem] of Object.entries(ordemAreas)) {
-    if (nomeNormalizado === chave || nomeNormalizado.includes(chave)) {
+    if (nomeNormalizado.includes(chave)) {
       return ordem;
     }
   }

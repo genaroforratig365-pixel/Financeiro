@@ -34,10 +34,13 @@ type PrevisaoRow = {
   tpr_tipos_receita?: MaybeArray<{ tpr_id?: unknown; tpr_nome?: unknown; tpr_codigo?: unknown } | null>;
 };
 
-type ReceitaRow = {
-  rec_valor?: unknown;
-  rec_ctr_id?: unknown;
+type CobrancaRow = {
+  cob_valor?: unknown;
+  cob_ctr_id?: unknown;
+  cob_ban_id?: unknown;
   ctr_contas_receita?: MaybeArray<{ ctr_nome?: unknown; ctr_codigo?: unknown } | null>;
+  ban_bancos?: MaybeArray<{ ban_nome?: unknown; ban_codigo?: unknown } | null>;
+  tpr_tipos_receita?: MaybeArray<{ tpr_id?: unknown; tpr_nome?: unknown; tpr_codigo?: unknown } | null>;
 };
 
 type TipoResumo = {
@@ -160,7 +163,7 @@ const RelatorioCobrancaPage: React.FC = () => {
         setCarregandoDados(true);
         const supabase = getSupabaseClient();
 
-        const [previsoesRes, receitasRes] = await Promise.all([
+        const [previsoesRes, cobrancasRes] = await Promise.all([
           supabase
             .from('pvi_previsao_itens')
             .select(
@@ -169,16 +172,16 @@ const RelatorioCobrancaPage: React.FC = () => {
             .eq('pvi_tipo', 'receita')
             .eq('pvi_data', data),
           supabase
-            .from('rec_receitas')
-            .select('rec_valor, rec_ctr_id, ctr_contas_receita(ctr_nome, ctr_codigo)')
-            .eq('rec_data', data),
+            .from('cob_cobrancas')
+            .select('cob_valor, cob_ctr_id, cob_ban_id, ctr_contas_receita(ctr_nome, ctr_codigo), ban_bancos(ban_nome, ban_codigo), tpr_tipos_receita(tpr_id, tpr_nome, tpr_codigo)')
+            .eq('cob_data', data),
         ]);
 
         if (previsoesRes.error) throw previsoesRes.error;
-        if (receitasRes.error) throw receitasRes.error;
+        if (cobrancasRes.error) throw cobrancasRes.error;
 
         const previsoes = normalizeRelation(previsoesRes.data as MaybeArray<PrevisaoRow>);
-        const receitas = normalizeRelation(receitasRes.data as MaybeArray<ReceitaRow>);
+        const cobrancas = normalizeRelation(cobrancasRes.data as MaybeArray<CobrancaRow>);
 
         type ContaResumo = {
           chave: string;
@@ -233,22 +236,44 @@ const RelatorioCobrancaPage: React.FC = () => {
           contasMap.set(contaChave, existente);
         });
 
-        receitas.forEach((item) => {
-          const valor = arredondar(toNumber(item.rec_valor));
+        cobrancas.forEach((item) => {
+          const valor = arredondar(toNumber(item.cob_valor));
           if (valor === 0) {
             return;
           }
 
           const contaRel = normalizeRelation(item.ctr_contas_receita)[0];
           const contaNome = contaRel?.ctr_nome ? toString(contaRel.ctr_nome) : 'Conta não informada';
-          const contaId = toNumber(item.rec_ctr_id, 0);
+          const contaId = toNumber(item.cob_ctr_id, 0);
           const contaChave = construirChave(contaId, contaNome, 'conta');
 
-          const existente = contasMap.get(contaChave);
-          if (existente) {
-            existente.realizado += valor;
-            contasMap.set(contaChave, existente);
-          }
+          const bancoRel = normalizeRelation(item.ban_bancos)[0];
+          const bancoNome = bancoRel?.ban_nome ? toString(bancoRel.ban_nome) : 'Banco não informado';
+          const bancoIdNumero = toNumber(item.cob_ban_id, NaN);
+          const bancoChave = construirChave(bancoIdNumero, bancoNome, 'banco');
+
+          const tipoRel = normalizeRelation(item.tpr_tipos_receita)[0];
+          const tipoNome = tipoRel?.tpr_nome ? toString(tipoRel.tpr_nome) : contaNome;
+          const tipoIdNumero = toNumber(tipoRel?.tpr_id, NaN);
+          const tipoChave = construirChave(tipoIdNumero, tipoNome, 'tipo');
+
+          const existente = contasMap.get(contaChave) ?? {
+            chave: contaChave,
+            contaNome,
+            bancoId: bancoChave,
+            bancoNome,
+            tipoId: tipoChave,
+            tipoNome,
+            previsto: 0,
+            realizado: 0,
+          };
+
+          existente.realizado += valor;
+          existente.bancoId = bancoChave;
+          existente.bancoNome = bancoNome;
+          existente.tipoId = tipoChave;
+          existente.tipoNome = tipoNome;
+          contasMap.set(contaChave, existente);
         });
 
         type BancoAcumulado = {
