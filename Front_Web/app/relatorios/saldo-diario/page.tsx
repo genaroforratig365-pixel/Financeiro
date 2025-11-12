@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 import { Header } from '@/components/layout';
-import { Button, Card, Loading } from '@/components/ui';
+import { Button, Card, Input, Loading, Modal, Textarea } from '@/components/ui';
 import { formatCurrency } from '@/lib/mathParser';
 import {
   getOrCreateUser,
@@ -65,12 +67,21 @@ type LinhaComparativa = {
   percentual: number | null;
 };
 
+type LinhaRealizada = {
+  chave: string;
+  titulo: string;
+  realizado: number;
+};
+
+type LinhaTabela = LinhaComparativa | LinhaRealizada;
+
 type TabelaAccent = 'azul' | 'verde' | 'amarelo' | 'laranja' | 'cinza';
 
 type RenderTabelaOptions = {
   accent?: TabelaAccent;
   totalLabel?: string;
   showTotals?: boolean;
+  layout?: 'comparativo' | 'realizado';
 };
 
 type RelatorioSaldoDiario = {
@@ -141,6 +152,14 @@ const tabelaAccentClassNames: Record<TabelaAccent, string> = {
   cinza: 'report-section report-section--cinza',
 };
 
+const tabelaAccentPdfColors: Record<TabelaAccent, [number, number, number]> = {
+  azul: [31, 73, 125],
+  verde: [27, 94, 32],
+  amarelo: [183, 121, 31],
+  laranja: [156, 66, 33],
+  cinza: [75, 85, 99],
+};
+
 const calcularPercentual = (previsto: number, realizado: number): number | null => {
   if (Math.abs(previsto) < 0.0001) {
     return null;
@@ -156,7 +175,9 @@ const formatarPercentual = (valor: number | null): string => {
   return `${arredondado.toFixed(1).replace('.', ',')}%`;
 };
 
-const converterMapaParaLinhas = (mapa: Map<string, { titulo: string; previsto: number; realizado: number }>): LinhaComparativa[] =>
+const converterMapaParaLinhas = (
+  mapa: Map<string, { titulo: string; previsto: number; realizado: number }>,
+): LinhaComparativa[] =>
   Array.from(mapa.entries())
     .map(([chave, item]) => {
       const previsto = arredondar(item.previsto);
@@ -167,10 +188,12 @@ const converterMapaParaLinhas = (mapa: Map<string, { titulo: string; previsto: n
     })
     .sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR'));
 
-const somarPrevisto = (linhas: LinhaComparativa[]): number =>
-  arredondar(linhas.reduce((acc, linha) => acc + linha.previsto, 0));
+const somarPrevisto = (linhas: LinhaTabela[]): number =>
+  arredondar(
+    linhas.reduce((acc, linha) => acc + ('previsto' in linha && typeof linha.previsto === 'number' ? linha.previsto : 0), 0),
+  );
 
-const somarRealizado = (linhas: LinhaComparativa[]): number =>
+const somarRealizado = (linhas: LinhaTabela[]): number =>
   arredondar(linhas.reduce((acc, linha) => acc + linha.realizado, 0));
 
 const RelatorioSaldoDiarioPage: React.FC = () => {
@@ -180,8 +203,11 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
   const [erro, setErro] = useState<string | null>(null);
   const [dataReferencia, setDataReferencia] = useState(() => toISODate(new Date()));
   const [relatorio, setRelatorio] = useState<RelatorioSaldoDiario | null>(null);
-
-  const reportRef = useRef<HTMLDivElement | null>(null);
+  const [emailModalAberto, setEmailModalAberto] = useState(false);
+  const [emailDestino, setEmailDestino] = useState('');
+  const [emailMensagem, setEmailMensagem] = useState('');
+  const [enviandoEmail, setEnviandoEmail] = useState(false);
+  const [feedbackEmail, setFeedbackEmail] = useState<string | null>(null);
 
   const carregarUsuario = useCallback(async () => {
     try {
@@ -403,246 +429,41 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
     carregarRelatorio(usuario, dataReferencia);
   }, [usuario, dataReferencia, carregarRelatorio]);
 
-  const handleExportPdf = () => {
-    if (!reportRef.current) {
-      return;
-    }
-
-    const html = reportRef.current.innerHTML;
-    const titulo = 'Relatório - Saldo Diário';
-    const janela = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=900');
-    if (!janela) {
-      return;
-    }
-
-    const estilos = `
-      * {
-        font-family: 'Segoe UI', Arial, sans-serif;
-        color: #111827;
-        box-sizing: border-box;
-      }
-      body {
-        margin: 24px;
-        background-color: #f8fafc;
-      }
-      h1, h2, h3 {
-        margin: 0;
-      }
-      .report-wrapper {
-        max-width: 960px;
-        margin: 0 auto;
-        background: #ffffff;
-        border: 1px solid #d1d5db;
-        border-radius: 12px;
-        padding: 24px;
-        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
-        font-size: 12px;
-        line-height: 1.45;
-      }
-      .report-header {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        border-bottom: 2px solid #1f497d;
-        padding-bottom: 16px;
-        margin-bottom: 20px;
-      }
-      .report-header__title {
-        font-size: 18px;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: #1f2937;
-      }
-      .report-header__subtitle {
-        margin-top: 6px;
-        font-size: 13px;
-        color: #374151;
-      }
-      .report-header__meta {
-        text-align: right;
-        font-size: 12px;
-        color: #4b5563;
-      }
-      .report-header__meta strong {
-        display: block;
-        margin-top: 4px;
-        font-size: 16px;
-        font-weight: 700;
-        color: #111827;
-      }
-      .report-grid {
-        display: grid;
-        gap: 16px;
-        margin-bottom: 20px;
-      }
-      .report-grid--two {
-        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      }
-      .report-section {
-        border: 1px solid #d1d5db;
-        border-radius: 10px;
-        overflow: hidden;
-        background: #ffffff;
-        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-      }
-      .report-section__header {
-        padding: 12px 16px;
-        font-size: 12px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: #ffffff;
-      }
-      .report-section__table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      .report-section__table thead th {
-        font-size: 11px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        padding: 10px 12px;
-        text-align: right;
-      }
-      .report-section__table tbody td,
-      .report-section__table tfoot td {
-        padding: 10px 12px;
-        font-size: 12px;
-        text-align: right;
-        border-top: 1px solid #e5e7eb;
-      }
-      .report-section__table thead th:first-child,
-      .report-section__table tbody td:first-child,
-      .report-section__table tfoot td:first-child {
-        text-align: left;
-      }
-      .report-section__table tbody tr:nth-child(even) {
-        background: #f9fafb;
-      }
-      .report-section__table tbody tr:hover {
-        background: #edf2f7;
-      }
-      .report-section__table tfoot td {
-        font-weight: 700;
-      }
-      .report-section__empty-cell {
-        padding: 24px 16px;
-        text-align: center;
-        font-size: 12px;
-        color: #6b7280;
-      }
-      .report-value--positivo {
-        color: #047857;
-        font-weight: 600;
-      }
-      .report-value--negativo {
-        color: #b91c1c;
-        font-weight: 600;
-      }
-      .report-section--azul .report-section__header {
-        background: #1f497d;
-      }
-      .report-section--azul .report-section__table thead {
-        background: #dbe5f1;
-        color: #1f497d;
-      }
-      .report-section--azul .report-section__table tfoot {
-        background: #eef3fb;
-        color: #1f497d;
-      }
-      .report-section--verde .report-section__header {
-        background: #1b5e20;
-      }
-      .report-section--verde .report-section__table thead {
-        background: #d7f2e3;
-        color: #1b5e20;
-      }
-      .report-section--verde .report-section__table tfoot {
-        background: #ebf7ef;
-        color: #1b5e20;
-      }
-      .report-section--amarelo .report-section__header {
-        background: #b7791f;
-      }
-      .report-section--amarelo .report-section__table thead {
-        background: #fcefc7;
-        color: #92400e;
-      }
-      .report-section--amarelo .report-section__table tfoot {
-        background: #fef3c7;
-        color: #92400e;
-      }
-      .report-section--laranja .report-section__header {
-        background: #9c4221;
-      }
-      .report-section--laranja .report-section__table thead {
-        background: #fde6d9;
-        color: #9c4221;
-      }
-      .report-section--laranja .report-section__table tfoot {
-        background: #fce9dc;
-        color: #9c4221;
-      }
-      .report-section--cinza .report-section__header {
-        background: #4b5563;
-      }
-      .report-section--cinza .report-section__table thead {
-        background: #e5e7eb;
-        color: #111827;
-      }
-      .report-section--cinza .report-section__table tfoot {
-        background: #f3f4f6;
-        color: #111827;
-      }
-      @media print {
-        body {
-          margin: 10mm;
-          background: #ffffff;
-        }
-        .report-wrapper {
-          box-shadow: none;
-          page-break-after: avoid;
-          page-break-inside: avoid;
-        }
-        .report-grid {
-          break-inside: avoid;
-        }
-      }
-    `;
-
-    const documento = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${titulo}</title><style>${estilos}</style></head><body>${html}</body></html>`;
-
-    // Define o onload ANTES de escrever o documento
-    janela.onload = () => {
-      setTimeout(() => {
-        try {
-          janela.focus();
-          janela.print();
-        } catch (err) {
-          console.error('Erro ao imprimir:', err);
-          alert('Não foi possível abrir a janela de impressão. Verifique se os popups estão habilitados.');
-        }
-      }, 1000);
-    };
-
-    janela.document.open();
-    janela.document.write(documento);
-    janela.document.close();
-  };
-
   const renderTabelaComparativa = useCallback(
-    (titulo: string, linhas: LinhaComparativa[], options: RenderTabelaOptions = {}) => {
-      const totalPrevisto = somarPrevisto(linhas);
-      const totalRealizado = somarRealizado(linhas);
-      const totalDesvio = arredondar(totalRealizado - totalPrevisto);
-      const totalPercentual = calcularPercentual(totalPrevisto, totalRealizado);
-
+    (titulo: string, linhas: LinhaTabela[], options: RenderTabelaOptions = {}) => {
+      const layout = options.layout ?? 'comparativo';
       const accent = options.accent ?? 'azul';
       const totalLabel = options.totalLabel ?? 'Totais';
-      const showTotals = options.showTotals ?? true;
+      const showTotals = options.showTotals ?? layout === 'comparativo';
       const sectionClass = tabelaAccentClassNames[accent] ?? tabelaAccentClassNames.azul;
+
+      const linhasComparativas =
+        layout === 'comparativo'
+          ? linhas.filter(
+              (linha): linha is LinhaComparativa =>
+                'previsto' in linha &&
+                typeof linha.previsto === 'number' &&
+                'desvio' in linha &&
+                typeof linha.desvio === 'number',
+            )
+          : [];
+      const linhasParaComparativo =
+        layout === 'comparativo'
+          ? linhasComparativas.length > 0
+            ? linhasComparativas
+            : (linhas as LinhaComparativa[])
+          : [];
+
+      const linhasParaExibir = layout === 'comparativo' ? linhasParaComparativo : linhas;
+
+      const totalPrevisto =
+        layout === 'comparativo' ? somarPrevisto(linhasParaComparativo) : 0;
+      const totalRealizado =
+        layout === 'comparativo' ? somarRealizado(linhasParaComparativo) : somarRealizado(linhas);
+      const totalDesvio = layout === 'comparativo' ? arredondar(totalRealizado - totalPrevisto) : 0;
+      const totalPercentual =
+        layout === 'comparativo' ? calcularPercentual(totalPrevisto, totalRealizado) : null;
+      const colSpan = layout === 'comparativo' ? 5 : 2;
 
       return (
         <div className={sectionClass}>
@@ -651,23 +472,30 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
           </div>
           <table className="report-section__table">
             <thead>
-              <tr>
-                <th>Categoria</th>
-                <th>Previsto</th>
-                <th>Realizado</th>
-                <th>Desvio</th>
-                <th>% Desvio</th>
-              </tr>
+              {layout === 'comparativo' ? (
+                <tr>
+                  <th>Categoria</th>
+                  <th>Previsto</th>
+                  <th>Realizado</th>
+                  <th>Desvio</th>
+                  <th>% Desvio</th>
+                </tr>
+              ) : (
+                <tr>
+                  <th>Banco / Conta</th>
+                  <th>Realizado</th>
+                </tr>
+              )}
             </thead>
             <tbody>
-              {linhas.length === 0 ? (
+              {linhasParaExibir.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="report-section__empty-cell">
+                  <td colSpan={colSpan} className="report-section__empty-cell">
                     Nenhuma informação encontrada para esta seção.
                   </td>
                 </tr>
-              ) : (
-                linhas.map((linha) => (
+              ) : layout === 'comparativo' ? (
+                linhasParaComparativo.map((linha) => (
                   <tr key={linha.chave}>
                     <td>{linha.titulo}</td>
                     <td>{formatCurrency(linha.previsto)}</td>
@@ -678,19 +506,33 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
                     <td>{formatarPercentual(linha.percentual)}</td>
                   </tr>
                 ))
+              ) : (
+                linhas.map((linha) => (
+                  <tr key={linha.chave}>
+                    <td>{linha.titulo}</td>
+                    <td>{formatCurrency(linha.realizado)}</td>
+                  </tr>
+                ))
               )}
             </tbody>
             {showTotals && (
               <tfoot>
-                <tr>
-                  <td>{totalLabel}</td>
-                  <td>{formatCurrency(totalPrevisto)}</td>
-                  <td>{formatCurrency(totalRealizado)}</td>
-                  <td className={totalDesvio >= 0 ? 'report-value--positivo' : 'report-value--negativo'}>
-                    {formatCurrency(totalDesvio)}
-                  </td>
-                  <td>{formatarPercentual(totalPercentual)}</td>
-                </tr>
+                {layout === 'comparativo' ? (
+                  <tr>
+                    <td>{totalLabel}</td>
+                    <td>{formatCurrency(totalPrevisto)}</td>
+                    <td>{formatCurrency(totalRealizado)}</td>
+                    <td className={totalDesvio >= 0 ? 'report-value--positivo' : 'report-value--negativo'}>
+                      {formatCurrency(totalDesvio)}
+                    </td>
+                    <td>{formatarPercentual(totalPercentual)}</td>
+                  </tr>
+                ) : (
+                  <tr>
+                    <td>{totalLabel}</td>
+                    <td>{formatCurrency(totalRealizado)}</td>
+                  </tr>
+                )}
               </tfoot>
             )}
           </table>
@@ -733,7 +575,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
     ];
   }, [relatorio]);
 
-  const linhasResumoGeral = useMemo(() => {
+  const linhasResumoGeral = useMemo<LinhaRealizada[]>(() => {
     if (!relatorio) {
       return [];
     }
@@ -742,61 +584,261 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
       {
         chave: 'saldo-anterior',
         titulo: 'Saldo do Dia Anterior',
-        previsto: resumo.saldoInicialPrevisto,
         realizado: resumo.saldoInicialRealizado,
-        desvio: arredondar(resumo.saldoInicialRealizado - resumo.saldoInicialPrevisto),
-        percentual: calcularPercentual(resumo.saldoInicialPrevisto, resumo.saldoInicialRealizado),
       },
       {
         chave: 'resultado',
         titulo: 'Resultado do Dia (Receitas - Despesas)',
-        previsto: resumo.resultadoPrevisto,
         realizado: resumo.resultadoRealizado,
-        desvio: arredondar(resumo.resultadoRealizado - resumo.resultadoPrevisto),
-        percentual: calcularPercentual(resumo.resultadoPrevisto, resumo.resultadoRealizado),
       },
       {
         chave: 'saldo-final',
         titulo: 'Saldo Final do Dia',
-        previsto: resumo.saldoFinalPrevisto,
         realizado: resumo.saldoFinalRealizado,
-        desvio: arredondar(resumo.saldoFinalRealizado - resumo.saldoFinalPrevisto),
-        percentual: calcularPercentual(resumo.saldoFinalPrevisto, resumo.saldoFinalRealizado),
-      },
-      {
-        chave: 'saldo-bancos',
-        titulo: 'Saldo em Bancos',
-        previsto: resumo.bancosPrevistos,
-        realizado: resumo.bancosRealizados,
-        desvio: arredondar(resumo.bancosRealizados - resumo.bancosPrevistos),
-        percentual: calcularPercentual(resumo.bancosPrevistos, resumo.bancosRealizados),
       },
     ];
   }, [relatorio]);
 
-  const dataEmissao = useMemo(() => formatarDataPt(toISODate(new Date())), []);
+  const gerarDocumentoPdf = useCallback(() => {
+    if (!relatorio) {
+      return null;
+    }
 
-  const nomeEmpresa = useMemo(() => {
-    if (!usuario) {
-      return 'EMPRESA';
+    const doc = new jsPDF('portrait', 'mm', 'a4');
+    const margemHorizontal = 14;
+    const larguraUtil = doc.internal.pageSize.getWidth() - margemHorizontal * 2;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('Saldo Diário', margemHorizontal, 14);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`Data de referência: ${formatarDataPt(relatorio.data)}`, margemHorizontal, 20);
+
+    const resumoLinha = `Receitas: ${formatCurrency(relatorio.resumo.totalReceitasRealizadas)}  |  Despesas: ${formatCurrency(relatorio.resumo.totalDespesasRealizadas)}  |  Resultado: ${formatCurrency(relatorio.resumo.resultadoRealizado)}  |  Saldos em Bancos: ${formatCurrency(relatorio.resumo.bancosRealizados)}`;
+    doc.setFontSize(9);
+    const resumoQuebrado = doc.splitTextToSize(resumoLinha, larguraUtil);
+    doc.text(resumoQuebrado, margemHorizontal, 26);
+
+    let posicaoAtual = 26 + resumoQuebrado.length * 5;
+
+    type TabelaPdfOptions = {
+      layout?: 'comparativo' | 'realizado';
+      accent?: TabelaAccent;
+      totalLabel?: string;
+      showTotals?: boolean;
+    };
+
+    const adicionarTabela = (
+      titulo: string,
+      linhas: LinhaTabela[],
+      { layout = 'comparativo', accent = 'azul', totalLabel, showTotals }: TabelaPdfOptions = {},
+    ) => {
+      posicaoAtual += 8;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text(titulo, margemHorizontal, posicaoAtual);
+
+      const cabecalho =
+        layout === 'comparativo'
+          ? [['Categoria', 'Previsto', 'Realizado', 'Diferença', '%']]
+          : [['Banco / Conta', 'Realizado']];
+
+      const linhasComparativas =
+        layout === 'comparativo'
+          ? linhas.filter(
+              (linha): linha is LinhaComparativa =>
+                'previsto' in linha &&
+                typeof linha.previsto === 'number' &&
+                'desvio' in linha &&
+                typeof linha.desvio === 'number',
+            )
+          : [];
+      const linhasParaComparativo =
+        layout === 'comparativo'
+          ? linhasComparativas.length > 0
+            ? linhasComparativas
+            : (linhas as LinhaComparativa[])
+          : [];
+
+      const linhasParaExibir = layout === 'comparativo' ? linhasParaComparativo : linhas;
+
+      const corpo =
+        linhasParaExibir.length === 0
+          ? layout === 'comparativo'
+            ? [['Nenhum registro', '-', '-', '-', '-']]
+            : [['Nenhum registro', '-']]
+          : layout === 'comparativo'
+            ? linhasParaComparativo.map((linha) => [
+                linha.titulo,
+                formatCurrency(linha.previsto),
+                formatCurrency(linha.realizado),
+                formatCurrency(linha.desvio),
+                formatarPercentual(linha.percentual),
+              ])
+            : linhas.map((linha) => [linha.titulo, formatCurrency(linha.realizado)]);
+
+      const totalPrevisto =
+        layout === 'comparativo' ? somarPrevisto(linhasParaComparativo) : 0;
+      const totalRealizado =
+        layout === 'comparativo' ? somarRealizado(linhasParaComparativo) : somarRealizado(linhas);
+      const totalDesvio = layout === 'comparativo' ? arredondar(totalRealizado - totalPrevisto) : 0;
+      const totalPercentual =
+        layout === 'comparativo' ? calcularPercentual(totalPrevisto, totalRealizado) : null;
+      const deveMostrarTotais = (showTotals ?? layout === 'comparativo') && linhasParaExibir.length > 0;
+
+      const rodape =
+        deveMostrarTotais
+          ? layout === 'comparativo'
+            ? [[
+                totalLabel ?? 'Totais',
+                formatCurrency(totalPrevisto),
+                formatCurrency(totalRealizado),
+                formatCurrency(totalDesvio),
+                formatarPercentual(totalPercentual),
+              ]]
+            : [[totalLabel ?? 'Total', formatCurrency(totalRealizado)]]
+          : undefined;
+
+      autoTable(doc, {
+        startY: posicaoAtual + 2,
+        head: cabecalho,
+        body: corpo,
+        foot: rodape,
+        theme: 'grid',
+        styles: { fontSize: 8, cellPadding: 2, halign: 'right' },
+        headStyles: {
+          fillColor: tabelaAccentPdfColors[accent] ?? tabelaAccentPdfColors.azul,
+          textColor: 255,
+          fontStyle: 'bold',
+        },
+        bodyStyles: { halign: 'right' },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        columnStyles: { 0: { halign: 'left' } },
+        margin: { left: margemHorizontal, right: margemHorizontal },
+        footStyles: { fontStyle: 'bold', fillColor: [255, 255, 255], textColor: [33, 37, 41] },
+      });
+
+      posicaoAtual = (doc as any).lastAutoTable.finalY;
+    };
+
+    adicionarTabela('Gastos por Área', relatorio.gastos, {
+      accent: 'amarelo',
+      totalLabel: 'Total de Gastos',
+    });
+
+    adicionarTabela('Receitas por Categoria', relatorio.receitas, {
+      accent: 'verde',
+      totalLabel: 'Total de Receitas',
+    });
+
+    adicionarTabela('Resultado de Saldo de Caixa do Dia', linhasResultadoCaixa, {
+      accent: 'laranja',
+      showTotals: false,
+    });
+
+    adicionarTabela('Resumo Geral', linhasResumoGeral, {
+      accent: 'azul',
+      layout: 'realizado',
+      showTotals: false,
+    });
+
+    adicionarTabela('Saldos Bancários', relatorio.bancos, {
+      accent: 'cinza',
+      layout: 'realizado',
+      totalLabel: 'Total em Bancos',
+      showTotals: true,
+    });
+
+    return doc;
+  }, [relatorio, linhasResultadoCaixa, linhasResumoGeral]);
+
+  const handleExportPdf = useCallback(() => {
+    if (!relatorio) {
+      alert('Nenhum relatório disponível para exportar.');
+      return;
     }
-    const nome = usuario.usr_nome?.trim();
-    if (nome && nome.length > 0) {
-      return nome.toUpperCase();
+
+    const doc = gerarDocumentoPdf();
+    if (!doc) {
+      alert('Não foi possível gerar o PDF. Tente novamente.');
+      return;
     }
-    if (usuario.usr_email) {
-      const prefixo = usuario.usr_email.split('@')[0];
-      if (prefixo) {
-        return prefixo.toUpperCase();
+
+    const nomeArquivo = `Saldo_Diario_${relatorio.data.replace(/-/g, '')}.pdf`;
+    doc.save(nomeArquivo);
+  }, [gerarDocumentoPdf, relatorio]);
+
+  const handleAbrirModalEmail = () => {
+    setFeedbackEmail(null);
+    if (!emailDestino && usuario?.usr_email) {
+      setEmailDestino(usuario.usr_email);
+    }
+    setEmailModalAberto(true);
+  };
+
+  const handleEnviarEmail = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!relatorio) {
+      setFeedbackEmail('Nenhum relatório disponível para envio.');
+      return;
+    }
+    if (!emailDestino.trim()) {
+      setFeedbackEmail('Informe um destinatário para continuar.');
+      return;
+    }
+
+    try {
+      setEnviandoEmail(true);
+      setFeedbackEmail(null);
+
+      const doc = gerarDocumentoPdf();
+      if (!doc) {
+        throw new Error('Não foi possível gerar o documento.');
       }
+
+      const nomeArquivo = `Saldo_Diario_${relatorio.data.replace(/-/g, '')}.pdf`;
+      const blob = doc.output('blob');
+      const arquivo = new File([blob], nomeArquivo, { type: 'application/pdf' });
+
+      const nav = navigator as Navigator & {
+        canShare?: (data: { files?: File[] }) => boolean;
+        share?: (data: { files?: File[]; title?: string; text?: string }) => Promise<void>;
+      };
+
+      if (nav.canShare && nav.share && nav.canShare({ files: [arquivo] })) {
+        await nav.share({
+          files: [arquivo],
+          title: 'Saldo Diário',
+          text: emailMensagem || 'Segue relatório de saldo diário.',
+        });
+        setEmailModalAberto(false);
+        return;
+      }
+
+      doc.save(nomeArquivo);
+
+      const assunto = encodeURIComponent('Relatório - Saldo Diário');
+      const corpo = encodeURIComponent(
+        `${emailMensagem || 'Segue relatório de saldo diário.'}\n\nO arquivo foi baixado automaticamente e pode ser anexado ao e-mail.`,
+      );
+      window.location.href = `mailto:${encodeURIComponent(emailDestino)}?subject=${assunto}&body=${corpo}`;
+
+      setEmailModalAberto(false);
+    } catch (error) {
+      console.error('Erro ao preparar envio por e-mail:', error);
+      setFeedbackEmail('Não foi possível preparar o envio. Tente novamente em instantes.');
+    } finally {
+      setEnviandoEmail(false);
     }
-    return 'EMPRESA';
-  }, [usuario]);
+  };
 
   if (carregandoUsuario) {
     return (
       <>
-        <Header title="Relatório - Saldo Diário" />
+        <Header title="Saldo Diário" />
         <div className="page-content flex h-80 items-center justify-center">
           <Loading text="Carregando informações do relatório..." />
         </div>
@@ -807,16 +849,23 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
   return (
     <>
       <Header
-        title="Relatório - Saldo Diário"
+        title="Saldo Diário"
         subtitle={`Data selecionada: ${formatarDataPt(dataReferencia)}`}
         actions={
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <input
+            <Input
               type="date"
               value={dataReferencia}
               onChange={(event) => setDataReferencia(event.target.value)}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              max={toISODate(new Date())}
             />
+            <Button
+              variant="secondary"
+              onClick={handleAbrirModalEmail}
+              disabled={!relatorio || carregandoDados}
+            >
+              Enviar por e-mail
+            </Button>
             <Button variant="primary" onClick={handleExportPdf} disabled={!relatorio || carregandoDados}>
               Exportar PDF
             </Button>
@@ -838,17 +887,11 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
         )}
 
         {relatorio && !carregandoDados && (
-          <div ref={reportRef} className="report-wrapper">
+          <div className="report-wrapper">
             <div className="report-header">
               <div>
-                <p className="report-header__title">
-                  Saldo Diário - {nomeEmpresa}
-                </p>
+                <p className="report-header__title">Saldo Diário</p>
                 <p className="report-header__subtitle">Data de referência: {formatarDataPt(relatorio.data)}</p>
-              </div>
-              <div className="report-header__meta">
-                <span>Emitido em</span>
-                <strong>{dataEmissao}</strong>
               </div>
             </div>
 
@@ -871,10 +914,14 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
             <div className="report-grid report-grid--two">
               {renderTabelaComparativa('Resumo Geral', linhasResumoGeral, {
                 accent: 'azul',
+                layout: 'realizado',
+                showTotals: false,
               })}
               {renderTabelaComparativa('Saldos Bancários', relatorio.bancos, {
                 accent: 'cinza',
+                layout: 'realizado',
                 totalLabel: 'Total em Bancos',
+                showTotals: true,
               })}
             </div>
           </div>
@@ -888,6 +935,61 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
           </Card>
         )}
       </div>
+
+      <Modal
+        isOpen={emailModalAberto}
+        onClose={() => {
+          if (!enviandoEmail) {
+            setEmailModalAberto(false);
+          }
+        }}
+        title="Enviar relatório por e-mail"
+        size="lg"
+        footer={
+          <div className="flex justify-end gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setEmailModalAberto(false)}
+              disabled={enviandoEmail}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              form="email-share-form"
+              variant="primary"
+              loading={enviandoEmail}
+              disabled={enviandoEmail}
+            >
+              Preparar envio
+            </Button>
+          </div>
+        }
+      >
+        <form id="email-share-form" onSubmit={handleEnviarEmail} className="space-y-4">
+          <Input
+            label="Destinatário"
+            type="email"
+            value={emailDestino}
+            onChange={(event) => setEmailDestino(event.target.value)}
+            placeholder="usuario@empresa.com.br"
+            required
+          />
+          <Textarea
+            label="Mensagem"
+            value={emailMensagem}
+            onChange={(event) => setEmailMensagem(event.target.value)}
+            placeholder="Mensagem opcional para acompanhar o relatório."
+            rows={4}
+          />
+          <p className="text-xs text-gray-500">
+            O relatório será gerado em PDF. Se o navegador não suportar compartilhamento direto, o arquivo será baixado
+            automaticamente para anexar ao e-mail.
+          </p>
+          {feedbackEmail && <p className="text-sm text-error-600">{feedbackEmail}</p>}
+        </form>
+      </Modal>
     </>
   );
 };

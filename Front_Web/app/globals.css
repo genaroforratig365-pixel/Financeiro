@@ -102,15 +102,20 @@ select {
   border-right: 1px solid var(--color-gray-200);
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow: hidden;
   box-shadow: var(--shadow-sm);
 }
 
-.sidebar::-webkit-scrollbar {
+.sidebar__scroll {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.sidebar__scroll::-webkit-scrollbar {
   width: 6px;
 }
 
-.sidebar::-webkit-scrollbar-thumb {
+.sidebar__scroll::-webkit-scrollbar-thumb {
   background: var(--color-gray-200);
   border-radius: 9999px;
 }
@@ -167,16 +172,23 @@ select {
 .report-wrapper {
   background: var(--color-white);
   border: 1px solid var(--color-gray-200);
-  border-radius: 12px;
-  padding: 1.75rem;
-  margin: 0 auto;
-  max-width: 960px;
+  border-radius: 16px;
+  padding: 2rem;
+  margin: 0;
+  width: 100%;
+  max-width: none;
   box-shadow: var(--shadow-lg);
-  font-size: 0.75rem;
-  line-height: 1.45;
+  font-size: 0.8rem;
+  line-height: 1.5;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1.5rem;
+}
+
+@media (min-width: 1280px) {
+  .report-wrapper {
+    padding: 2.5rem;
+  }
 }
 
 .report-header {
@@ -279,6 +291,8 @@ select {
 
 .report-section__table tfoot td {
   font-weight: 700;
+  background: transparent;
+  color: inherit;
 }
 
 .report-section__empty-cell {
@@ -307,10 +321,6 @@ select {
   color: #1f497d;
 }
 
-.report-section--azul .report-section__table tfoot {
-  background: #eef3fb;
-  color: #1f497d;
-}
 
 .report-section--verde .report-section__header {
   background: #1b5e20;
@@ -321,10 +331,6 @@ select {
   color: #1b5e20;
 }
 
-.report-section--verde .report-section__table tfoot {
-  background: #ebf7ef;
-  color: #1b5e20;
-}
 
 .report-section--amarelo .report-section__header {
   background: #b7791f;
@@ -335,10 +341,6 @@ select {
   color: #92400e;
 }
 
-.report-section--amarelo .report-section__table tfoot {
-  background: #fef3c7;
-  color: #92400e;
-}
 
 .report-section--laranja .report-section__header {
   background: #9c4221;
@@ -349,10 +351,6 @@ select {
   color: #9c4221;
 }
 
-.report-section--laranja .report-section__table tfoot {
-  background: #fce9dc;
-  color: #9c4221;
-}
 
 .report-section--cinza .report-section__header {
   background: #4b5563;
@@ -363,10 +361,6 @@ select {
   color: var(--color-gray-900);
 }
 
-.report-section--cinza .report-section__table tfoot {
-  background: #f3f4f6;
-  color: var(--color-gray-900);
-}
 
 @media print {
   .report-wrapper {
