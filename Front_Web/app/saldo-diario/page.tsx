@@ -4,7 +4,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Header } from '@/components/layout';
-import { Button, Card, Input, Loading } from '@/components/ui';
+import { Button, Card, Input, Loading, ConfirmModal } from '@/components/ui';
 import {
   getOrCreateUser,
   getSupabaseClient,
@@ -312,6 +312,19 @@ const SaldoDiarioPage: React.FC = () => {
   const [emEdicaoReceita, setEmEdicaoReceita] = useState<Set<number>>(new Set());
   const [emEdicaoPagamentoBanco, setEmEdicaoPagamentoBanco] = useState<Set<number>>(new Set());
   const [emEdicaoSaldoBanco, setEmEdicaoSaldoBanco] = useState<Set<number>>(new Set());
+
+  // Controle de quais registros estão selecionados para exclusão em lote
+  const [itensSelecionadosArea, setItensSelecionadosArea] = useState<Set<number>>(new Set());
+  const [itensSelecionadosReceita, setItensSelecionadosReceita] = useState<Set<number>>(new Set());
+  const [itensSelecionadosBanco, setItensSelecionadosBanco] = useState<Set<number>>(new Set());
+  const [itensSelecionadosSaldo, setItensSelecionadosSaldo] = useState<Set<number>>(new Set());
+
+  // Controle do modal de confirmação de exclusão em lote
+  const [modalConfirmacao, setModalConfirmacao] = useState<{
+    aberto: boolean;
+    processo: Processo | null;
+    quantidade: number;
+  }>({ aberto: false, processo: null, quantidade: 0 });
 
   // Áreas ordenadas de acordo com a sequência definida
   const areaOptionsOrdenadas = useMemo(() => {
@@ -1402,6 +1415,231 @@ const SaldoDiarioPage: React.FC = () => {
     }
   };
 
+  // Funções de exclusão em lote
+  const abrirConfirmacaoExclusaoLote = (processo: Processo) => {
+    let quantidade = 0;
+    switch (processo) {
+      case 'area':
+        quantidade = itensSelecionadosArea.size;
+        break;
+      case 'receita':
+        quantidade = itensSelecionadosReceita.size;
+        break;
+      case 'banco':
+        quantidade = itensSelecionadosBanco.size;
+        break;
+      case 'saldo':
+        quantidade = itensSelecionadosSaldo.size;
+        break;
+    }
+
+    if (quantidade === 0) return;
+
+    setModalConfirmacao({ aberto: true, processo, quantidade });
+  };
+
+  const confirmarExclusaoLote = async () => {
+    const { processo } = modalConfirmacao;
+    setModalConfirmacao({ aberto: false, processo: null, quantidade: 0 });
+
+    if (!processo) return;
+
+    switch (processo) {
+      case 'area':
+        await handleExcluirLotePagamentosArea();
+        break;
+      case 'receita':
+        await handleExcluirLoteReceitas();
+        break;
+      case 'banco':
+        await handleExcluirLotePagamentosBanco();
+        break;
+      case 'saldo':
+        await handleExcluirLoteSaldosBanco();
+        break;
+    }
+  };
+
+  const handleExcluirLotePagamentosArea = async () => {
+    if (!usuario || itensSelecionadosArea.size === 0) return;
+    if (!edicaoLiberada) {
+      atualizarMensagem('area', {
+        tipo: 'erro',
+        texto: `As exclusões só podem ser realizadas para o último dia útil (${formatarData(ultimoDiaUtil)}).`,
+      });
+      return;
+    }
+
+    try {
+      setProcessando((prev) => ({ ...prev, area: true }));
+      atualizarMensagem('area', null);
+
+      const supabase = getSupabaseClient();
+      const ids = Array.from(itensSelecionadosArea);
+
+      const { error } = await supabase
+        .from('pag_pagamentos_area')
+        .delete()
+        .in('pag_id', ids);
+
+      if (error) throw error;
+
+      atualizarMensagem('area', {
+        tipo: 'sucesso',
+        texto: `${ids.length} pagamento(s) por área removido(s) com sucesso.`,
+      });
+
+      setItensSelecionadosArea(new Set());
+      await carregarMovimentacoes(dataReferencia);
+    } catch (error) {
+      console.error('Erro ao excluir pagamentos por área:', error);
+      atualizarMensagem('area', {
+        tipo: 'erro',
+        texto: traduzirErroSupabase(
+          error,
+          'Não foi possível remover os pagamentos selecionados. Tente novamente.',
+        ),
+      });
+    } finally {
+      setProcessando((prev) => ({ ...prev, area: false }));
+    }
+  };
+
+  const handleExcluirLoteReceitas = async () => {
+    if (!usuario || itensSelecionadosReceita.size === 0) return;
+    if (!edicaoLiberada) {
+      atualizarMensagem('receita', {
+        tipo: 'erro',
+        texto: `As exclusões só podem ser realizadas para o último dia útil (${formatarData(ultimoDiaUtil)}).`,
+      });
+      return;
+    }
+
+    try {
+      setProcessando((prev) => ({ ...prev, receita: true }));
+      atualizarMensagem('receita', null);
+
+      const supabase = getSupabaseClient();
+      const ids = Array.from(itensSelecionadosReceita);
+
+      const { error } = await supabase
+        .from('rec_receitas')
+        .delete()
+        .in('rec_id', ids);
+
+      if (error) throw error;
+
+      atualizarMensagem('receita', {
+        tipo: 'sucesso',
+        texto: `${ids.length} receita(s) removida(s) com sucesso.`,
+      });
+
+      setItensSelecionadosReceita(new Set());
+      await carregarMovimentacoes(dataReferencia);
+    } catch (error) {
+      console.error('Erro ao excluir receitas:', error);
+      atualizarMensagem('receita', {
+        tipo: 'erro',
+        texto: traduzirErroSupabase(
+          error,
+          'Não foi possível remover as receitas selecionadas. Tente novamente.',
+        ),
+      });
+    } finally {
+      setProcessando((prev) => ({ ...prev, receita: false }));
+    }
+  };
+
+  const handleExcluirLotePagamentosBanco = async () => {
+    if (!usuario || itensSelecionadosBanco.size === 0) return;
+    if (!edicaoLiberada) {
+      atualizarMensagem('banco', {
+        tipo: 'erro',
+        texto: `As exclusões só podem ser realizadas para o último dia útil (${formatarData(ultimoDiaUtil)}).`,
+      });
+      return;
+    }
+
+    try {
+      setProcessando((prev) => ({ ...prev, banco: true }));
+      atualizarMensagem('banco', null);
+
+      const supabase = getSupabaseClient();
+      const ids = Array.from(itensSelecionadosBanco);
+
+      const { error } = await supabase
+        .from('pbk_pagamentos_banco')
+        .delete()
+        .in('pbk_id', ids);
+
+      if (error) throw error;
+
+      atualizarMensagem('banco', {
+        tipo: 'sucesso',
+        texto: `${ids.length} pagamento(s) por banco removido(s) com sucesso.`,
+      });
+
+      setItensSelecionadosBanco(new Set());
+      await carregarMovimentacoes(dataReferencia);
+    } catch (error) {
+      console.error('Erro ao excluir pagamentos por banco:', error);
+      atualizarMensagem('banco', {
+        tipo: 'erro',
+        texto: traduzirErroSupabase(
+          error,
+          'Não foi possível remover os pagamentos selecionados. Tente novamente.',
+        ),
+      });
+    } finally {
+      setProcessando((prev) => ({ ...prev, banco: false }));
+    }
+  };
+
+  const handleExcluirLoteSaldosBanco = async () => {
+    if (!usuario || itensSelecionadosSaldo.size === 0) return;
+    if (!edicaoLiberada) {
+      atualizarMensagem('saldo', {
+        tipo: 'erro',
+        texto: `As exclusões só podem ser realizadas para o último dia útil (${formatarData(ultimoDiaUtil)}).`,
+      });
+      return;
+    }
+
+    try {
+      setProcessando((prev) => ({ ...prev, saldo: true }));
+      atualizarMensagem('saldo', null);
+
+      const supabase = getSupabaseClient();
+      const ids = Array.from(itensSelecionadosSaldo);
+
+      const { error } = await supabase
+        .from('sdb_saldo_banco')
+        .delete()
+        .in('sdb_id', ids);
+
+      if (error) throw error;
+
+      atualizarMensagem('saldo', {
+        tipo: 'sucesso',
+        texto: `${ids.length} saldo(s) bancário(s) removido(s) com sucesso.`,
+      });
+
+      setItensSelecionadosSaldo(new Set());
+      await carregarMovimentacoes(dataReferencia);
+    } catch (error) {
+      console.error('Erro ao excluir saldos bancários:', error);
+      atualizarMensagem('saldo', {
+        tipo: 'erro',
+        texto: traduzirErroSupabase(
+          error,
+          'Não foi possível remover os saldos selecionados. Tente novamente.',
+        ),
+      });
+    } finally {
+      setProcessando((prev) => ({ ...prev, saldo: false }));
+    }
+  };
+
   const totalPagamentosArea = useMemo(
     () => pagamentosArea.reduce((sum, p) => sum + Number(p.valor), 0),
     [pagamentosArea]
@@ -1635,10 +1873,39 @@ const SaldoDiarioPage: React.FC = () => {
                   </div>
                 </div>
 
+                {pagamentosArea.length > 0 && (
+                  <div className="mb-3 flex justify-end">
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      onClick={() => abrirConfirmacaoExclusaoLote('area')}
+                      disabled={!edicaoLiberada || itensSelecionadosArea.size === 0 || processando.area}
+                    >
+                      Excluir Selecionados ({itensSelecionadosArea.size})
+                    </Button>
+                  </div>
+                )}
+
                 <div className="overflow-x-auto rounded-lg border border-gray-200">
                   <table className="min-w-full divide-y divide-gray-200 text-sm">
                     <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                       <tr>
+                        <th className="px-4 py-3 text-center font-semibold w-12">
+                          <input
+                            type="checkbox"
+                            checked={pagamentosArea.length > 0 && itensSelecionadosArea.size === pagamentosArea.length}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setItensSelecionadosArea(new Set(pagamentosArea.map(p => p.id)));
+                              } else {
+                                setItensSelecionadosArea(new Set());
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            disabled={!edicaoLiberada || pagamentosArea.length === 0}
+                          />
+                        </th>
                         <th className="px-4 py-3 text-left font-semibold">Área</th>
                         <th className="px-4 py-3 text-left font-semibold w-52">Valor / Expressão</th>
                         <th className="px-4 py-3 text-left font-semibold min-w-[280px]">Registrado</th>
@@ -1647,7 +1914,7 @@ const SaldoDiarioPage: React.FC = () => {
                     <tbody className="divide-y divide-gray-100 bg-white/80">
                       {areaOptions.length === 0 ? (
                         <tr>
-                          <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-500">
+                          <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">
                             Cadastre áreas no menu Cadastros &gt; Áreas para liberar esta seção.
                           </td>
                         </tr>
@@ -1656,6 +1923,25 @@ const SaldoDiarioPage: React.FC = () => {
                           const registro = pagamentosAreaPorAreaId.get(area.id);
                           return (
                             <tr key={area.id}>
+                              <td className="px-4 py-3 text-center">
+                                {registro && (
+                                  <input
+                                    type="checkbox"
+                                    checked={itensSelecionadosArea.has(registro.id)}
+                                    onChange={(e) => {
+                                      const novoSet = new Set(itensSelecionadosArea);
+                                      if (e.target.checked) {
+                                        novoSet.add(registro.id);
+                                      } else {
+                                        novoSet.delete(registro.id);
+                                      }
+                                      setItensSelecionadosArea(novoSet);
+                                    }}
+                                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                    disabled={!edicaoLiberada || emEdicaoArea.has(registro.id)}
+                                  />
+                                )}
+                              </td>
                               <td className="px-4 py-3 font-medium text-gray-700">{area.nome}</td>
                               <td className="px-4 py-3 align-top">
                                 <Input
@@ -1735,33 +2021,21 @@ const SaldoDiarioPage: React.FC = () => {
                                         <span className="font-semibold text-primary-700">
                                           {formatCurrency(registro.valor)}
                                         </span>
-                                        <div className="flex flex-row gap-2">
-                                          <Button
-                                            type="button"
-                                            variant="secondary"
-                                            size="sm"
-                                            onClick={() => {
-                                              setEmEdicaoArea(prev => new Set(prev).add(registro.id));
-                                              setPagamentosAreaEdicao((prev) => ({
-                                                ...prev,
-                                                [registro.id]: formatarValorParaInput(registro.valor),
-                                              }));
-                                            }}
-                                            disabled={!edicaoLiberada}
-                                          >
-                                            Editar
-                                          </Button>
-                                          <Button
-                                            type="button"
-                                            variant="danger"
-                                            size="sm"
-                                            onClick={() => handleExcluirPagamentoArea(registro)}
-                                            disabled={!edicaoLiberada}
-                                            loading={registroExcluindo.area === registro.id}
-                                          >
-                                            Excluir
-                                          </Button>
-                                        </div>
+                                        <Button
+                                          type="button"
+                                          variant="secondary"
+                                          size="sm"
+                                          onClick={() => {
+                                            setEmEdicaoArea(prev => new Set(prev).add(registro.id));
+                                            setPagamentosAreaEdicao((prev) => ({
+                                              ...prev,
+                                              [registro.id]: formatarValorParaInput(registro.valor),
+                                            }));
+                                          }}
+                                          disabled={!edicaoLiberada}
+                                        >
+                                          Editar
+                                        </Button>
                                       </div>
                                     )}
                                   </div>
@@ -1827,10 +2101,39 @@ const SaldoDiarioPage: React.FC = () => {
                   </div>
                 </div>
 
+                {pagamentosBanco.length > 0 && (
+                  <div className="mb-3 flex justify-end">
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      onClick={() => abrirConfirmacaoExclusaoLote('banco')}
+                      disabled={!edicaoLiberada || itensSelecionadosBanco.size === 0 || processando.banco}
+                    >
+                      Excluir Selecionados ({itensSelecionadosBanco.size})
+                    </Button>
+                  </div>
+                )}
+
                 <div className="overflow-x-auto rounded-lg border border-gray-200">
                   <table className="min-w-full divide-y divide-gray-200 text-sm">
                     <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                       <tr>
+                        <th className="px-4 py-3 text-center font-semibold w-12">
+                          <input
+                            type="checkbox"
+                            checked={pagamentosBanco.length > 0 && itensSelecionadosBanco.size === pagamentosBanco.length}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setItensSelecionadosBanco(new Set(pagamentosBanco.map(p => p.id)));
+                              } else {
+                                setItensSelecionadosBanco(new Set());
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            disabled={!edicaoLiberada || pagamentosBanco.length === 0}
+                          />
+                        </th>
                         <th className="px-4 py-3 text-left font-semibold">Banco</th>
                         <th className="px-4 py-3 text-left font-semibold w-52">Valor / Expressão</th>
                         <th className="px-4 py-3 text-left font-semibold min-w-[280px]">Registrado</th>
@@ -1839,7 +2142,7 @@ const SaldoDiarioPage: React.FC = () => {
                     <tbody className="divide-y divide-gray-100 bg-white/80">
                       {bancoOptions.length === 0 ? (
                         <tr>
-                          <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-500">
+                          <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">
                             Cadastre bancos no menu Cadastros &gt; Bancos para liberar esta seção.
                           </td>
                         </tr>
@@ -1848,6 +2151,25 @@ const SaldoDiarioPage: React.FC = () => {
                           const registro = pagamentosBancoPorBancoId.get(banco.id);
                           return (
                             <tr key={banco.id}>
+                              <td className="px-4 py-3 text-center">
+                                {registro && (
+                                  <input
+                                    type="checkbox"
+                                    checked={itensSelecionadosBanco.has(registro.id)}
+                                    onChange={(e) => {
+                                      const novoSet = new Set(itensSelecionadosBanco);
+                                      if (e.target.checked) {
+                                        novoSet.add(registro.id);
+                                      } else {
+                                        novoSet.delete(registro.id);
+                                      }
+                                      setItensSelecionadosBanco(novoSet);
+                                    }}
+                                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                    disabled={!edicaoLiberada || emEdicaoPagamentoBanco.has(registro.id)}
+                                  />
+                                )}
+                              </td>
                               <td className="px-4 py-3 font-medium text-gray-700">{banco.nome}</td>
                               <td className="px-4 py-3 align-top">
                                 <Input
@@ -1927,33 +2249,21 @@ const SaldoDiarioPage: React.FC = () => {
                                         <span className="font-semibold text-error-700">
                                           {formatCurrency(registro.valor)}
                                         </span>
-                                        <div className="flex flex-row gap-2">
-                                          <Button
-                                            type="button"
-                                            variant="secondary"
-                                            size="sm"
-                                            onClick={() => {
-                                              setEmEdicaoPagamentoBanco(prev => new Set(prev).add(registro.id));
-                                              setPagamentosBancoEdicao((prev) => ({
-                                                ...prev,
-                                                [registro.id]: formatarValorParaInput(registro.valor),
-                                              }));
-                                            }}
-                                            disabled={!edicaoLiberada}
-                                          >
-                                            Editar
-                                          </Button>
-                                          <Button
-                                            type="button"
-                                            variant="danger"
-                                            size="sm"
-                                            onClick={() => handleExcluirPagamentoBanco(registro)}
-                                            disabled={!edicaoLiberada}
-                                            loading={registroExcluindo.banco === registro.id}
-                                          >
-                                            Excluir
-                                          </Button>
-                                        </div>
+                                        <Button
+                                          type="button"
+                                          variant="secondary"
+                                          size="sm"
+                                          onClick={() => {
+                                            setEmEdicaoPagamentoBanco(prev => new Set(prev).add(registro.id));
+                                            setPagamentosBancoEdicao((prev) => ({
+                                              ...prev,
+                                              [registro.id]: formatarValorParaInput(registro.valor),
+                                            }));
+                                          }}
+                                          disabled={!edicaoLiberada}
+                                        >
+                                          Editar
+                                        </Button>
                                       </div>
                                     )}
                                   </div>
@@ -2019,10 +2329,39 @@ const SaldoDiarioPage: React.FC = () => {
                   </div>
                 </div>
 
+                {receitas.length > 0 && (
+                  <div className="mb-3 flex justify-end">
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      onClick={() => abrirConfirmacaoExclusaoLote('receita')}
+                      disabled={!edicaoLiberada || itensSelecionadosReceita.size === 0 || processando.receita}
+                    >
+                      Excluir Selecionados ({itensSelecionadosReceita.size})
+                    </Button>
+                  </div>
+                )}
+
                 <div className="overflow-x-auto rounded-lg border border-gray-200">
                   <table className="min-w-full divide-y divide-gray-200 text-sm">
                     <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                       <tr>
+                        <th className="px-4 py-3 text-center font-semibold w-12">
+                          <input
+                            type="checkbox"
+                            checked={receitas.length > 0 && itensSelecionadosReceita.size === receitas.length}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setItensSelecionadosReceita(new Set(receitas.map(r => r.id)));
+                              } else {
+                                setItensSelecionadosReceita(new Set());
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            disabled={!edicaoLiberada || receitas.length === 0}
+                          />
+                        </th>
                         <th className="px-4 py-3 text-left font-semibold">Conta de receita</th>
                         <th className="px-4 py-3 text-left font-semibold w-52">Valor / Expressão</th>
                         <th className="px-4 py-3 text-left font-semibold min-w-[280px]">Registrado</th>
@@ -2031,7 +2370,7 @@ const SaldoDiarioPage: React.FC = () => {
                     <tbody className="divide-y divide-gray-100 bg-white/80">
                       {contaOptions.length === 0 ? (
                         <tr>
-                          <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-500">
+                          <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">
                             Cadastre contas em Cadastros &gt; Contas de Receita para liberar esta seção.
                           </td>
                         </tr>
@@ -2040,6 +2379,25 @@ const SaldoDiarioPage: React.FC = () => {
                           const registro = receitasPorContaId.get(conta.id);
                           return (
                             <tr key={conta.id}>
+                              <td className="px-4 py-3 text-center">
+                                {registro && (
+                                  <input
+                                    type="checkbox"
+                                    checked={itensSelecionadosReceita.has(registro.id)}
+                                    onChange={(e) => {
+                                      const novoSet = new Set(itensSelecionadosReceita);
+                                      if (e.target.checked) {
+                                        novoSet.add(registro.id);
+                                      } else {
+                                        novoSet.delete(registro.id);
+                                      }
+                                      setItensSelecionadosReceita(novoSet);
+                                    }}
+                                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                    disabled={!edicaoLiberada || emEdicaoReceita.has(registro.id)}
+                                  />
+                                )}
+                              </td>
                               <td className="px-4 py-3 font-medium text-gray-700">{conta.nome}</td>
                               <td className="px-4 py-3 align-top">
                                 <Input
@@ -2119,33 +2477,21 @@ const SaldoDiarioPage: React.FC = () => {
                                         <span className="font-semibold text-success-700">
                                           {formatCurrency(registro.valor)}
                                         </span>
-                                        <div className="flex flex-row gap-2">
-                                          <Button
-                                            type="button"
-                                            variant="secondary"
-                                            size="sm"
-                                            onClick={() => {
-                                              setEmEdicaoReceita(prev => new Set(prev).add(registro.id));
-                                              setReceitasEdicao((prev) => ({
-                                                ...prev,
-                                                [registro.id]: formatarValorParaInput(registro.valor),
-                                              }));
-                                            }}
-                                            disabled={!edicaoLiberada}
-                                          >
-                                            Editar
-                                          </Button>
-                                          <Button
-                                            type="button"
-                                            variant="danger"
-                                            size="sm"
-                                            onClick={() => handleExcluirReceita(registro)}
-                                            disabled={!edicaoLiberada}
-                                            loading={registroExcluindo.receita === registro.id}
-                                          >
-                                            Excluir
-                                          </Button>
-                                        </div>
+                                        <Button
+                                          type="button"
+                                          variant="secondary"
+                                          size="sm"
+                                          onClick={() => {
+                                            setEmEdicaoReceita(prev => new Set(prev).add(registro.id));
+                                            setReceitasEdicao((prev) => ({
+                                              ...prev,
+                                              [registro.id]: formatarValorParaInput(registro.valor),
+                                            }));
+                                          }}
+                                          disabled={!edicaoLiberada}
+                                        >
+                                          Editar
+                                        </Button>
                                       </div>
                                     )}
                                   </div>
@@ -2212,10 +2558,39 @@ const SaldoDiarioPage: React.FC = () => {
                   </div>
                 </div>
 
+                {saldosBanco.length > 0 && (
+                  <div className="mb-3 flex justify-end">
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      onClick={() => abrirConfirmacaoExclusaoLote('saldo')}
+                      disabled={!edicaoLiberada || itensSelecionadosSaldo.size === 0 || processando.saldo}
+                    >
+                      Excluir Selecionados ({itensSelecionadosSaldo.size})
+                    </Button>
+                  </div>
+                )}
+
                 <div className="overflow-x-auto rounded-lg border border-gray-200">
                   <table className="min-w-full divide-y divide-gray-200 text-sm">
                     <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                       <tr>
+                        <th className="px-4 py-3 text-center font-semibold w-12">
+                          <input
+                            type="checkbox"
+                            checked={saldosBanco.length > 0 && itensSelecionadosSaldo.size === saldosBanco.length}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setItensSelecionadosSaldo(new Set(saldosBanco.map(s => s.id)));
+                              } else {
+                                setItensSelecionadosSaldo(new Set());
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            disabled={!edicaoLiberada || saldosBanco.length === 0}
+                          />
+                        </th>
                         <th className="px-4 py-3 text-left font-semibold">Banco</th>
                         <th className="px-4 py-3 text-left font-semibold w-52">Saldo / Expressão</th>
                         <th className="px-4 py-3 text-left font-semibold min-w-[280px]">Registrado</th>
@@ -2224,7 +2599,7 @@ const SaldoDiarioPage: React.FC = () => {
                     <tbody className="divide-y divide-gray-100 bg-white/80">
                       {bancoOptions.length === 0 ? (
                         <tr>
-                          <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-500">
+                          <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">
                             Cadastre bancos no menu Cadastros &gt; Bancos para liberar esta seção.
                           </td>
                         </tr>
@@ -2233,6 +2608,25 @@ const SaldoDiarioPage: React.FC = () => {
                           const registro = saldosBancoPorBancoId.get(banco.id);
                           return (
                             <tr key={banco.id}>
+                              <td className="px-4 py-3 text-center">
+                                {registro && (
+                                  <input
+                                    type="checkbox"
+                                    checked={itensSelecionadosSaldo.has(registro.id)}
+                                    onChange={(e) => {
+                                      const novoSet = new Set(itensSelecionadosSaldo);
+                                      if (e.target.checked) {
+                                        novoSet.add(registro.id);
+                                      } else {
+                                        novoSet.delete(registro.id);
+                                      }
+                                      setItensSelecionadosSaldo(novoSet);
+                                    }}
+                                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                    disabled={!edicaoLiberada || emEdicaoSaldoBanco.has(registro.id)}
+                                  />
+                                )}
+                              </td>
                               <td className="px-4 py-3 font-medium text-gray-700">{banco.nome}</td>
                               <td className="px-4 py-3 align-top">
                                 <Input
@@ -2316,33 +2710,21 @@ const SaldoDiarioPage: React.FC = () => {
                                         >
                                           {formatCurrency(registro.valor)}
                                         </span>
-                                        <div className="flex flex-row gap-2">
-                                          <Button
-                                            type="button"
-                                            variant="secondary"
-                                            size="sm"
-                                            onClick={() => {
-                                              setEmEdicaoSaldoBanco(prev => new Set(prev).add(registro.id));
-                                              setSaldosBancoEdicao((prev) => ({
-                                                ...prev,
-                                                [registro.id]: formatarValorParaInput(registro.valor),
-                                              }));
-                                            }}
-                                            disabled={!edicaoLiberada}
-                                          >
-                                            Editar
-                                          </Button>
-                                          <Button
-                                            type="button"
-                                            variant="danger"
-                                            size="sm"
-                                            onClick={() => handleExcluirSaldoBanco(registro)}
-                                            disabled={!edicaoLiberada}
-                                            loading={registroExcluindo.saldo === registro.id}
-                                          >
-                                            Excluir
-                                          </Button>
-                                        </div>
+                                        <Button
+                                          type="button"
+                                          variant="secondary"
+                                          size="sm"
+                                          onClick={() => {
+                                            setEmEdicaoSaldoBanco(prev => new Set(prev).add(registro.id));
+                                            setSaldosBancoEdicao((prev) => ({
+                                              ...prev,
+                                              [registro.id]: formatarValorParaInput(registro.valor),
+                                            }));
+                                          }}
+                                          disabled={!edicaoLiberada}
+                                        >
+                                          Editar
+                                        </Button>
                                       </div>
                                     )}
                                   </div>
@@ -2377,6 +2759,17 @@ const SaldoDiarioPage: React.FC = () => {
           </Card>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={modalConfirmacao.aberto}
+        onClose={() => setModalConfirmacao({ aberto: false, processo: null, quantidade: 0 })}
+        onConfirm={confirmarExclusaoLote}
+        title="Confirmar exclusão em lote"
+        message={`Tem certeza que deseja excluir ${modalConfirmacao.quantidade} registro(s) selecionado(s)? Esta ação não pode ser desfeita.`}
+        confirmText="Excluir"
+        cancelText="Cancelar"
+        variant="danger"
+      />
     </>
   );
 };
