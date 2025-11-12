@@ -609,13 +609,15 @@ const RelatorioCobrancaPage: React.FC = () => {
 
   const botoesAcoes = (
     <div className="flex flex-wrap items-center gap-3">
-      <Input
-        type="date"
-        label="Data"
-        value={dataFiltro}
-        onChange={(event) => setDataFiltro(event.target.value)}
-        className="w-40"
-      />
+      <div className="flex items-center gap-2">
+        <label className="text-sm font-medium text-gray-700">Data:</label>
+        <input
+          type="date"
+          value={dataFiltro}
+          onChange={(event) => setDataFiltro(event.target.value)}
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        />
+      </div>
       <Button
         type="button"
         variant="primary"

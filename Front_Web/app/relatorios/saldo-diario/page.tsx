@@ -779,18 +779,21 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
         body: corpo,
         foot: rodape,
         theme: 'grid',
-        styles: { fontSize: 6.5, cellPadding: 1, halign: 'right' },
+        styles: { fontSize: 8, cellPadding: 1.5, halign: 'right' },
         headStyles: {
           fillColor: tabelaAccentPdfColors[accent] ?? tabelaAccentPdfColors.azul,
           textColor: 255,
           fontStyle: 'bold',
           halign: 'center',
+          fontSize: 8,
         },
         bodyStyles: { halign: 'right' },
         alternateRowStyles: { fillColor: [248, 250, 252] },
-        columnStyles: { 0: { halign: 'left' } },
+        columnStyles: {
+          0: { halign: 'left', cellWidth: 45 }
+        },
         margin: { left: margemHorizontal, right: margemHorizontal },
-        footStyles: { fontStyle: 'bold', fillColor: [255, 255, 255], textColor: [33, 37, 41] },
+        footStyles: { fontStyle: 'bold', fillColor: [255, 255, 255], textColor: [33, 37, 41], fontSize: 8 },
       });
 
       posicaoAtual = (doc as any).lastAutoTable.finalY;
