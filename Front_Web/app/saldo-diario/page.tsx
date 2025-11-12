@@ -1439,24 +1439,20 @@ const SaldoDiarioPage: React.FC = () => {
   };
 
   const confirmarExclusaoLote = async () => {
-    const { processo } = modalConfirmacao;
     setModalConfirmacao({ aberto: false, processo: null, quantidade: 0 });
 
-    if (!processo) return;
-
-    switch (processo) {
-      case 'area':
-        await handleExcluirLotePagamentosArea();
-        break;
-      case 'receita':
-        await handleExcluirLoteReceitas();
-        break;
-      case 'banco':
-        await handleExcluirLotePagamentosBanco();
-        break;
-      case 'saldo':
-        await handleExcluirLoteSaldosBanco();
-        break;
+    // Executa as exclusões para todos os cards que têm itens selecionados
+    if (itensSelecionadosArea.size > 0) {
+      await handleExcluirLotePagamentosArea();
+    }
+    if (itensSelecionadosReceita.size > 0) {
+      await handleExcluirLoteReceitas();
+    }
+    if (itensSelecionadosBanco.size > 0) {
+      await handleExcluirLotePagamentosBanco();
+    }
+    if (itensSelecionadosSaldo.size > 0) {
+      await handleExcluirLoteSaldosBanco();
     }
   };
 
@@ -1793,11 +1789,23 @@ const SaldoDiarioPage: React.FC = () => {
               onChange={(event) => setDataReferencia(event.target.value)}
               min={ultimoDiaUtil}
               max={ultimoDiaUtil}
-              helperText="Os lançamentos ficam disponíveis apenas para o último dia útil."
             />
             <Button variant="secondary" onClick={handleAtualizar} loading={atualizando}>
               Atualizar
             </Button>
+            {(itensSelecionadosArea.size > 0 || itensSelecionadosReceita.size > 0 || itensSelecionadosBanco.size > 0 || itensSelecionadosSaldo.size > 0) && (
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => {
+                  const total = itensSelecionadosArea.size + itensSelecionadosReceita.size + itensSelecionadosBanco.size + itensSelecionadosSaldo.size;
+                  setModalConfirmacao({ aberto: true, processo: 'area', quantidade: total });
+                }}
+                disabled={!edicaoLiberada}
+              >
+                Excluir Selecionados ({itensSelecionadosArea.size + itensSelecionadosReceita.size + itensSelecionadosBanco.size + itensSelecionadosSaldo.size})
+              </Button>
+            )}
           </div>
         }
       />
@@ -1872,20 +1880,6 @@ const SaldoDiarioPage: React.FC = () => {
                     <strong>{formatCurrency(totalFormArea)}</strong>
                   </div>
                 </div>
-
-                {pagamentosArea.length > 0 && (
-                  <div className="mb-3 flex justify-end">
-                    <Button
-                      type="button"
-                      variant="danger"
-                      size="sm"
-                      onClick={() => abrirConfirmacaoExclusaoLote('area')}
-                      disabled={!edicaoLiberada || itensSelecionadosArea.size === 0 || processando.area}
-                    >
-                      Excluir Selecionados ({itensSelecionadosArea.size})
-                    </Button>
-                  </div>
-                )}
 
                 <div className="overflow-x-auto rounded-lg border border-gray-200">
                   <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -2101,20 +2095,6 @@ const SaldoDiarioPage: React.FC = () => {
                   </div>
                 </div>
 
-                {pagamentosBanco.length > 0 && (
-                  <div className="mb-3 flex justify-end">
-                    <Button
-                      type="button"
-                      variant="danger"
-                      size="sm"
-                      onClick={() => abrirConfirmacaoExclusaoLote('banco')}
-                      disabled={!edicaoLiberada || itensSelecionadosBanco.size === 0 || processando.banco}
-                    >
-                      Excluir Selecionados ({itensSelecionadosBanco.size})
-                    </Button>
-                  </div>
-                )}
-
                 <div className="overflow-x-auto rounded-lg border border-gray-200">
                   <table className="min-w-full divide-y divide-gray-200 text-sm">
                     <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
@@ -2328,20 +2308,6 @@ const SaldoDiarioPage: React.FC = () => {
                     <strong>{formatCurrency(totalFormReceita)}</strong>
                   </div>
                 </div>
-
-                {receitas.length > 0 && (
-                  <div className="mb-3 flex justify-end">
-                    <Button
-                      type="button"
-                      variant="danger"
-                      size="sm"
-                      onClick={() => abrirConfirmacaoExclusaoLote('receita')}
-                      disabled={!edicaoLiberada || itensSelecionadosReceita.size === 0 || processando.receita}
-                    >
-                      Excluir Selecionados ({itensSelecionadosReceita.size})
-                    </Button>
-                  </div>
-                )}
 
                 <div className="overflow-x-auto rounded-lg border border-gray-200">
                   <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -2557,20 +2523,6 @@ const SaldoDiarioPage: React.FC = () => {
                     <strong>{formatCurrency(totalFormSaldoBanco)}</strong>
                   </div>
                 </div>
-
-                {saldosBanco.length > 0 && (
-                  <div className="mb-3 flex justify-end">
-                    <Button
-                      type="button"
-                      variant="danger"
-                      size="sm"
-                      onClick={() => abrirConfirmacaoExclusaoLote('saldo')}
-                      disabled={!edicaoLiberada || itensSelecionadosSaldo.size === 0 || processando.saldo}
-                    >
-                      Excluir Selecionados ({itensSelecionadosSaldo.size})
-                    </Button>
-                  </div>
-                )}
 
                 <div className="overflow-x-auto rounded-lg border border-gray-200">
                   <table className="min-w-full divide-y divide-gray-200 text-sm">
