@@ -508,6 +508,80 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
     [],
   );
 
+  const linhasResultadoCaixa = useMemo(() => {
+    if (!relatorio) {
+      return [];
+    }
+    const { resumo } = relatorio;
+    return [
+      {
+        chave: 'receitas-dia',
+        titulo: 'Entradas do Dia (Receitas)',
+        previsto: resumo.totalReceitasPrevistas,
+        realizado: resumo.totalReceitasRealizadas,
+        desvio: arredondar(resumo.totalReceitasRealizadas - resumo.totalReceitasPrevistas),
+        percentual: calcularPercentual(resumo.totalReceitasPrevistas, resumo.totalReceitasRealizadas),
+      },
+      {
+        chave: 'despesas-dia',
+        titulo: 'Saídas do Dia (Despesas)',
+        previsto: resumo.totalDespesasPrevistas,
+        realizado: resumo.totalDespesasRealizadas,
+        desvio: arredondar(resumo.totalDespesasRealizadas - resumo.totalDespesasPrevistas),
+        percentual: calcularPercentual(resumo.totalDespesasPrevistas, resumo.totalDespesasRealizadas),
+      },
+      {
+        chave: 'resultado-dia',
+        titulo: 'Saldo Operacional do Dia',
+        previsto: resumo.resultadoPrevisto,
+        realizado: resumo.resultadoRealizado,
+        desvio: arredondar(resumo.resultadoRealizado - resumo.resultadoPrevisto),
+        percentual: calcularPercentual(resumo.resultadoPrevisto, resumo.resultadoRealizado),
+      },
+    ];
+  }, [relatorio]);
+
+  const linhasResumoGeral = useMemo(() => {
+    if (!relatorio) {
+      return [];
+    }
+    const { resumo } = relatorio;
+    return [
+      {
+        chave: 'saldo-anterior',
+        titulo: 'Saldo do Dia Anterior',
+        previsto: resumo.saldoInicialPrevisto,
+        realizado: resumo.saldoInicialRealizado,
+        desvio: arredondar(resumo.saldoInicialRealizado - resumo.saldoInicialPrevisto),
+        percentual: calcularPercentual(resumo.saldoInicialPrevisto, resumo.saldoInicialRealizado),
+      },
+      {
+        chave: 'resultado',
+        titulo: 'Resultado do Dia (Receitas - Despesas)',
+        previsto: resumo.resultadoPrevisto,
+        realizado: resumo.resultadoRealizado,
+        desvio: arredondar(resumo.resultadoRealizado - resumo.resultadoPrevisto),
+        percentual: calcularPercentual(resumo.resultadoPrevisto, resumo.resultadoRealizado),
+      },
+      {
+        chave: 'saldo-final',
+        titulo: 'Saldo Final do Dia',
+        previsto: resumo.saldoFinalPrevisto,
+        realizado: resumo.saldoFinalRealizado,
+        desvio: arredondar(resumo.saldoFinalRealizado - resumo.saldoFinalPrevisto),
+        percentual: calcularPercentual(resumo.saldoFinalPrevisto, resumo.saldoFinalRealizado),
+      },
+      {
+        chave: 'saldo-bancos',
+        titulo: 'Saldo em Bancos',
+        previsto: resumo.bancosPrevistos,
+        realizado: resumo.bancosRealizados,
+        desvio: arredondar(resumo.bancosRealizados - resumo.bancosPrevistos),
+        percentual: calcularPercentual(resumo.bancosPrevistos, resumo.bancosRealizados),
+      },
+    ];
+  }, [relatorio]);
+
   const gerarDocumentoPdf = useCallback(() => {
     if (!relatorio) {
       return null;
@@ -718,80 +792,6 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
       setEnviandoEmail(false);
     }
   };
-
-  const linhasResultadoCaixa = useMemo(() => {
-    if (!relatorio) {
-      return [];
-    }
-    const { resumo } = relatorio;
-    return [
-      {
-        chave: 'receitas-dia',
-        titulo: 'Entradas do Dia (Receitas)',
-        previsto: resumo.totalReceitasPrevistas,
-        realizado: resumo.totalReceitasRealizadas,
-        desvio: arredondar(resumo.totalReceitasRealizadas - resumo.totalReceitasPrevistas),
-        percentual: calcularPercentual(resumo.totalReceitasPrevistas, resumo.totalReceitasRealizadas),
-      },
-      {
-        chave: 'despesas-dia',
-        titulo: 'Saídas do Dia (Despesas)',
-        previsto: resumo.totalDespesasPrevistas,
-        realizado: resumo.totalDespesasRealizadas,
-        desvio: arredondar(resumo.totalDespesasRealizadas - resumo.totalDespesasPrevistas),
-        percentual: calcularPercentual(resumo.totalDespesasPrevistas, resumo.totalDespesasRealizadas),
-      },
-      {
-        chave: 'resultado-dia',
-        titulo: 'Saldo Operacional do Dia',
-        previsto: resumo.resultadoPrevisto,
-        realizado: resumo.resultadoRealizado,
-        desvio: arredondar(resumo.resultadoRealizado - resumo.resultadoPrevisto),
-        percentual: calcularPercentual(resumo.resultadoPrevisto, resumo.resultadoRealizado),
-      },
-    ];
-  }, [relatorio]);
-
-  const linhasResumoGeral = useMemo(() => {
-    if (!relatorio) {
-      return [];
-    }
-    const { resumo } = relatorio;
-    return [
-      {
-        chave: 'saldo-anterior',
-        titulo: 'Saldo do Dia Anterior',
-        previsto: resumo.saldoInicialPrevisto,
-        realizado: resumo.saldoInicialRealizado,
-        desvio: arredondar(resumo.saldoInicialRealizado - resumo.saldoInicialPrevisto),
-        percentual: calcularPercentual(resumo.saldoInicialPrevisto, resumo.saldoInicialRealizado),
-      },
-      {
-        chave: 'resultado',
-        titulo: 'Resultado do Dia (Receitas - Despesas)',
-        previsto: resumo.resultadoPrevisto,
-        realizado: resumo.resultadoRealizado,
-        desvio: arredondar(resumo.resultadoRealizado - resumo.resultadoPrevisto),
-        percentual: calcularPercentual(resumo.resultadoPrevisto, resumo.resultadoRealizado),
-      },
-      {
-        chave: 'saldo-final',
-        titulo: 'Saldo Final do Dia',
-        previsto: resumo.saldoFinalPrevisto,
-        realizado: resumo.saldoFinalRealizado,
-        desvio: arredondar(resumo.saldoFinalRealizado - resumo.saldoFinalPrevisto),
-        percentual: calcularPercentual(resumo.saldoFinalPrevisto, resumo.saldoFinalRealizado),
-      },
-      {
-        chave: 'saldo-bancos',
-        titulo: 'Saldo em Bancos',
-        previsto: resumo.bancosPrevistos,
-        realizado: resumo.bancosRealizados,
-        desvio: arredondar(resumo.bancosRealizados - resumo.bancosPrevistos),
-        percentual: calcularPercentual(resumo.bancosPrevistos, resumo.bancosRealizados),
-      },
-    ];
-  }, [relatorio]);
 
   if (carregandoUsuario) {
     return (

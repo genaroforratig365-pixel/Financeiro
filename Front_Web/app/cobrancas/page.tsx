@@ -600,7 +600,7 @@ export default function LancamentoCobrancaPage() {
     };
 
     carregarDados();
-  }, [dataReferencia]);
+  }, [dataReferencia, carregarLancamentosDia]);
 
   useEffect(() => {
     if (bancos.length > 0 && bancoSelecionadoId === null) {
