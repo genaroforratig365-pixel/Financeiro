@@ -133,10 +133,25 @@ export default function DashboardPage() {
     <>
       <Header
         title="Dashboard"
-        subtitle="Bem-vindo ao painel central. Escolha um módulo para começar."
+        subtitle={`Bem-vindo, ${session.displayName}`}
       />
 
-      <div className="page-content space-y-6">
+      <div
+        className="page-content space-y-6 relative"
+        style={{
+          backgroundImage: `url('https://static.wixstatic.com/media/ce3165_c01db19c0ef64e2abb8c894c7ecc6f95~mv2.png/v1/fill/w_322,h_138,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/logomarca-Germani-2023-Branca-borda-dour.png')`,
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundSize: '400px',
+          backgroundAttachment: 'fixed',
+        }}
+      >
+        <div
+          className="absolute inset-0 bg-white/90 pointer-events-none"
+          style={{ zIndex: 0 }}
+        ></div>
+
+        <div className="relative" style={{ zIndex: 1 }}>
         <Card>
           <div className="space-y-6">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
@@ -236,6 +251,7 @@ export default function DashboardPage() {
             </Card>
           </div>
         )}
+        </div>
       </div>
     </>
   );

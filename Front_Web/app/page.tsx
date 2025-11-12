@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { Button, Card, Input, Loading } from '@/components/ui';
+import { Button, Loading } from '@/components/ui';
 import { getOrCreateUser, getSupabaseClient } from '@/lib/supabaseClient';
 import {
   clearUserEmail,
@@ -181,32 +181,32 @@ const HomePage: React.FC = () => {
   const identificadorAtual = getStoredUserId();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       <div className="flex min-h-screen flex-col">
-        <header className="flex items-center justify-between px-8 py-6">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">Seleção de Operador</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Escolha quem irá registrar os dados do último dia útil. Todos os cadastros ficam disponíveis para qualquer operador.
+        <header className="bg-[#C1272D] px-8 py-8 shadow-lg">
+          <div className="mx-auto max-w-4xl">
+            <h1 className="text-3xl font-bold text-white">Germani Alimentos</h1>
+            <p className="mt-2 text-sm text-white/90">
+              Sistema de Gestão Financeira
             </p>
           </div>
-
-          {sessionAtual && (
-            <Button variant="outline" onClick={() => router.push('/dashboard')}>
-              Ir para Dashboard
-            </Button>
-          )}
         </header>
 
-        <main className="flex flex-1 items-center justify-center px-4 pb-12">
-          <Card className="w-full max-w-xl border-primary-200/70 shadow-xl shadow-primary-200/30 backdrop-blur-sm">
-            <div className="space-y-6">
-              <div className="space-y-2 text-center">
-                <h1 className="text-2xl font-semibold text-gray-900">
-                  Selecione quem irá operar hoje
-                </h1>
-                <p className="text-sm text-gray-500">
-                  Todos os usuários ativos estão listados abaixo. Basta escolher para abrir a movimentação do dia.
+        <main className="flex flex-1 items-center justify-center px-4 py-12">
+          <div className="w-full max-w-md">
+            <div className="rounded-lg border-2 border-[#C1272D]/20 bg-white p-8 shadow-2xl">
+              <div className="space-y-6">
+              <div className="space-y-3 text-center">
+                <div className="mx-auto h-16 w-16 rounded-full bg-[#C1272D] flex items-center justify-center">
+                  <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Selecione o Operador
+                </h2>
+                <p className="text-sm text-gray-600">
+                  Escolha quem irá registrar as movimentações
                 </p>
               </div>
 
@@ -214,10 +214,10 @@ const HomePage: React.FC = () => {
                 <div
                   className={`rounded-md border px-4 py-3 text-sm ${
                     mensagem.tipo === 'sucesso'
-                      ? 'border-success-200 bg-success-50 text-success-700'
+                      ? 'border-green-200 bg-green-50 text-green-700'
                       : mensagem.tipo === 'erro'
-                      ? 'border-error-200 bg-error-50 text-error-700'
-                      : 'border-primary-200 bg-primary-50 text-primary-800'
+                      ? 'border-[#C1272D]/30 bg-red-50 text-[#C1272D]'
+                      : 'border-gray-200 bg-gray-50 text-gray-700'
                   }`}
                 >
                   {mensagem.texto}
@@ -226,25 +226,17 @@ const HomePage: React.FC = () => {
 
               {loading ? (
                 <div className="flex justify-center py-12">
-                  <Loading size="lg" text="Carregando usuários cadastrados..." />
+                  <Loading size="lg" text="Carregando..." />
                 </div>
               ) : (
-                <div className="space-y-5">
-                  <Input
-                    label="Buscar usuário"
-                    placeholder="Filtrar por nome ou e-mail"
-                    value={filtro}
-                    onChange={(event) => setFiltro(event.target.value)}
-                    fullWidth
-                  />
-
+                <div className="space-y-6">
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700" htmlFor="usuario-selecionado">
-                      Usuário selecionado
+                      Usuário
                     </label>
                     <select
                       id="usuario-selecionado"
-                      className="w-full rounded-md border border-gray-200 bg-white/80 px-3 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-3 text-sm font-medium transition focus:border-[#C1272D] focus:outline-none focus:ring-2 focus:ring-[#C1272D]/20"
                       value={selecionado}
                       onChange={(event) => setSelecionado(event.target.value)}
                     >
@@ -256,89 +248,39 @@ const HomePage: React.FC = () => {
                         </option>
                       ))}
                     </select>
-                    {usuariosFiltrados.length === 0 && (
-                      <p className="text-sm text-gray-500">
-                        Nenhum usuário corresponde ao filtro informado.
-                      </p>
-                    )}
                   </div>
 
-                  <div className="rounded-lg border border-dashed border-primary-200 bg-primary-50/40 px-4 py-3 text-sm text-primary-900">
-                    {usuarioAtualNome ? (
-                      <>
-                        Operando como <strong>{usuarioAtualNome}</strong>.
-                        <br />
-                        {identificadorAtual && (
-                          <span className="block text-xs text-gray-500">
-                            Identificador local:{' '}
-                            <code className="font-mono text-xs">{identificadorAtual}</code>
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        Nenhum usuário está ativo neste navegador.
-                        <br />
-                        Escolha um operador para liberar os módulos do sistema.
-                        {identificadorAtual && (
-                          <span className="mt-1 block text-xs text-gray-500">
-                            Identificador local:{' '}
-                            <code className="font-mono text-xs">{identificadorAtual}</code>
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </div>
+                  {usuarioAtualNome && (
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                      <p>Operador atual: <strong className="text-[#C1272D]">{usuarioAtualNome}</strong></p>
+                    </div>
+                  )}
 
-                  <div className="max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-white/70">
-                    <ul className="divide-y divide-gray-100 text-sm">
-                      {usuarios.map((usuario) => {
-                        const ativo = usuario.usr_identificador === selecionado;
-                        return (
-                          <li key={usuario.usr_id} className={ativo ? 'bg-primary-50/70' : ''}>
-                            <button
-                              type="button"
-                              className={`flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition hover:bg-primary-50/80 ${ativo ? 'text-primary-700' : 'text-gray-700'}`}
-                              onClick={() => setSelecionado(usuario.usr_identificador)}
-                            >
-                              <div>
-                                <p className="font-medium">
-                                  {formatarNome(usuario)}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  Identificador: {usuario.usr_identificador}
-                                </p>
-                                {usuario.usr_email && (
-                                  <p className="text-xs text-gray-500">{usuario.usr_email}</p>
-                                )}
-                              </div>
-                              <span className="text-xs uppercase tracking-wide text-gray-400">
-                                {ativo ? 'Selecionado' : 'Escolher'}
-                              </span>
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
+                  <Button
+                    variant="primary"
+                    onClick={selecionarUsuario}
+                    disabled={!selecionado}
+                    loading={aplicando}
+                    fullWidth
+                    className="!bg-[#C1272D] hover:!bg-[#A01F24] !text-white !py-3 !text-base !font-semibold"
+                  >
+                    Entrar
+                  </Button>
 
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-sm text-gray-500">
-                      Precisa cadastrar um novo usuário? Abra Cadastros &gt; Usuários.
-                    </p>
-                    <Button
-                      variant="primary"
-                      onClick={selecionarUsuario}
-                      disabled={!selecionado}
-                      loading={aplicando}
+                  {sessionAtual && (
+                    <button
+                      type="button"
+                      onClick={() => router.push('/dashboard')}
+                      className="w-full text-center text-sm text-gray-600 hover:text-[#C1272D] transition"
                     >
-                      Entrar com este usuário
-                    </Button>
-                  </div>
+                      Ir para Dashboard →
+                    </button>
+                  )}
                 </div>
               )}
             </div>
-          </Card>
+          </div>
+        </div>
         </main>
       </div>
     </div>
