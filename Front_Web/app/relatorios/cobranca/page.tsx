@@ -500,28 +500,7 @@ const RelatorioCobrancaPage: React.FC = () => {
     }
   };
 
-  const resumoCards = useMemo(() => {
-    if (!relatorio) {
-      return null;
-    }
-    return [
-      {
-        titulo: 'Total Previsto',
-        valor: relatorio.resumo.totalPrevisto,
-        descricao: 'Soma das previsões de cobrança para o período.',
-      },
-      {
-        titulo: 'Total Realizado',
-        valor: relatorio.resumo.totalRealizado,
-        descricao: 'Recebimentos efetivados no período selecionado.',
-      },
-      {
-        titulo: 'Diferença',
-        valor: relatorio.resumo.diferenca,
-        descricao: 'Resultado entre realizado e previsto.',
-      },
-    ];
-  }, [relatorio]);
+  const diferencaPeriodoPositiva = relatorio ? relatorio.resumo.diferenca >= 0 : true;
 
   if (carregandoUsuario) {
     return (
@@ -589,81 +568,159 @@ const RelatorioCobrancaPage: React.FC = () => {
 
         {relatorio && !carregandoDados && (
           <>
-            {resumoCards && (
-              <div className="grid gap-4 md:grid-cols-3">
-                {resumoCards.map((card) => (
-                  <div key={card.titulo} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{card.titulo}</p>
-                    <p className="mt-2 text-2xl font-semibold text-gray-900">{formatCurrency(card.valor)}</p>
-                    <p className="mt-1 text-xs text-gray-500">{card.descricao}</p>
-                  </div>
-                ))}
+            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+              <div className="bg-slate-800 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white">
+                Resumo do Período
               </div>
-            )}
+              <table className="min-w-full text-xs text-gray-600 sm:text-sm">
+                <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-600 sm:text-xs">
+                  <tr>
+                    <th className="px-3 py-2 text-left sm:px-4 sm:py-3">Descrição</th>
+                    <th className="px-3 py-2 text-right sm:px-4 sm:py-3">Previsto</th>
+                    <th className="px-3 py-2 text-right sm:px-4 sm:py-3">Realizado</th>
+                    <th className="px-3 py-2 text-right sm:px-4 sm:py-3">Diferença</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  <tr>
+                    <td className="px-3 py-2 text-gray-700 sm:px-4 sm:py-3">Recebimentos do período</td>
+                    <td className="px-3 py-2 text-right text-gray-700 sm:px-4 sm:py-3">
+                      {formatCurrency(relatorio.resumo.totalPrevisto)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-gray-700 sm:px-4 sm:py-3">
+                      {formatCurrency(relatorio.resumo.totalRealizado)}
+                    </td>
+                    <td
+                      className={`px-3 py-2 text-right font-semibold sm:px-4 sm:py-3 ${
+                        relatorio.resumo.diferenca >= 0 ? 'text-success-600' : 'text-error-600'
+                      }`}
+                    >
+                      {formatCurrency(relatorio.resumo.diferenca)}
+                    </td>
+                  </tr>
+                  <tr
+                    className={`${
+                      diferencaPeriodoPositiva ? 'bg-success-50 text-success-800' : 'bg-error-50 text-error-800'
+                    } font-semibold`}
+                  >
+                    <td className="px-3 py-2 sm:px-4 sm:py-3" colSpan={3}>
+                      Diferença entre realizado e previsto
+                    </td>
+                    <td className="px-3 py-2 text-right sm:px-4 sm:py-3">
+                      {formatCurrency(relatorio.resumo.diferenca)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
 
             <div className="space-y-5">
-              {relatorio.dias.map((dia) => (
-                <Card
-                  key={dia.data}
-                  variant="primary"
-                  title={`Recebimentos - ${formatarDataPt(dia.data)}`}
-                  subtitle={`Diferença no dia: ${formatCurrency(dia.diferenca)}`}
-                >
-                  <div className="overflow-x-auto rounded-lg border border-gray-200">
-                    <table className="min-w-full divide-y divide-gray-200 text-sm">
-                      <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                        <tr>
-                          <th className="px-4 py-3 text-left font-semibold">Banco / Conta</th>
-                          <th className="px-4 py-3 text-right font-semibold">Previsto</th>
-                          <th className="px-4 py-3 text-right font-semibold">Realizado</th>
-                          <th className="px-4 py-3 text-right font-semibold">Diferença</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 bg-white">
-                        {dia.itens.length === 0 ? (
+              {relatorio.dias.map((dia) => {
+                const diferencaPositiva = dia.diferenca >= 0;
+                return (
+                  <Card
+                    key={dia.data}
+                    variant="primary"
+                    title={`Recebimentos - ${formatarDataPt(dia.data)}`}
+                    subtitle={`Diferença no dia: ${formatCurrency(dia.diferenca)}`}
+                  >
+                    <div className="mb-4 overflow-hidden rounded-lg border border-gray-200">
+                      <table className="min-w-full text-xs text-gray-600 sm:text-sm">
+                        <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-600 sm:text-xs">
                           <tr>
-                            <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">
-                              Nenhum recebimento registrado para este dia.
+                            <th className="px-3 py-2 text-left sm:px-4 sm:py-3">Descrição</th>
+                            <th className="px-3 py-2 text-right sm:px-4 sm:py-3">Previsto</th>
+                            <th className="px-3 py-2 text-right sm:px-4 sm:py-3">Realizado</th>
+                            <th className="px-3 py-2 text-right sm:px-4 sm:py-3">Diferença</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                          <tr>
+                            <td className="px-3 py-2 text-gray-700 sm:px-4 sm:py-3">Recebimentos do dia</td>
+                            <td className="px-3 py-2 text-right text-gray-700 sm:px-4 sm:py-3">
+                              {formatCurrency(dia.totalPrevisto)}
+                            </td>
+                            <td className="px-3 py-2 text-right text-gray-700 sm:px-4 sm:py-3">
+                              {formatCurrency(dia.totalRealizado)}
+                            </td>
+                            <td
+                              className={`px-3 py-2 text-right font-semibold sm:px-4 sm:py-3 ${
+                                diferencaPositiva ? 'text-success-600' : 'text-error-600'
+                              }`}
+                            >
+                              {formatCurrency(dia.diferenca)}
                             </td>
                           </tr>
-                        ) : (
-                          dia.itens.map((item) => (
-                            <tr key={item.chave}>
-                              <td className="px-4 py-3">
-                                <div className="font-medium text-gray-800">{item.banco}</div>
-                                <div className="text-xs text-gray-500">{item.conta}</div>
-                              </td>
-                              <td className="px-4 py-3 text-right text-gray-700">{formatCurrency(item.previsto)}</td>
-                              <td className="px-4 py-3 text-right text-gray-700">{formatCurrency(item.realizado)}</td>
-                              <td
-                                className={`px-4 py-3 text-right font-semibold ${
-                                  item.diferenca >= 0 ? 'text-success-600' : 'text-error-600'
-                                }`}
-                              >
-                                {formatCurrency(item.diferenca)}
+                          <tr
+                            className={`${
+                              diferencaPositiva ? 'bg-success-50 text-success-800' : 'bg-error-50 text-error-800'
+                            } font-semibold`}
+                          >
+                            <td className="px-3 py-2 sm:px-4 sm:py-3" colSpan={3}>
+                              Diferença entre realizado e previsto
+                            </td>
+                            <td className="px-3 py-2 text-right sm:px-4 sm:py-3">{formatCurrency(dia.diferenca)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-lg border border-gray-200">
+                      <table className="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                          <tr>
+                            <th className="px-4 py-3 text-left font-semibold">Banco / Conta</th>
+                            <th className="px-4 py-3 text-right font-semibold">Previsto</th>
+                            <th className="px-4 py-3 text-right font-semibold">Realizado</th>
+                            <th className="px-4 py-3 text-right font-semibold">Diferença</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                          {dia.itens.length === 0 ? (
+                            <tr>
+                              <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">
+                                Nenhum recebimento registrado para este dia.
                               </td>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                      <tfoot className="bg-gray-50 text-sm font-semibold text-gray-700">
-                        <tr>
-                          <td className="px-4 py-3 text-right">Totais do dia</td>
-                          <td className="px-4 py-3 text-right">{formatCurrency(dia.totalPrevisto)}</td>
-                          <td className="px-4 py-3 text-right">{formatCurrency(dia.totalRealizado)}</td>
-                          <td
-                            className={`px-4 py-3 text-right ${
-                              dia.diferenca >= 0 ? 'text-success-600' : 'text-error-600'
-                            }`}
-                          >
-                            {formatCurrency(dia.diferenca)}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </Card>
-              ))}
+                          ) : (
+                            dia.itens.map((item) => (
+                              <tr key={item.chave}>
+                                <td className="px-4 py-3">
+                                  <div className="font-medium text-gray-800">{item.banco}</div>
+                                  <div className="text-xs text-gray-500">{item.conta}</div>
+                                </td>
+                                <td className="px-4 py-3 text-right text-gray-700">{formatCurrency(item.previsto)}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{formatCurrency(item.realizado)}</td>
+                                <td
+                                  className={`px-4 py-3 text-right font-semibold ${
+                                    item.diferenca >= 0 ? 'text-success-600' : 'text-error-600'
+                                  }`}
+                                >
+                                  {formatCurrency(item.diferenca)}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                        <tfoot className="bg-gray-50 text-sm font-semibold text-gray-700">
+                          <tr>
+                            <td className="px-4 py-3 text-right">Totais do dia</td>
+                            <td className="px-4 py-3 text-right">{formatCurrency(dia.totalPrevisto)}</td>
+                            <td className="px-4 py-3 text-right">{formatCurrency(dia.totalRealizado)}</td>
+                            <td
+                              className={`px-4 py-3 text-right ${
+                                diferencaPositiva ? 'text-success-600' : 'text-error-600'
+                              }`}
+                            >
+                              {formatCurrency(dia.diferenca)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
           </>
         )}

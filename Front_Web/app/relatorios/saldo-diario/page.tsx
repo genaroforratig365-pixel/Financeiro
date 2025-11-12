@@ -67,6 +67,14 @@ type LinhaComparativa = {
   percentual: number | null;
 };
 
+type LinhaRealizada = {
+  chave: string;
+  titulo: string;
+  realizado: number;
+};
+
+type LinhaTabela = LinhaComparativa | LinhaRealizada;
+
 type TabelaAccent = 'azul' | 'verde' | 'amarelo' | 'laranja' | 'cinza';
 
 type RenderTabelaOptions = {
@@ -167,7 +175,9 @@ const formatarPercentual = (valor: number | null): string => {
   return `${arredondado.toFixed(1).replace('.', ',')}%`;
 };
 
-const converterMapaParaLinhas = (mapa: Map<string, { titulo: string; previsto: number; realizado: number }>): LinhaComparativa[] =>
+const converterMapaParaLinhas = (
+  mapa: Map<string, { titulo: string; previsto: number; realizado: number }>,
+): LinhaComparativa[] =>
   Array.from(mapa.entries())
     .map(([chave, item]) => {
       const previsto = arredondar(item.previsto);
@@ -178,10 +188,12 @@ const converterMapaParaLinhas = (mapa: Map<string, { titulo: string; previsto: n
     })
     .sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR'));
 
-const somarPrevisto = (linhas: LinhaComparativa[]): number =>
-  arredondar(linhas.reduce((acc, linha) => acc + linha.previsto, 0));
+const somarPrevisto = (linhas: LinhaTabela[]): number =>
+  arredondar(
+    linhas.reduce((acc, linha) => acc + ('previsto' in linha && typeof linha.previsto === 'number' ? linha.previsto : 0), 0),
+  );
 
-const somarRealizado = (linhas: LinhaComparativa[]): number =>
+const somarRealizado = (linhas: LinhaTabela[]): number =>
   arredondar(linhas.reduce((acc, linha) => acc + linha.realizado, 0));
 
 const RelatorioSaldoDiarioPage: React.FC = () => {
@@ -418,17 +430,39 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
   }, [usuario, dataReferencia, carregarRelatorio]);
 
   const renderTabelaComparativa = useCallback(
-    (titulo: string, linhas: LinhaComparativa[], options: RenderTabelaOptions = {}) => {
+    (titulo: string, linhas: LinhaTabela[], options: RenderTabelaOptions = {}) => {
       const layout = options.layout ?? 'comparativo';
       const accent = options.accent ?? 'azul';
       const totalLabel = options.totalLabel ?? 'Totais';
       const showTotals = options.showTotals ?? layout === 'comparativo';
       const sectionClass = tabelaAccentClassNames[accent] ?? tabelaAccentClassNames.azul;
 
-      const totalPrevisto = somarPrevisto(linhas);
-      const totalRealizado = somarRealizado(linhas);
-      const totalDesvio = arredondar(totalRealizado - totalPrevisto);
-      const totalPercentual = calcularPercentual(totalPrevisto, totalRealizado);
+      const linhasComparativas =
+        layout === 'comparativo'
+          ? linhas.filter(
+              (linha): linha is LinhaComparativa =>
+                'previsto' in linha &&
+                typeof linha.previsto === 'number' &&
+                'desvio' in linha &&
+                typeof linha.desvio === 'number',
+            )
+          : [];
+      const linhasParaComparativo =
+        layout === 'comparativo'
+          ? linhasComparativas.length > 0
+            ? linhasComparativas
+            : (linhas as LinhaComparativa[])
+          : [];
+
+      const linhasParaExibir = layout === 'comparativo' ? linhasParaComparativo : linhas;
+
+      const totalPrevisto =
+        layout === 'comparativo' ? somarPrevisto(linhasParaComparativo) : 0;
+      const totalRealizado =
+        layout === 'comparativo' ? somarRealizado(linhasParaComparativo) : somarRealizado(linhas);
+      const totalDesvio = layout === 'comparativo' ? arredondar(totalRealizado - totalPrevisto) : 0;
+      const totalPercentual =
+        layout === 'comparativo' ? calcularPercentual(totalPrevisto, totalRealizado) : null;
       const colSpan = layout === 'comparativo' ? 5 : 2;
 
       return (
@@ -454,14 +488,14 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
               )}
             </thead>
             <tbody>
-              {linhas.length === 0 ? (
+              {linhasParaExibir.length === 0 ? (
                 <tr>
                   <td colSpan={colSpan} className="report-section__empty-cell">
                     Nenhuma informação encontrada para esta seção.
                   </td>
                 </tr>
               ) : layout === 'comparativo' ? (
-                linhas.map((linha) => (
+                linhasParaComparativo.map((linha) => (
                   <tr key={linha.chave}>
                     <td>{linha.titulo}</td>
                     <td>{formatCurrency(linha.previsto)}</td>
@@ -541,7 +575,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
     ];
   }, [relatorio]);
 
-  const linhasResumoGeral = useMemo(() => {
+  const linhasResumoGeral = useMemo<LinhaRealizada[]>(() => {
     if (!relatorio) {
       return [];
     }
@@ -550,34 +584,22 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
       {
         chave: 'saldo-anterior',
         titulo: 'Saldo do Dia Anterior',
-        previsto: resumo.saldoInicialPrevisto,
         realizado: resumo.saldoInicialRealizado,
-        desvio: arredondar(resumo.saldoInicialRealizado - resumo.saldoInicialPrevisto),
-        percentual: calcularPercentual(resumo.saldoInicialPrevisto, resumo.saldoInicialRealizado),
       },
       {
         chave: 'resultado',
         titulo: 'Resultado do Dia (Receitas - Despesas)',
-        previsto: resumo.resultadoPrevisto,
         realizado: resumo.resultadoRealizado,
-        desvio: arredondar(resumo.resultadoRealizado - resumo.resultadoPrevisto),
-        percentual: calcularPercentual(resumo.resultadoPrevisto, resumo.resultadoRealizado),
       },
       {
         chave: 'saldo-final',
         titulo: 'Saldo Final do Dia',
-        previsto: resumo.saldoFinalPrevisto,
         realizado: resumo.saldoFinalRealizado,
-        desvio: arredondar(resumo.saldoFinalRealizado - resumo.saldoFinalPrevisto),
-        percentual: calcularPercentual(resumo.saldoFinalPrevisto, resumo.saldoFinalRealizado),
       },
       {
         chave: 'saldo-bancos',
         titulo: 'Saldo em Bancos',
-        previsto: resumo.bancosPrevistos,
         realizado: resumo.bancosRealizados,
-        desvio: arredondar(resumo.bancosRealizados - resumo.bancosPrevistos),
-        percentual: calcularPercentual(resumo.bancosPrevistos, resumo.bancosRealizados),
       },
     ];
   }, [relatorio]);
@@ -615,7 +637,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
 
     const adicionarTabela = (
       titulo: string,
-      linhas: LinhaComparativa[],
+      linhas: LinhaTabela[],
       { layout = 'comparativo', accent = 'azul', totalLabel, showTotals }: TabelaPdfOptions = {},
     ) => {
       posicaoAtual += 8;
@@ -629,13 +651,32 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
           ? [['Categoria', 'Previsto', 'Realizado', 'Diferença', '%']]
           : [['Banco / Conta', 'Realizado']];
 
+      const linhasComparativas =
+        layout === 'comparativo'
+          ? linhas.filter(
+              (linha): linha is LinhaComparativa =>
+                'previsto' in linha &&
+                typeof linha.previsto === 'number' &&
+                'desvio' in linha &&
+                typeof linha.desvio === 'number',
+            )
+          : [];
+      const linhasParaComparativo =
+        layout === 'comparativo'
+          ? linhasComparativas.length > 0
+            ? linhasComparativas
+            : (linhas as LinhaComparativa[])
+          : [];
+
+      const linhasParaExibir = layout === 'comparativo' ? linhasParaComparativo : linhas;
+
       const corpo =
-        linhas.length === 0
+        linhasParaExibir.length === 0
           ? layout === 'comparativo'
             ? [['Nenhum registro', '-', '-', '-', '-']]
             : [['Nenhum registro', '-']]
           : layout === 'comparativo'
-            ? linhas.map((linha) => [
+            ? linhasParaComparativo.map((linha) => [
                 linha.titulo,
                 formatCurrency(linha.previsto),
                 formatCurrency(linha.realizado),
@@ -644,11 +685,14 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
               ])
             : linhas.map((linha) => [linha.titulo, formatCurrency(linha.realizado)]);
 
-      const totalPrevisto = somarPrevisto(linhas);
-      const totalRealizado = somarRealizado(linhas);
-      const totalDesvio = arredondar(totalRealizado - totalPrevisto);
-      const totalPercentual = calcularPercentual(totalPrevisto, totalRealizado);
-      const deveMostrarTotais = (showTotals ?? layout === 'comparativo') && linhas.length > 0;
+      const totalPrevisto =
+        layout === 'comparativo' ? somarPrevisto(linhasParaComparativo) : 0;
+      const totalRealizado =
+        layout === 'comparativo' ? somarRealizado(linhasParaComparativo) : somarRealizado(linhas);
+      const totalDesvio = layout === 'comparativo' ? arredondar(totalRealizado - totalPrevisto) : 0;
+      const totalPercentual =
+        layout === 'comparativo' ? calcularPercentual(totalPrevisto, totalRealizado) : null;
+      const deveMostrarTotais = (showTotals ?? layout === 'comparativo') && linhasParaExibir.length > 0;
 
       const rodape =
         deveMostrarTotais
@@ -702,6 +746,9 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
 
     adicionarTabela('Resumo Geral', linhasResumoGeral, {
       accent: 'azul',
+      layout: 'realizado',
+      totalLabel: 'Total Geral',
+      showTotals: true,
     });
 
     adicionarTabela('Saldos Bancários', relatorio.bancos, {
@@ -870,9 +917,12 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
             })}
 
             <div className="report-grid report-grid--two">
-              {renderTabelaComparativa('Resumo Geral', linhasResumoGeral, {
-                accent: 'azul',
-              })}
+            {renderTabelaComparativa('Resumo Geral', linhasResumoGeral, {
+              accent: 'azul',
+              layout: 'realizado',
+              showTotals: true,
+              totalLabel: 'Total Geral',
+            })}
               {renderTabelaComparativa('Saldos Bancários', relatorio.bancos, {
                 accent: 'cinza',
                 layout: 'realizado',

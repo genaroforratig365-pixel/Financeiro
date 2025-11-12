@@ -5,7 +5,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 import { Header } from '@/components/layout';
-import { Button, Card, Loading } from '@/components/ui';
+import { Button, Card, Input, Loading, Modal, Textarea } from '@/components/ui';
 import { formatCurrency } from '@/lib/mathParser';
 import {
   getOrCreateUser,
@@ -136,6 +136,12 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [relatorio, setRelatorio] = useState<RelatorioDados | null>(null);
+
+  const [emailModalAberto, setEmailModalAberto] = useState(false);
+  const [emailDestino, setEmailDestino] = useState('');
+  const [emailMensagem, setEmailMensagem] = useState('');
+  const [enviandoEmail, setEnviandoEmail] = useState(false);
+  const [feedbackEmail, setFeedbackEmail] = useState<string | null>(null);
 
   const reportRef = useRef<HTMLDivElement | null>(null);
 
@@ -388,22 +394,25 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
     return saldoInicialTotal + resultadoSemana;
   }, [relatorio, saldoInicialTotal, resultadoSemana]);
 
-  const handleExportPdf = () => {
+  const obterNomeArquivoPdf = useCallback(() => {
+    if (semanaAtual) {
+      return `Previsao_Semanal_${semanaAtual.inicio}_${semanaAtual.fim}.pdf`;
+    }
+    return 'Previsao_Semanal.pdf';
+  }, [semanaAtual]);
+
+  const gerarDocumentoPdf = useCallback(() => {
     if (!relatorio) {
-      alert('Nenhum relatório disponível para exportar.');
-      return;
+      return null;
     }
 
     try {
       const doc = new jsPDF('landscape', 'mm', 'a4');
-      const pageWidth = doc.internal.pageSize.getWidth();
 
-      // Título
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.text('Relatório - Previsão Semanal', 14, 12);
 
-      // Período
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       if (semanaAtual) {
@@ -414,7 +423,6 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
 
       let yPos = 24;
 
-      // Resumo financeiro - TUDO EM UMA LINHA
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
       doc.text('Resumo:', 14, yPos);
@@ -423,71 +431,64 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
       doc.text(resumoTexto, 35, yPos);
       yPos += 6;
 
-      // Tabela principal
-      const datasOrdenadas = relatorio.datas.sort();
-      const headers = ['Categoria', ...datasOrdenadas.map(d => formatarData(d)), 'Total'];
+      const datasOrdenadas = [...relatorio.datas].sort((a, b) => a.localeCompare(b));
+      const headers = ['Categoria', ...datasOrdenadas.map((d) => formatarData(d)), 'Total'];
 
-      // Receitas
-      const receitasData = relatorio.receitas.map(row => [
+      const receitasData = relatorio.receitas.map((row) => [
         row.categoria,
-        ...datasOrdenadas.map(d => formatCurrency(row.valores[d] || 0)),
-        formatCurrency(row.total)
+        ...datasOrdenadas.map((d) => formatCurrency(row.valores[d] || 0)),
+        formatCurrency(row.total),
       ]);
 
-      // Adiciona linha de total de receitas
-      const totalReceitaPorData = datasOrdenadas.map(data =>
-        relatorio.receitas.reduce((sum, row) => sum + (row.valores[data] || 0), 0)
+      const totalReceitaPorData = datasOrdenadas.map((data) =>
+        relatorio.receitas.reduce((sum, row) => sum + (row.valores[data] || 0), 0),
       );
       const totalReceitaGeral = relatorio.receitas.reduce((sum, row) => sum + row.total, 0);
       receitasData.push([
         'TOTAL RECEITAS',
-        ...totalReceitaPorData.map(v => formatCurrency(v)),
-        formatCurrency(totalReceitaGeral)
+        ...totalReceitaPorData.map((valor) => formatCurrency(valor)),
+        formatCurrency(totalReceitaGeral),
       ]);
 
-      // Despesas
-      const despesasData = relatorio.despesas.map(row => [
+      const despesasData = relatorio.despesas.map((row) => [
         row.categoria,
-        ...datasOrdenadas.map(d => formatCurrency(row.valores[d] || 0)),
-        formatCurrency(row.total)
+        ...datasOrdenadas.map((d) => formatCurrency(row.valores[d] || 0)),
+        formatCurrency(row.total),
       ]);
 
-      // Adiciona linha de total de despesas
-      const totalDespesaPorData = datasOrdenadas.map(data =>
-        relatorio.despesas.reduce((sum, row) => sum + (row.valores[data] || 0), 0)
+      const totalDespesaPorData = datasOrdenadas.map((data) =>
+        relatorio.despesas.reduce((sum, row) => sum + (row.valores[data] || 0), 0),
       );
       const totalDespesaGeral = relatorio.despesas.reduce((sum, row) => sum + row.total, 0);
       despesasData.push([
         'TOTAL DESPESAS',
-        ...totalDespesaPorData.map(v => formatCurrency(v)),
-        formatCurrency(totalDespesaGeral)
+        ...totalDespesaPorData.map((valor) => formatCurrency(valor)),
+        formatCurrency(totalDespesaGeral),
       ]);
 
-      // Saldos
-      const saldosData = [];
+      const saldosData: string[][] = [];
       if (relatorio.saldoInicial) {
         saldosData.push([
           'Saldo inicial',
-          ...datasOrdenadas.map(d => formatCurrency(relatorio.saldoInicial!.valores[d] || 0)),
-          formatCurrency(relatorio.saldoInicial.total)
+          ...datasOrdenadas.map((d) => formatCurrency(relatorio.saldoInicial!.valores[d] || 0)),
+          formatCurrency(relatorio.saldoInicial.total),
         ]);
       }
       if (relatorio.saldoDiario) {
         saldosData.push([
           'Saldo diário previsto',
-          ...datasOrdenadas.map(d => formatCurrency(relatorio.saldoDiario!.valores[d] || 0)),
-          formatCurrency(relatorio.saldoDiario.total)
+          ...datasOrdenadas.map((d) => formatCurrency(relatorio.saldoDiario!.valores[d] || 0)),
+          formatCurrency(relatorio.saldoDiario.total),
         ]);
       }
       if (relatorio.saldoAcumulado) {
         saldosData.push([
           'Saldo acumulado previsto',
-          ...datasOrdenadas.map(d => formatCurrency(relatorio.saldoAcumulado!.valores[d] || 0)),
-          formatCurrency(relatorio.saldoAcumulado.total)
+          ...datasOrdenadas.map((d) => formatCurrency(relatorio.saldoAcumulado!.valores[d] || 0)),
+          formatCurrency(relatorio.saldoAcumulado.total),
         ]);
       }
 
-      // Adiciona tabelas com tamanho menor para caber em uma página
       if (receitasData.length > 0) {
         autoTable(doc, {
           startY: yPos,
@@ -500,15 +501,14 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
           styles: { cellPadding: 1.5 },
           columnStyles: {
             0: { halign: 'left', cellWidth: 45 },
-            [headers.length - 1]: { fontStyle: 'bold' }
+            [headers.length - 1]: { fontStyle: 'bold' },
           },
-          didParseCell: function(data) {
-            // Destaca linha de total
+          didParseCell: (data) => {
             if (data.row.index === receitasData.length - 1) {
               data.cell.styles.fontStyle = 'bold';
-              data.cell.styles.fillColor = [220, 252, 231]; // Verde claro
+              data.cell.styles.fillColor = [220, 252, 231];
             }
-          }
+          },
         });
         yPos = (doc as any).lastAutoTable.finalY + 3;
       }
@@ -525,15 +525,14 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
           styles: { cellPadding: 1.5 },
           columnStyles: {
             0: { halign: 'left', cellWidth: 45 },
-            [headers.length - 1]: { fontStyle: 'bold' }
+            [headers.length - 1]: { fontStyle: 'bold' },
           },
-          didParseCell: function(data) {
-            // Destaca linha de total
+          didParseCell: (data) => {
             if (data.row.index === despesasData.length - 1) {
               data.cell.styles.fontStyle = 'bold';
-              data.cell.styles.fillColor = [254, 226, 226]; // Vermelho claro
+              data.cell.styles.fillColor = [254, 226, 226];
             }
-          }
+          },
         });
         yPos = (doc as any).lastAutoTable.finalY + 3;
       }
@@ -550,19 +549,94 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
           styles: { cellPadding: 1.5 },
           columnStyles: {
             0: { halign: 'left', cellWidth: 45 },
-            [headers.length - 1]: { fontStyle: 'bold' }
-          }
+            [headers.length - 1]: { fontStyle: 'bold' },
+          },
         });
       }
 
-      // Salva o PDF
-      const nomeArquivo = semanaAtual
-        ? `Previsao_Semanal_${semanaAtual.inicio}_${semanaAtual.fim}.pdf`
-        : 'Previsao_Semanal.pdf';
-      doc.save(nomeArquivo);
+      return doc;
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
-      alert('Erro ao gerar PDF. Verifique o console para mais detalhes.');
+      return null;
+    }
+  }, [relatorio, semanaAtual, totalReceitas, totalDespesas, resultadoSemana, saldoFinalPrevisto]);
+
+  const handleExportPdf = useCallback(() => {
+    if (!relatorio) {
+      alert('Nenhum relatório disponível para exportar.');
+      return;
+    }
+
+    const doc = gerarDocumentoPdf();
+    if (!doc) {
+      alert('Não foi possível gerar o PDF. Verifique os dados e tente novamente.');
+      return;
+    }
+
+    doc.save(obterNomeArquivoPdf());
+  }, [gerarDocumentoPdf, obterNomeArquivoPdf, relatorio]);
+
+  const handleAbrirModalEmail = () => {
+    setFeedbackEmail(null);
+    if (!emailDestino && usuario?.usr_email) {
+      setEmailDestino(usuario.usr_email);
+    }
+    setEmailModalAberto(true);
+  };
+
+  const handleEnviarEmail = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!relatorio) {
+      setFeedbackEmail('Nenhum relatório disponível para envio.');
+      return;
+    }
+    if (!emailDestino.trim()) {
+      setFeedbackEmail('Informe um destinatário para continuar.');
+      return;
+    }
+
+    try {
+      setEnviandoEmail(true);
+      setFeedbackEmail(null);
+
+      const doc = gerarDocumentoPdf();
+      if (!doc) {
+        throw new Error('Não foi possível gerar o documento.');
+      }
+
+      const nomeArquivo = obterNomeArquivoPdf();
+      const blob = doc.output('blob');
+      const arquivo = new File([blob], nomeArquivo, { type: 'application/pdf' });
+
+      const nav = navigator as Navigator & {
+        canShare?: (data: { files?: File[] }) => boolean;
+        share?: (data: { files?: File[]; title?: string; text?: string }) => Promise<void>;
+      };
+
+      if (nav.canShare && nav.share && nav.canShare({ files: [arquivo] })) {
+        await nav.share({
+          files: [arquivo],
+          title: 'Relatório - Previsão Semanal',
+          text: emailMensagem || 'Segue relatório de previsão semanal atualizado.',
+        });
+        setEmailModalAberto(false);
+        return;
+      }
+
+      doc.save(nomeArquivo);
+
+      const assunto = encodeURIComponent('Relatório - Previsão Semanal');
+      const corpo = encodeURIComponent(
+        `${emailMensagem || 'Segue relatório de previsão semanal atualizado.'}\n\nO arquivo foi baixado automaticamente e pode ser anexado ao e-mail.`,
+      );
+      window.location.href = `mailto:${encodeURIComponent(emailDestino)}?subject=${assunto}&body=${corpo}`;
+
+      setEmailModalAberto(false);
+    } catch (error) {
+      console.error('Erro ao preparar envio por e-mail:', error);
+      setFeedbackEmail('Não foi possível preparar o envio. Tente novamente em instantes.');
+    } finally {
+      setEnviandoEmail(false);
     }
   };
 
@@ -605,6 +679,13 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
                 ))
               )}
             </select>
+            <Button
+              variant="secondary"
+              onClick={handleAbrirModalEmail}
+              disabled={!relatorio || carregandoDados}
+            >
+              Enviar por e-mail
+            </Button>
             <Button
               variant="primary"
               onClick={handleExportPdf}
@@ -779,6 +860,61 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
           </>
         )}
       </div>
+
+      <Modal
+        isOpen={emailModalAberto}
+        onClose={() => {
+          if (!enviandoEmail) {
+            setEmailModalAberto(false);
+          }
+        }}
+        title="Enviar relatório por e-mail"
+        size="lg"
+        footer={
+          <div className="flex justify-end gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setEmailModalAberto(false)}
+              disabled={enviandoEmail}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              form="previsao-semanal-email-form"
+              variant="primary"
+              loading={enviandoEmail}
+              disabled={enviandoEmail}
+            >
+              Preparar envio
+            </Button>
+          </div>
+        }
+      >
+        <form id="previsao-semanal-email-form" onSubmit={handleEnviarEmail} className="space-y-4">
+          <Input
+            label="Destinatário"
+            type="email"
+            value={emailDestino}
+            onChange={(event) => setEmailDestino(event.target.value)}
+            placeholder="usuario@empresa.com.br"
+            required
+          />
+          <Textarea
+            label="Mensagem"
+            value={emailMensagem}
+            onChange={(event) => setEmailMensagem(event.target.value)}
+            placeholder="Mensagem opcional para acompanhar o relatório."
+            rows={4}
+          />
+          <p className="text-xs text-gray-500">
+            O relatório será gerado em PDF. Caso o compartilhamento direto não esteja disponível, o arquivo será baixado
+            automaticamente para anexar ao e-mail.
+          </p>
+          {feedbackEmail && <p className="text-sm text-error-600">{feedbackEmail}</p>}
+        </form>
+      </Modal>
     </>
   );
 };
