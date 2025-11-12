@@ -142,7 +142,7 @@ export default function DashboardPage() {
             {/* Logo */}
             <div className="flex justify-center mb-8">
               <img
-                src="https://static.wixstatic.com/media/ce3165_c01db19c0ef64e2abb8c894c7ecc6f95~mv2.png/v1/fill/w_322,h_138,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/logomarca-Germani-2023-Branca-borda-dour.png"
+                src="https://static.wixstatic.com/media/cbd3a3_72a33219add84f32b64b3671a7e25171~mv2.jpg/v1/fill/w_210,h_105,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/logo%20germani%20contorno%20dourado_Prancheta%201.jpg"
                 alt="Germani Alimentos"
                 className="h-32 w-auto"
               />

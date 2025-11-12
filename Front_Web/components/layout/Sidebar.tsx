@@ -286,9 +286,16 @@ export const Sidebar: React.FC = () => {
     <aside className="sidebar">
       {/* Logo */}
       <div className="p-6 border-b border-gray-200">
-        <Link href="/dashboard" className="flex flex-col gap-1">
-          <span className="text-xs font-semibold uppercase text-primary-600">Germani</span>
-          <span className="text-lg font-semibold text-gray-900 tracking-tight">Financeiro</span>
+        <Link href="/dashboard" className="flex flex-col items-center gap-2">
+          <img
+            src="https://static.wixstatic.com/media/cbd3a3_72a33219add84f32b64b3671a7e25171~mv2.jpg/v1/fill/w_210,h_105,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/logo%20germani%20contorno%20dourado_Prancheta%201.jpg"
+            alt="Germani"
+            className="w-24 h-auto"
+          />
+          <div className="flex flex-col items-center">
+            <span className="text-lg font-bold text-primary-600">Germani</span>
+            <span className="text-sm font-medium text-gray-700">Financeiro</span>
+          </div>
         </Link>
       </div>
 

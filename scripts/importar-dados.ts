@@ -135,36 +135,114 @@ async function importarMovimentacaoDiaria(caminhoArquivo: string) {
     }
 
     const area = linha['Area'] || linha['Área'] || linha['area'];
-    const valorPrev = converterValor(linha['Valor_Prev'] || linha['valorPrev'] || 0);
+    const valorPrev = converterValor(linha['Valor_Previsto'] || linha['Valor_Prev'] || linha['valorPrev'] || 0);
     const valorReal = converterValor(linha['Valor_Realizado'] || linha['valorRealizado'] || 0);
-    const origem = linha['Origem'] || linha['origem'] || '';
+    const origem = (linha['Origem'] || linha['origem'] || '').toLowerCase();
 
     try {
-      // Identifica o tipo de registro
-      const areaId = obterIdArea(area);
+      // SALDO INICIAL
+      if (origem.includes('ajuste') || origem.includes('saldo inicial')) {
+        if (valorReal > 0) {
+          await supabase.from('pvi_previsao_itens').insert({
+            pvi_data: data,
+            pvi_valor: valorReal,
+            pvi_tipo: 'saldo_inicial',
+            pvi_categoria: area,
+          });
+          sucesso++;
+        }
+        continue;
+      }
 
-      if (areaId && origem.toLowerCase().includes('área')) {
-        // Importa como pagamento por área
-        if (valorPrev > 0) {
+      // PAGAMENTOS POR ÁREA
+      if (origem.includes('previsão por área') || origem.includes('previsao por area')) {
+        const areaId = obterIdArea(area);
+        if (areaId && valorPrev > 0) {
           await supabase.from('pvi_previsao_itens').insert({
             pvi_data: data,
             pvi_are_id: areaId,
             pvi_valor: valorPrev,
-            pvi_tipo: 'pagamento',
+            pvi_tipo: 'gasto',
+            pvi_categoria: area,
           });
+          sucesso++;
         }
+        continue;
+      }
 
-        if (valorReal > 0) {
+      if (origem.includes('pagamentos por área') || origem.includes('pagamentos por area')) {
+        const areaId = obterIdArea(area);
+        if (areaId && valorReal > 0) {
           await supabase.from('pag_pagamentos_area').insert({
             pag_data: data,
             pag_are_id: areaId,
             pag_valor: valorReal,
           });
+          sucesso++;
         }
-
-        sucesso++;
+        continue;
       }
-      // Adicione lógica para outros tipos de registros (receitas, bancos, etc)
+
+      // RECEITAS
+      if (origem.includes('previsão de receitas') || origem.includes('previsao de receitas')) {
+        if (valorPrev > 0) {
+          await supabase.from('pvi_previsao_itens').insert({
+            pvi_data: data,
+            pvi_valor: valorPrev,
+            pvi_tipo: 'receita',
+            pvi_categoria: area,
+          });
+          sucesso++;
+        }
+        continue;
+      }
+
+      if (origem.includes('receitas por tipo')) {
+        if (valorReal > 0) {
+          // Nota: Este registro precisa de um ctr_id (conta de receita)
+          // Por enquanto, vamos inserir sem conta específica
+          console.warn(`⚠️  Receita por tipo sem mapeamento de conta: ${area}`);
+          await supabase.from('rec_receitas').insert({
+            rec_data: data,
+            rec_valor: valorReal,
+            // rec_ctr_id: null, // Necessário mapear contas de receita
+          });
+          sucesso++;
+        }
+        continue;
+      }
+
+      // SALDOS BANCÁRIOS
+      if (origem.includes('saldo por banco')) {
+        if (valorReal > 0) {
+          // Nota: Este registro precisa de um ban_id (banco)
+          console.warn(`⚠️  Saldo bancário sem mapeamento de banco: ${area}`);
+          await supabase.from('sdb_saldo_banco').insert({
+            sdb_data: data,
+            sdb_saldo: valorReal,
+            // sdb_ban_id: null, // Necessário mapear bancos
+          });
+          sucesso++;
+        }
+        continue;
+      }
+
+      // PAGAMENTOS POR BANCO
+      if (origem.includes('pagamento por banco')) {
+        if (valorReal > 0) {
+          // Nota: Este registro precisa de um ban_id (banco)
+          console.warn(`⚠️  Pagamento bancário sem mapeamento de banco: ${area}`);
+          await supabase.from('pbk_pagamentos_banco').insert({
+            pbk_data: data,
+            pbk_valor: valorReal,
+            // pbk_ban_id: null, // Necessário mapear bancos
+          });
+          sucesso++;
+        }
+        continue;
+      }
+
+      console.warn(`⚠️  Origem não reconhecida: ${origem} - Linha ignorada`);
 
     } catch (err) {
       console.error(`❌ Erro ao importar linha:`, err);
