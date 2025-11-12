@@ -334,10 +334,20 @@ const RelatorioCobrancaPage: React.FC = () => {
               .filter((tipo) => tipo.realizado !== 0)
               .sort((a, b) => b.realizado - a.realizado);
 
-            const previsto = arredondar(banco.previsto);
+            // Soma apenas os tipos "prevista" no comparativo
+            const previsto = arredondar(
+              tipos
+                .filter((t) => t.nome.trim().toUpperCase().includes('PREVIS'))
+                .reduce((acc, t) => acc + t.previsto, 0)
+            );
+            const realizadoPrevista = arredondar(
+              tipos
+                .filter((t) => t.nome.trim().toUpperCase().includes('PREVIS'))
+                .reduce((acc, t) => acc + t.realizado, 0)
+            );
             const realizado = arredondar(banco.realizado);
-            const diferenca = arredondar(realizado - previsto);
-            const percentual = previsto > 0 ? arredondar((realizado / previsto) * 100) : 0;
+            const diferenca = arredondar(realizadoPrevista - previsto);
+            const percentual = previsto > 0 ? arredondar((realizadoPrevista / previsto) * 100) : 0;
 
             return {
               id,
@@ -353,15 +363,23 @@ const RelatorioCobrancaPage: React.FC = () => {
           .sort((a, b) => b.realizado - a.realizado || a.nome.localeCompare(b.nome, 'pt-BR'));
 
         const totalPrevisto = arredondar(bancos.reduce((acc, banco) => acc + banco.previsto, 0));
+        const totalRealizadoPrevista = arredondar(
+          bancos.reduce((acc, banco) => {
+            const realizadoPrevista = banco.tipos
+              .filter((t) => t.nome.trim().toUpperCase().includes('PREVIS'))
+              .reduce((sum, t) => sum + t.realizado, 0);
+            return acc + realizadoPrevista;
+          }, 0)
+        );
         const totalRealizado = arredondar(bancos.reduce((acc, banco) => acc + banco.realizado, 0));
-        const diferenca = arredondar(totalRealizado - totalPrevisto);
+        const diferenca = arredondar(totalRealizadoPrevista - totalPrevisto);
 
         setRelatorio({
           data,
           bancos,
           totais: {
             previsto: totalPrevisto,
-            realizado: totalRealizado,
+            realizado: totalRealizadoPrevista,
             diferenca,
           },
         });
@@ -676,45 +694,22 @@ const RelatorioCobrancaPage: React.FC = () => {
                   <table className="min-w-full text-sm text-gray-700">
                     <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                       <tr>
-                        <th className="px-4 py-3 text-left font-semibold">Banco</th>
-                        <th className="px-4 py-3 text-right font-semibold">Previsto</th>
-                        <th className="px-4 py-3 text-right font-semibold">Realizado</th>
-                        <th className="px-4 py-3 text-right font-semibold">Diferença</th>
-                        <th className="px-4 py-3 text-right font-semibold">% REC</th>
+                        <th className="px-4 py-3 text-center font-semibold">Banco</th>
+                        <th className="px-4 py-3 text-center font-semibold">Realizado</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white">
                       {relatorio.bancos.map((banco) => (
                         <tr key={banco.id}>
                           <td className="px-4 py-3 font-medium text-gray-800">{banco.nome}</td>
-                          <td className="px-4 py-3 text-right text-gray-700">{formatCurrency(banco.previsto)}</td>
                           <td className="px-4 py-3 text-right text-gray-700">{formatCurrency(banco.realizado)}</td>
-                          <td
-                            className={`px-4 py-3 text-right font-semibold ${
-                              banco.diferenca >= 0 ? 'text-success-600' : 'text-error-600'
-                            }`}
-                          >
-                            {formatCurrency(banco.diferenca)}
-                          </td>
-                          <td className="px-4 py-3 text-right text-gray-700">
-                            {banco.percentual.toFixed(1).replace('.', ',')}%
-                          </td>
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="bg-gray-50 text-sm font-semibold text-gray-700">
+                    <tfoot className="bg-gray-50 text-sm font-semibold text-gray-700 border-t-2 border-gray-400">
                       <tr>
-                        <td className="px-4 py-3 text-right">Totais</td>
-                        <td className="px-4 py-3 text-right">{formatCurrency(relatorio.totais.previsto)}</td>
+                        <td className="px-4 py-3 text-right">Total</td>
                         <td className="px-4 py-3 text-right">{formatCurrency(relatorio.totais.realizado)}</td>
-                        <td
-                          className={`px-4 py-3 text-right ${
-                            relatorio.totais.diferenca >= 0 ? 'text-success-600' : 'text-error-600'
-                          }`}
-                        >
-                          {formatCurrency(relatorio.totais.diferenca)}
-                        </td>
-                        <td className="px-4 py-3 text-right">-</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -739,31 +734,36 @@ const RelatorioCobrancaPage: React.FC = () => {
                         <table className="min-w-full text-sm text-gray-700">
                           <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                             <tr>
-                              <th className="px-4 py-3 text-left font-semibold">Tipo de Receita</th>
-                              <th className="px-4 py-3 text-right font-semibold">Previsto</th>
-                              <th className="px-4 py-3 text-right font-semibold">Realizado</th>
-                              <th className="px-4 py-3 text-right font-semibold">Diferença</th>
-                              <th className="px-4 py-3 text-right font-semibold">% REC</th>
+                              <th className="px-4 py-3 text-center font-semibold">Tipo de Receita</th>
+                              <th className="px-4 py-3 text-center font-semibold">Previsto</th>
+                              <th className="px-4 py-3 text-center font-semibold">Realizado</th>
+                              <th className="px-4 py-3 text-center font-semibold">Diferença</th>
+                              <th className="px-4 py-3 text-center font-semibold">% REC</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100 bg-white">
-                            {banco.tipos.map((tipo) => (
-                              <tr key={tipo.id}>
-                                <td className="px-4 py-3 font-medium text-gray-800">{tipo.nome}</td>
-                                <td className="px-4 py-3 text-right text-gray-700">{formatCurrency(tipo.previsto)}</td>
-                                <td className="px-4 py-3 text-right text-gray-700">{formatCurrency(tipo.realizado)}</td>
-                                <td
-                                  className={`px-4 py-3 text-right font-semibold ${
-                                    tipo.diferenca >= 0 ? 'text-success-600' : 'text-error-600'
-                                  }`}
-                                >
-                                  {formatCurrency(tipo.diferenca)}
-                                </td>
-                                <td className="px-4 py-3 text-right text-gray-700">
-                                  {tipo.percentual.toFixed(1).replace('.', ',')}%
-                                </td>
-                              </tr>
-                            ))}
+                            {banco.tipos.map((tipo) => {
+                              const ehPrevista = tipo.nome.trim().toUpperCase().includes('PREVIS');
+                              return (
+                                <tr key={tipo.id}>
+                                  <td className="px-4 py-3 font-medium text-gray-800">{tipo.nome}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">
+                                    {ehPrevista ? formatCurrency(tipo.previsto) : '-'}
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{formatCurrency(tipo.realizado)}</td>
+                                  <td
+                                    className={`px-4 py-3 text-right font-semibold ${
+                                      ehPrevista && tipo.diferenca >= 0 ? 'text-success-600' : ehPrevista && tipo.diferenca < 0 ? 'text-error-600' : 'text-gray-700'
+                                    }`}
+                                  >
+                                    {ehPrevista ? formatCurrency(tipo.diferenca) : '-'}
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-gray-700">
+                                    {ehPrevista ? `${tipo.percentual.toFixed(1).replace('.', ',')}%` : '-'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>

@@ -1731,35 +1731,37 @@ const SaldoDiarioPage: React.FC = () => {
                                         </div>
                                       </div>
                                     ) : (
-                                      <div className="flex flex-wrap items-center gap-2">
+                                      <div className="flex items-start justify-between gap-2">
                                         <span className="font-semibold text-primary-700">
                                           {formatCurrency(registro.valor)}
                                         </span>
-                                        <Button
-                                          type="button"
-                                          variant="secondary"
-                                          size="sm"
-                                          onClick={() => {
-                                            setEmEdicaoArea(prev => new Set(prev).add(registro.id));
-                                            setPagamentosAreaEdicao((prev) => ({
-                                              ...prev,
-                                              [registro.id]: formatarValorParaInput(registro.valor),
-                                            }));
-                                          }}
-                                          disabled={!edicaoLiberada}
-                                        >
-                                          Editar
-                                        </Button>
-                                        <Button
-                                          type="button"
-                                          variant="danger"
-                                          size="sm"
-                                          onClick={() => handleExcluirPagamentoArea(registro)}
-                                          disabled={!edicaoLiberada}
-                                          loading={registroExcluindo.area === registro.id}
-                                        >
-                                          Excluir
-                                        </Button>
+                                        <div className="flex flex-col gap-1">
+                                          <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => {
+                                              setEmEdicaoArea(prev => new Set(prev).add(registro.id));
+                                              setPagamentosAreaEdicao((prev) => ({
+                                                ...prev,
+                                                [registro.id]: formatarValorParaInput(registro.valor),
+                                              }));
+                                            }}
+                                            disabled={!edicaoLiberada}
+                                          >
+                                            Editar
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="danger"
+                                            size="sm"
+                                            onClick={() => handleExcluirPagamentoArea(registro)}
+                                            disabled={!edicaoLiberada}
+                                            loading={registroExcluindo.area === registro.id}
+                                          >
+                                            Excluir
+                                          </Button>
+                                        </div>
                                       </div>
                                     )}
                                   </div>
@@ -1921,35 +1923,37 @@ const SaldoDiarioPage: React.FC = () => {
                                         </div>
                                       </div>
                                     ) : (
-                                      <div className="flex flex-wrap items-center gap-2">
+                                      <div className="flex items-start justify-between gap-2">
                                         <span className="font-semibold text-error-700">
                                           {formatCurrency(registro.valor)}
                                         </span>
-                                        <Button
-                                          type="button"
-                                          variant="secondary"
-                                          size="sm"
-                                          onClick={() => {
-                                            setEmEdicaoPagamentoBanco(prev => new Set(prev).add(registro.id));
-                                            setPagamentosBancoEdicao((prev) => ({
-                                              ...prev,
-                                              [registro.id]: formatarValorParaInput(registro.valor),
-                                            }));
-                                          }}
-                                          disabled={!edicaoLiberada}
-                                        >
-                                          Editar
-                                        </Button>
-                                        <Button
-                                          type="button"
-                                          variant="danger"
-                                          size="sm"
-                                          onClick={() => handleExcluirPagamentoBanco(registro)}
-                                          disabled={!edicaoLiberada}
-                                          loading={registroExcluindo.banco === registro.id}
-                                        >
-                                          Excluir
-                                        </Button>
+                                        <div className="flex flex-col gap-1">
+                                          <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => {
+                                              setEmEdicaoPagamentoBanco(prev => new Set(prev).add(registro.id));
+                                              setPagamentosBancoEdicao((prev) => ({
+                                                ...prev,
+                                                [registro.id]: formatarValorParaInput(registro.valor),
+                                              }));
+                                            }}
+                                            disabled={!edicaoLiberada}
+                                          >
+                                            Editar
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="danger"
+                                            size="sm"
+                                            onClick={() => handleExcluirPagamentoBanco(registro)}
+                                            disabled={!edicaoLiberada}
+                                            loading={registroExcluindo.banco === registro.id}
+                                          >
+                                            Excluir
+                                          </Button>
+                                        </div>
                                       </div>
                                     )}
                                   </div>
@@ -2111,35 +2115,37 @@ const SaldoDiarioPage: React.FC = () => {
                                         </div>
                                       </div>
                                     ) : (
-                                      <div className="flex flex-wrap items-center gap-2">
+                                      <div className="flex items-start justify-between gap-2">
                                         <span className="font-semibold text-success-700">
                                           {formatCurrency(registro.valor)}
                                         </span>
-                                        <Button
-                                          type="button"
-                                          variant="secondary"
-                                          size="sm"
-                                          onClick={() => {
-                                            setEmEdicaoReceita(prev => new Set(prev).add(registro.id));
-                                            setReceitasEdicao((prev) => ({
-                                              ...prev,
-                                              [registro.id]: formatarValorParaInput(registro.valor),
-                                            }));
-                                          }}
-                                          disabled={!edicaoLiberada}
-                                        >
-                                          Editar
-                                        </Button>
-                                        <Button
-                                          type="button"
-                                          variant="danger"
-                                          size="sm"
-                                          onClick={() => handleExcluirReceita(registro)}
-                                          disabled={!edicaoLiberada}
-                                          loading={registroExcluindo.receita === registro.id}
-                                        >
-                                          Excluir
-                                        </Button>
+                                        <div className="flex flex-col gap-1">
+                                          <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => {
+                                              setEmEdicaoReceita(prev => new Set(prev).add(registro.id));
+                                              setReceitasEdicao((prev) => ({
+                                                ...prev,
+                                                [registro.id]: formatarValorParaInput(registro.valor),
+                                              }));
+                                            }}
+                                            disabled={!edicaoLiberada}
+                                          >
+                                            Editar
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="danger"
+                                            size="sm"
+                                            onClick={() => handleExcluirReceita(registro)}
+                                            disabled={!edicaoLiberada}
+                                            loading={registroExcluindo.receita === registro.id}
+                                          >
+                                            Excluir
+                                          </Button>
+                                        </div>
                                       </div>
                                     )}
                                   </div>
@@ -2302,7 +2308,7 @@ const SaldoDiarioPage: React.FC = () => {
                                         </div>
                                       </div>
                                     ) : (
-                                      <div className="flex flex-wrap items-center gap-2">
+                                      <div className="flex items-start justify-between gap-2">
                                         <span
                                           className={`font-semibold ${
                                             registro.valor >= 0 ? 'text-success-700' : 'text-error-700'
@@ -2310,31 +2316,33 @@ const SaldoDiarioPage: React.FC = () => {
                                         >
                                           {formatCurrency(registro.valor)}
                                         </span>
-                                        <Button
-                                          type="button"
-                                          variant="secondary"
-                                          size="sm"
-                                          onClick={() => {
-                                            setEmEdicaoSaldoBanco(prev => new Set(prev).add(registro.id));
-                                            setSaldosBancoEdicao((prev) => ({
-                                              ...prev,
-                                              [registro.id]: formatarValorParaInput(registro.valor),
-                                            }));
-                                          }}
-                                          disabled={!edicaoLiberada}
-                                        >
-                                          Editar
-                                        </Button>
-                                        <Button
-                                          type="button"
-                                          variant="danger"
-                                          size="sm"
-                                          onClick={() => handleExcluirSaldoBanco(registro)}
-                                          disabled={!edicaoLiberada}
-                                          loading={registroExcluindo.saldo === registro.id}
-                                        >
-                                          Excluir
-                                        </Button>
+                                        <div className="flex flex-col gap-1">
+                                          <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => {
+                                              setEmEdicaoSaldoBanco(prev => new Set(prev).add(registro.id));
+                                              setSaldosBancoEdicao((prev) => ({
+                                                ...prev,
+                                                [registro.id]: formatarValorParaInput(registro.valor),
+                                              }));
+                                            }}
+                                            disabled={!edicaoLiberada}
+                                          >
+                                            Editar
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="danger"
+                                            size="sm"
+                                            onClick={() => handleExcluirSaldoBanco(registro)}
+                                            disabled={!edicaoLiberada}
+                                            loading={registroExcluindo.saldo === registro.id}
+                                          >
+                                            Excluir
+                                          </Button>
+                                        </div>
                                       </div>
                                     )}
                                   </div>

@@ -232,7 +232,7 @@ const converterMapaParaLinhas = (
     .map(([chave, item]) => {
       const previsto = arredondar(item.previsto);
       const realizado = arredondar(item.realizado);
-      const desvio = arredondar(previsto - realizado);
+      const desvio = arredondar(realizado - previsto);
       const percentual = calcularPercentual(previsto, realizado);
       return { chave, titulo: item.titulo, previsto, realizado, desvio, percentual };
     })
@@ -521,7 +521,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
         layout === 'comparativo' ? somarPrevisto(linhasParaComparativo) : 0;
       const totalRealizado =
         layout === 'comparativo' ? somarRealizado(linhasParaComparativo) : somarRealizado(linhas);
-      const totalDesvio = layout === 'comparativo' ? arredondar(totalPrevisto - totalRealizado) : 0;
+      const totalDesvio = layout === 'comparativo' ? arredondar(totalRealizado - totalPrevisto) : 0;
       const totalPercentual =
         layout === 'comparativo' ? calcularPercentual(totalPrevisto, totalRealizado) : null;
       const colSpan = layout === 'comparativo' ? 5 : 2;
@@ -577,7 +577,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
               )}
             </tbody>
             {showTotals && (
-              <tfoot>
+              <tfoot className="border-t-2 border-gray-400">
                 {layout === 'comparativo' ? (
                   <tr>
                     <td>{totalLabel}</td>
@@ -745,7 +745,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
         layout === 'comparativo' ? somarPrevisto(linhasParaComparativo) : 0;
       const totalRealizado =
         layout === 'comparativo' ? somarRealizado(linhasParaComparativo) : somarRealizado(linhas);
-      const totalDesvio = layout === 'comparativo' ? arredondar(totalPrevisto - totalRealizado) : 0;
+      const totalDesvio = layout === 'comparativo' ? arredondar(totalRealizado - totalPrevisto) : 0;
       const totalPercentual =
         layout === 'comparativo' ? calcularPercentual(totalPrevisto, totalRealizado) : null;
       const deveMostrarTotais = (showTotals ?? layout === 'comparativo') && linhasParaExibir.length > 0;
