@@ -34,10 +34,13 @@ type PrevisaoRow = {
   tpr_tipos_receita?: MaybeArray<{ tpr_id?: unknown; tpr_nome?: unknown; tpr_codigo?: unknown } | null>;
 };
 
-type ReceitaRow = {
-  rec_valor?: unknown;
-  rec_ctr_id?: unknown;
+type CobrancaRow = {
+  cob_valor?: unknown;
+  cob_ctr_id?: unknown;
+  cob_ban_id?: unknown;
   ctr_contas_receita?: MaybeArray<{ ctr_nome?: unknown; ctr_codigo?: unknown } | null>;
+  ban_bancos?: MaybeArray<{ ban_nome?: unknown; ban_codigo?: unknown } | null>;
+  tpr_tipos_receita?: MaybeArray<{ tpr_id?: unknown; tpr_nome?: unknown; tpr_codigo?: unknown } | null>;
 };
 
 type TipoResumo = {
@@ -160,7 +163,7 @@ const RelatorioCobrancaPage: React.FC = () => {
         setCarregandoDados(true);
         const supabase = getSupabaseClient();
 
-        const [previsoesRes, receitasRes] = await Promise.all([
+        const [previsoesRes, cobrancasRes] = await Promise.all([
           supabase
             .from('pvi_previsao_itens')
             .select(
@@ -169,16 +172,16 @@ const RelatorioCobrancaPage: React.FC = () => {
             .eq('pvi_tipo', 'receita')
             .eq('pvi_data', data),
           supabase
-            .from('rec_receitas')
-            .select('rec_valor, rec_ctr_id, ctr_contas_receita(ctr_nome, ctr_codigo)')
-            .eq('rec_data', data),
+            .from('cob_cobrancas')
+            .select('cob_valor, cob_ctr_id, cob_ban_id, ctr_contas_receita(ctr_nome, ctr_codigo), ban_bancos(ban_nome, ban_codigo), tpr_tipos_receita(tpr_id, tpr_nome, tpr_codigo)')
+            .eq('cob_data', data),
         ]);
 
         if (previsoesRes.error) throw previsoesRes.error;
-        if (receitasRes.error) throw receitasRes.error;
+        if (cobrancasRes.error) throw cobrancasRes.error;
 
         const previsoes = normalizeRelation(previsoesRes.data as MaybeArray<PrevisaoRow>);
-        const receitas = normalizeRelation(receitasRes.data as MaybeArray<ReceitaRow>);
+        const cobrancas = normalizeRelation(cobrancasRes.data as MaybeArray<CobrancaRow>);
 
         type ContaResumo = {
           chave: string;
@@ -233,22 +236,44 @@ const RelatorioCobrancaPage: React.FC = () => {
           contasMap.set(contaChave, existente);
         });
 
-        receitas.forEach((item) => {
-          const valor = arredondar(toNumber(item.rec_valor));
+        cobrancas.forEach((item) => {
+          const valor = arredondar(toNumber(item.cob_valor));
           if (valor === 0) {
             return;
           }
 
           const contaRel = normalizeRelation(item.ctr_contas_receita)[0];
           const contaNome = contaRel?.ctr_nome ? toString(contaRel.ctr_nome) : 'Conta não informada';
-          const contaId = toNumber(item.rec_ctr_id, 0);
+          const contaId = toNumber(item.cob_ctr_id, 0);
           const contaChave = construirChave(contaId, contaNome, 'conta');
 
-          const existente = contasMap.get(contaChave);
-          if (existente) {
-            existente.realizado += valor;
-            contasMap.set(contaChave, existente);
-          }
+          const bancoRel = normalizeRelation(item.ban_bancos)[0];
+          const bancoNome = bancoRel?.ban_nome ? toString(bancoRel.ban_nome) : 'Banco não informado';
+          const bancoIdNumero = toNumber(item.cob_ban_id, NaN);
+          const bancoChave = construirChave(bancoIdNumero, bancoNome, 'banco');
+
+          const tipoRel = normalizeRelation(item.tpr_tipos_receita)[0];
+          const tipoNome = tipoRel?.tpr_nome ? toString(tipoRel.tpr_nome) : contaNome;
+          const tipoIdNumero = toNumber(tipoRel?.tpr_id, NaN);
+          const tipoChave = construirChave(tipoIdNumero, tipoNome, 'tipo');
+
+          const existente = contasMap.get(contaChave) ?? {
+            chave: contaChave,
+            contaNome,
+            bancoId: bancoChave,
+            bancoNome,
+            tipoId: tipoChave,
+            tipoNome,
+            previsto: 0,
+            realizado: 0,
+          };
+
+          existente.realizado += valor;
+          existente.bancoId = bancoChave;
+          existente.bancoNome = bancoNome;
+          existente.tipoId = tipoChave;
+          existente.tipoNome = tipoNome;
+          contasMap.set(contaChave, existente);
         });
 
         type BancoAcumulado = {
@@ -309,10 +334,20 @@ const RelatorioCobrancaPage: React.FC = () => {
               .filter((tipo) => tipo.realizado !== 0)
               .sort((a, b) => b.realizado - a.realizado);
 
-            const previsto = arredondar(banco.previsto);
+            // Soma apenas os tipos "prevista" no comparativo
+            const previsto = arredondar(
+              tipos
+                .filter((t) => t.nome.trim().toUpperCase().includes('PREVIS'))
+                .reduce((acc, t) => acc + t.previsto, 0)
+            );
+            const realizadoPrevista = arredondar(
+              tipos
+                .filter((t) => t.nome.trim().toUpperCase().includes('PREVIS'))
+                .reduce((acc, t) => acc + t.realizado, 0)
+            );
             const realizado = arredondar(banco.realizado);
-            const diferenca = arredondar(realizado - previsto);
-            const percentual = previsto > 0 ? arredondar((realizado / previsto) * 100) : 0;
+            const diferenca = arredondar(realizadoPrevista - previsto);
+            const percentual = previsto > 0 ? arredondar((realizadoPrevista / previsto) * 100) : 0;
 
             return {
               id,
@@ -328,15 +363,23 @@ const RelatorioCobrancaPage: React.FC = () => {
           .sort((a, b) => b.realizado - a.realizado || a.nome.localeCompare(b.nome, 'pt-BR'));
 
         const totalPrevisto = arredondar(bancos.reduce((acc, banco) => acc + banco.previsto, 0));
+        const totalRealizadoPrevista = arredondar(
+          bancos.reduce((acc, banco) => {
+            const realizadoPrevista = banco.tipos
+              .filter((t) => t.nome.trim().toUpperCase().includes('PREVIS'))
+              .reduce((sum, t) => sum + t.realizado, 0);
+            return acc + realizadoPrevista;
+          }, 0)
+        );
         const totalRealizado = arredondar(bancos.reduce((acc, banco) => acc + banco.realizado, 0));
-        const diferenca = arredondar(totalRealizado - totalPrevisto);
+        const diferenca = arredondar(totalRealizadoPrevista - totalPrevisto);
 
         setRelatorio({
           data,
           bancos,
           totais: {
             previsto: totalPrevisto,
-            realizado: totalRealizado,
+            realizado: totalRealizadoPrevista,
             diferenca,
           },
         });
@@ -364,9 +407,7 @@ const RelatorioCobrancaPage: React.FC = () => {
     carregarRelatorio(dataReferencia);
   }, [usuario, dataReferencia, carregarRelatorio]);
 
-  const handleAplicarFiltro = useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
+  const handleAplicarFiltro = useCallback(() => {
       if (!dataFiltro) {
         return;
       }
@@ -567,7 +608,24 @@ const RelatorioCobrancaPage: React.FC = () => {
   );
 
   const botoesAcoes = (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap items-center gap-3">
+      <div className="flex items-center gap-2">
+        <label className="text-sm font-medium text-gray-700">Data:</label>
+        <input
+          type="date"
+          value={dataFiltro}
+          onChange={(event) => setDataFiltro(event.target.value)}
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        />
+      </div>
+      <Button
+        type="button"
+        variant="primary"
+        onClick={handleAplicarFiltro}
+        disabled={carregandoDados}
+      >
+        Gerar relatório
+      </Button>
       <Button
         type="button"
         variant="secondary"
@@ -607,25 +665,6 @@ const RelatorioCobrancaPage: React.FC = () => {
       />
 
       <div className="page-content space-y-6">
-        <Card title="Filtros" subtitle="Defina a data desejada e gere o relatório">
-          <form className="space-y-4" onSubmit={handleAplicarFiltro}>
-            <div className="grid gap-4 md:grid-cols-3">
-              <Input
-                type="date"
-                label="Data de referência"
-                value={dataFiltro}
-                onChange={(event) => setDataFiltro(event.target.value)}
-                required
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button type="submit" variant="primary" disabled={carregandoDados}>
-                Gerar relatório
-              </Button>
-            </div>
-          </form>
-        </Card>
-
         {erro && (
           <Card variant="danger" title="Não foi possível gerar o relatório">
             <p className="text-sm text-gray-700">{erro}</p>
@@ -651,45 +690,22 @@ const RelatorioCobrancaPage: React.FC = () => {
                   <table className="min-w-full text-sm text-gray-700">
                     <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                       <tr>
-                        <th className="px-4 py-3 text-left font-semibold">Banco</th>
-                        <th className="px-4 py-3 text-right font-semibold">Previsto</th>
-                        <th className="px-4 py-3 text-right font-semibold">Realizado</th>
-                        <th className="px-4 py-3 text-right font-semibold">Diferença</th>
-                        <th className="px-4 py-3 text-right font-semibold">% REC</th>
+                        <th className="px-4 py-3 text-center font-semibold">Banco</th>
+                        <th className="px-4 py-3 text-center font-semibold">Realizado</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white">
                       {relatorio.bancos.map((banco) => (
                         <tr key={banco.id}>
                           <td className="px-4 py-3 font-medium text-gray-800">{banco.nome}</td>
-                          <td className="px-4 py-3 text-right text-gray-700">{formatCurrency(banco.previsto)}</td>
                           <td className="px-4 py-3 text-right text-gray-700">{formatCurrency(banco.realizado)}</td>
-                          <td
-                            className={`px-4 py-3 text-right font-semibold ${
-                              banco.diferenca >= 0 ? 'text-success-600' : 'text-error-600'
-                            }`}
-                          >
-                            {formatCurrency(banco.diferenca)}
-                          </td>
-                          <td className="px-4 py-3 text-right text-gray-700">
-                            {banco.percentual.toFixed(1).replace('.', ',')}%
-                          </td>
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="bg-gray-50 text-sm font-semibold text-gray-700">
+                    <tfoot className="bg-gray-50 text-sm font-semibold text-gray-700 border-t-2 border-gray-400">
                       <tr>
-                        <td className="px-4 py-3 text-right">Totais</td>
-                        <td className="px-4 py-3 text-right">{formatCurrency(relatorio.totais.previsto)}</td>
+                        <td className="px-4 py-3 text-right">Total</td>
                         <td className="px-4 py-3 text-right">{formatCurrency(relatorio.totais.realizado)}</td>
-                        <td
-                          className={`px-4 py-3 text-right ${
-                            relatorio.totais.diferenca >= 0 ? 'text-success-600' : 'text-error-600'
-                          }`}
-                        >
-                          {formatCurrency(relatorio.totais.diferenca)}
-                        </td>
-                        <td className="px-4 py-3 text-right">-</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -714,31 +730,36 @@ const RelatorioCobrancaPage: React.FC = () => {
                         <table className="min-w-full text-sm text-gray-700">
                           <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                             <tr>
-                              <th className="px-4 py-3 text-left font-semibold">Tipo de Receita</th>
-                              <th className="px-4 py-3 text-right font-semibold">Previsto</th>
-                              <th className="px-4 py-3 text-right font-semibold">Realizado</th>
-                              <th className="px-4 py-3 text-right font-semibold">Diferença</th>
-                              <th className="px-4 py-3 text-right font-semibold">% REC</th>
+                              <th className="px-4 py-3 text-center font-semibold">Tipo de Receita</th>
+                              <th className="px-4 py-3 text-center font-semibold">Previsto</th>
+                              <th className="px-4 py-3 text-center font-semibold">Realizado</th>
+                              <th className="px-4 py-3 text-center font-semibold">Diferença</th>
+                              <th className="px-4 py-3 text-center font-semibold">% REC</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100 bg-white">
-                            {banco.tipos.map((tipo) => (
-                              <tr key={tipo.id}>
-                                <td className="px-4 py-3 font-medium text-gray-800">{tipo.nome}</td>
-                                <td className="px-4 py-3 text-right text-gray-700">{formatCurrency(tipo.previsto)}</td>
-                                <td className="px-4 py-3 text-right text-gray-700">{formatCurrency(tipo.realizado)}</td>
-                                <td
-                                  className={`px-4 py-3 text-right font-semibold ${
-                                    tipo.diferenca >= 0 ? 'text-success-600' : 'text-error-600'
-                                  }`}
-                                >
-                                  {formatCurrency(tipo.diferenca)}
-                                </td>
-                                <td className="px-4 py-3 text-right text-gray-700">
-                                  {tipo.percentual.toFixed(1).replace('.', ',')}%
-                                </td>
-                              </tr>
-                            ))}
+                            {banco.tipos.map((tipo) => {
+                              const ehPrevista = tipo.nome.trim().toUpperCase().includes('PREVIS');
+                              return (
+                                <tr key={tipo.id}>
+                                  <td className="px-4 py-3 font-medium text-gray-800">{tipo.nome}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">
+                                    {ehPrevista ? formatCurrency(tipo.previsto) : '-'}
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{formatCurrency(tipo.realizado)}</td>
+                                  <td
+                                    className={`px-4 py-3 text-right font-semibold ${
+                                      ehPrevista && tipo.diferenca >= 0 ? 'text-success-600' : ehPrevista && tipo.diferenca < 0 ? 'text-error-600' : 'text-gray-700'
+                                    }`}
+                                  >
+                                    {ehPrevista ? formatCurrency(tipo.diferenca) : '-'}
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-gray-700">
+                                    {ehPrevista ? `${tipo.percentual.toFixed(1).replace('.', ',')}%` : '-'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>

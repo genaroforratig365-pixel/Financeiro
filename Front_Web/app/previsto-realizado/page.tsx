@@ -97,13 +97,6 @@ export default function PrevistoRealizadoPage() {
 
         // Buscar previsões do período (da tabela pvi_previsao_itens)
         // Primeiro, vamos verificar se existe ALGUM dado na tabela
-        const { data: todosRegistros, error: erroTodos } = await supabase
-          .from('pvi_previsao_itens')
-          .select('pvi_id, pvi_data, pvi_tipo')
-          .limit(5);
-
-        console.log('Primeiros 5 registros da tabela (para debug):', todosRegistros);
-
         const { data: previsoesData, error: erroPrevisoes } = await supabase
           .from('pvi_previsao_itens')
           .select(`
@@ -121,11 +114,6 @@ export default function PrevistoRealizadoPage() {
 
         if (erroPrevisoes) throw erroPrevisoes;
 
-        console.log('=== DEBUG Previsto x Realizado ===');
-        console.log('Período:', periodoInicio, 'até', periodoFim);
-        console.log('Dados retornados de pvi_previsao_itens:', previsoesData);
-        console.log('Quantidade de registros:', previsoesData?.length || 0);
-
         // Transformar dados
         const previsoesFormatadas = (previsoesData || []).map((item: any) => {
           const area = Array.isArray(item.are_areas) ? item.are_areas[0] : item.are_areas;
@@ -138,8 +126,6 @@ export default function PrevistoRealizadoPage() {
             area_nome: area?.are_nome || null
           };
         });
-
-        console.log('Previsões formatadas:', previsoesFormatadas);
 
         // Buscar saldos realizados - calculando diretamente das tabelas
         // Buscar receitas de rec_receitas
@@ -190,8 +176,6 @@ export default function PrevistoRealizadoPage() {
             saldo: valores.receitas - valores.despesas
           })
         );
-
-        console.log('Saldos realizados calculados:', saldosCalculados);
 
         setPrevisoes(previsoesFormatadas);
         setSaldos(saldosCalculados);
@@ -330,36 +314,6 @@ export default function PrevistoRealizadoPage() {
       />
 
       <div className="page-content space-y-6">
-        {/* DEBUG - Remover depois */}
-        {!carregando && (
-          <Card title="🔍 DEBUG - Informações de Dados">
-            <div className="space-y-2 text-sm">
-              <div>
-                <strong>Período:</strong> {periodoInicio} até {periodoFim}
-              </div>
-              <div>
-                <strong>Total de previsões carregadas:</strong> {previsoes.length} registros
-              </div>
-              <div>
-                <strong>Previsões após filtros:</strong> {previsoesFiltradas.length} registros
-              </div>
-              <div>
-                <strong>Datas no comparativo:</strong> {dadosComparativos.length} dias
-              </div>
-              {previsoes.length > 0 && (
-                <div>
-                  <strong>Primeira previsão:</strong>{' '}
-                  {previsoes[0].data} - {previsoes[0].tipo} - {previsoes[0].categoria} -{' '}
-                  {formatCurrency(previsoes[0].valor)}
-                </div>
-              )}
-              <div className="text-xs text-gray-500 mt-2">
-                Abra o Console do navegador (F12) para ver logs detalhados
-              </div>
-            </div>
-          </Card>
-        )}
-
         {/* Filtros de período e área */}
         <Card title="Filtros de Análise">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

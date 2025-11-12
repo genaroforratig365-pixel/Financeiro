@@ -286,7 +286,7 @@ export const Sidebar: React.FC = () => {
     <aside className="sidebar">
       {/* Logo */}
       <div className="p-6 border-b border-gray-200">
-        <Link href="/saldo-diario" className="flex flex-col gap-1">
+        <Link href="/dashboard" className="flex flex-col gap-1">
           <span className="text-xs font-semibold uppercase text-primary-600">Germani</span>
           <span className="text-lg font-semibold text-gray-900 tracking-tight">Financeiro</span>
         </Link>

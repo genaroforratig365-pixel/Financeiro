@@ -132,110 +132,72 @@ export default function DashboardPage() {
   return (
     <>
       <Header
-        title="Dashboard"
-        subtitle="Bem-vindo ao painel central. Escolha um módulo para começar."
+        title="Germani Alimentos"
+        subtitle={`Bem-vindo, ${session.displayName}`}
       />
 
-      <div className="page-content space-y-6">
-        <Card>
-          <div className="space-y-6">
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Operador ativo</p>
-                <h2 className="text-xl font-semibold text-gray-900">{session.displayName}</h2>
-                {session.userEmail && (
-                  <p className="text-sm text-gray-500">{session.userEmail}</p>
-                )}
-              </div>
-              <div className="rounded-lg border border-primary-100 bg-primary-50/40 px-4 py-3 text-sm text-primary-700">
-                Escolha um módulo abaixo para registrar ou consultar os dados do dia.
-              </div>
+      <div className="page-content">
+        <div className="flex min-h-[calc(100vh-200px)] items-center justify-center">
+          <div className="w-full max-w-4xl text-center space-y-8">
+            {/* Logo */}
+            <div className="flex justify-center mb-8">
+              <img
+                src="https://static.wixstatic.com/media/ce3165_c01db19c0ef64e2abb8c894c7ecc6f95~mv2.png/v1/fill/w_322,h_138,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/logomarca-Germani-2023-Branca-borda-dour.png"
+                alt="Germani Alimentos"
+                className="h-32 w-auto"
+              />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {modulos.map((modulo) => (
-                <Link
-                  key={modulo.titulo}
-                  href={modulo.href}
-                  className="group flex h-full flex-col justify-between rounded-lg border border-gray-200 bg-white/80 p-4 shadow-sm transition hover:border-primary-300 hover:shadow-md"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-base font-semibold text-gray-900 group-hover:text-primary-700">
-                        {modulo.titulo}
-                      </h3>
-                      {modulo.destaque && (
-                        <span className="rounded-full bg-primary-100 px-2 py-0.5 text-xs font-semibold text-primary-700">
-                          {modulo.destaque}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600">{modulo.descricao}</p>
-                  </div>
-                  <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary-600">
-                    Acessar módulo
-                    <svg
-                      className="h-4 w-4 transition group-hover:translate-x-1"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </span>
-                </Link>
-              ))}
+            {/* Informações da Empresa */}
+            <div className="space-y-4">
+              <h1 className="text-4xl font-bold text-gray-900">Germani Alimentos LTDA</h1>
+              <p className="text-xl text-gray-600">Sistema de Gestão Financeira</p>
+            </div>
+
+            {/* Operador Ativo */}
+            <div className="inline-flex items-center gap-2 rounded-full border-2 border-[#C1272D]/20 bg-white px-6 py-3 shadow-lg">
+              <svg className="h-5 w-5 text-[#C1272D]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span className="text-sm font-medium text-gray-700">
+                Operador: <strong className="text-[#C1272D]">{session.displayName}</strong>
+              </span>
+            </div>
+
+            {/* Link para o Site */}
+            <div className="pt-8">
+              <a
+                href="https://www.germani.com.br/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-lg bg-[#C1272D] px-6 py-3 text-white font-semibold hover:bg-[#A01F24] transition shadow-lg hover:shadow-xl"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                </svg>
+                Visite nosso site
+              </a>
+            </div>
+
+            {/* Módulos de Acesso Rápido */}
+            <div className="pt-12">
+              <h2 className="text-lg font-semibold text-gray-700 mb-6">Módulos Disponíveis</h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {modulos.map((modulo) => (
+                  <Link
+                    key={modulo.titulo}
+                    href={modulo.href}
+                    className="group rounded-lg border-2 border-gray-200 bg-white p-4 hover:border-[#C1272D] hover:shadow-lg transition"
+                  >
+                    <h3 className="font-semibold text-gray-900 group-hover:text-[#C1272D] transition">
+                      {modulo.titulo}
+                    </h3>
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
-        </Card>
-
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <Loading text="Calculando indicadores..." />
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            <Card
-              title="Pagamentos do Dia"
-              subtitle={formatCurrency(resumo.total_pagamentos)}
-              variant="danger"
-            >
-              <p className="text-sm text-gray-600">
-                Total consolidado dos pagamentos registrados para hoje.
-              </p>
-            </Card>
-
-            <Card
-              title="Recebimentos do Dia"
-              subtitle={formatCurrency(resumo.total_recebimentos)}
-              variant="success"
-            >
-              <p className="text-sm text-gray-600">
-                Receitas confirmadas nas contas cadastradas.
-              </p>
-            </Card>
-
-            <Card
-              title="Saldo Previsto"
-              subtitle={formatCurrency(resumo.saldo_previsto)}
-              variant="primary"
-            >
-              <p className="text-sm text-gray-600">
-                Resultado financeiro esperado considerando lançamentos programados.
-              </p>
-            </Card>
-
-            <Card
-              title="Saldo Realizado"
-              subtitle={formatCurrency(resumo.saldo_realizado)}
-            >
-              <p className="text-sm text-gray-600">
-                Resultado após compensações confirmadas em bancos e áreas.
-              </p>
-            </Card>
-          </div>
-        )}
+        </div>
       </div>
     </>
   );

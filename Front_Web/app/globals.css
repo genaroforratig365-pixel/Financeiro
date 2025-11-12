@@ -233,7 +233,7 @@ select {
 }
 
 .report-grid--two {
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  grid-template-columns: 1fr 1fr;
 }
 
 .report-section {

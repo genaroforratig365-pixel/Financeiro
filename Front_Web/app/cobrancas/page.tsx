@@ -122,6 +122,17 @@ const formatarNumeroEmTempoReal = (valor: string): string => {
   });
 };
 
+const obterResultadoFormula = (valor: string): string | null => {
+  // Se contém operadores matemáticos, calcula o resultado
+  if (/[+\-*/()]/.test(valor)) {
+    const resultado = avaliarValor(valor);
+    if (resultado !== null && resultado > 0) {
+      return formatCurrency(resultado);
+    }
+  }
+  return null;
+};
+
 const gerarChaveLancamento = (bancoId: number, contaId: number, tipoId: number) =>
   `${bancoId}-${contaId}-${tipoId}`;
 
@@ -1277,45 +1288,52 @@ export default function LancamentoCobrancaPage() {
                                         <div className="text-xs text-gray-500">Código: {tipo.codigo}</div>
                                       </td>
                                       <td className="px-3 py-2">
-                                        <Input
-                                          type="text"
-                                          inputMode="decimal"
-                                          value={valorCampo}
-                                          onChange={(event) =>
-                                            handleValorBancoChange(
-                                              bancoSelecionado.id,
-                                              conta.id,
-                                              tipo.id,
-                                              event.target.value,
-                                            )
-                                          }
-                                          onKeyDown={(event) => {
-                                            // Enter, Tab e Seta para baixo movem para próximo campo
-                                            if (event.key === 'Enter' || event.key === 'ArrowDown' || event.key === 'Tab') {
-                                              event.preventDefault();
-                                              const inputs = Array.from(
-                                                document.querySelectorAll('input[type="text"]:not([disabled])')
-                                              ) as HTMLInputElement[];
-                                              const currentIndex = inputs.indexOf(event.currentTarget as HTMLInputElement);
-                                              if (currentIndex >= 0 && currentIndex < inputs.length - 1) {
-                                                inputs[currentIndex + 1].focus();
-                                              }
+                                        <div>
+                                          <Input
+                                            type="text"
+                                            inputMode="decimal"
+                                            value={valorCampo}
+                                            onChange={(event) =>
+                                              handleValorBancoChange(
+                                                bancoSelecionado.id,
+                                                conta.id,
+                                                tipo.id,
+                                                event.target.value,
+                                              )
                                             }
-                                            // Seta para cima move para campo anterior
-                                            if (event.key === 'ArrowUp') {
-                                              event.preventDefault();
-                                              const inputs = Array.from(
-                                                document.querySelectorAll('input[type="text"]:not([disabled])')
-                                              ) as HTMLInputElement[];
-                                              const currentIndex = inputs.indexOf(event.currentTarget as HTMLInputElement);
-                                              if (currentIndex > 0) {
-                                                inputs[currentIndex - 1].focus();
+                                            onKeyDown={(event) => {
+                                              // Enter, Tab e Seta para baixo movem para próximo campo
+                                              if (event.key === 'Enter' || event.key === 'ArrowDown' || event.key === 'Tab') {
+                                                event.preventDefault();
+                                                const inputs = Array.from(
+                                                  document.querySelectorAll('input[type="text"]:not([disabled])')
+                                                ) as HTMLInputElement[];
+                                                const currentIndex = inputs.indexOf(event.currentTarget as HTMLInputElement);
+                                                if (currentIndex >= 0 && currentIndex < inputs.length - 1) {
+                                                  inputs[currentIndex + 1].focus();
+                                                }
                                               }
-                                            }
-                                          }}
-                                          disabled={campoDesabilitado}
-                                          fullWidth
-                                        />
+                                              // Seta para cima move para campo anterior
+                                              if (event.key === 'ArrowUp') {
+                                                event.preventDefault();
+                                                const inputs = Array.from(
+                                                  document.querySelectorAll('input[type="text"]:not([disabled])')
+                                                ) as HTMLInputElement[];
+                                                const currentIndex = inputs.indexOf(event.currentTarget as HTMLInputElement);
+                                                if (currentIndex > 0) {
+                                                  inputs[currentIndex - 1].focus();
+                                                }
+                                              }
+                                            }}
+                                            disabled={campoDesabilitado}
+                                            fullWidth
+                                          />
+                                          {obterResultadoFormula(valorCampo) && (
+                                            <div className="mt-1 text-xs text-success-700 font-medium">
+                                              Resultado: {obterResultadoFormula(valorCampo)}
+                                            </div>
+                                          )}
+                                        </div>
                                       </td>
                                       <td className="px-3 py-2 text-right">
                                         {valorSalvo > 0 ? (
