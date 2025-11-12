@@ -982,14 +982,14 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
               })}
             </div>
 
-            <div className="mt-16">
+            <div className="mt-6">
               {renderTabelaComparativa('Resultado de Saldo de Caixa do Dia', linhasResultadoCaixa, {
                 accent: 'laranja',
                 showTotals: false,
               })}
             </div>
 
-            <div className="report-grid report-grid--two mt-16">
+            <div className="report-grid report-grid--two mt-6">
               {renderTabelaComparativa('Resumo Geral', linhasResumoGeral, {
                 accent: 'azul',
                 layout: 'realizado',
