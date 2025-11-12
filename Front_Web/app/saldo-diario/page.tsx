@@ -193,6 +193,54 @@ const calcularUltimoDiaUtilAnterior = (): string => {
   return new Date().toISOString().split('T')[0];
 };
 
+const obterOrdemArea = (nomeArea: string): number => {
+  const nomeNormalizado = nomeArea.trim().toUpperCase();
+  const ordemAreas: Record<string, number> = {
+    'GASTO COM MATERIAL E CONSUMO': 1,
+    'MATERIAL E CONSUMO': 1,
+    'GASTO RH': 2,
+    'RH': 2,
+    'GASTO FINANCEIRO E FISCAL': 3,
+    'FINANCEIRO E FISCAL': 3,
+    'GASTO LOGISTICA': 4,
+    'LOGISTICA': 4,
+    'GASTO COMERCIAL': 5,
+    'COMERCIAL': 5,
+    'GASTO MARKETING': 6,
+    'MARKETING': 6,
+    'GASTO LOJA DE FABRICA': 7,
+    'LOJA DE FABRICA': 7,
+    'GASTO TI': 8,
+    'TI': 8,
+    'GASTO DIRETORIA': 9,
+    'DIRETORIA': 9,
+    'GASTO COMPRAS': 10,
+    'COMPRAS': 10,
+    'GASTO INVESTIMENTO': 11,
+    'INVESTIMENTO': 11,
+    'GASTO DALLAS': 12,
+    'DALLAS': 12,
+    'TRANSFERÊNCIA PARA APLICAÇÃO': 13,
+    'TRANSFERENCIA PARA APLICACAO': 13,
+    'APLICACAO': 13,
+  };
+
+  // Procura pela chave exata
+  if (ordemAreas[nomeNormalizado] !== undefined) {
+    return ordemAreas[nomeNormalizado];
+  }
+
+  // Procura se contém alguma das palavras-chave
+  for (const [chave, ordem] of Object.entries(ordemAreas)) {
+    if (nomeNormalizado.includes(chave)) {
+      return ordem;
+    }
+  }
+
+  // Se não encontrou, retorna um valor alto para aparecer no final
+  return 999;
+};
+
 const normalizarExpressao = (valor: string): string =>
   valor.replace(/\s+/g, '').replace(/,/g, '.');
 
@@ -258,6 +306,24 @@ const SaldoDiarioPage: React.FC = () => {
   const [receitasEdicao, setReceitasEdicao] = useState<FormMapa>({});
   const [pagamentosBancoEdicao, setPagamentosBancoEdicao] = useState<FormMapa>({});
   const [saldosBancoEdicao, setSaldosBancoEdicao] = useState<FormMapa>({});
+
+  // Controle de quais registros estão em modo de edição
+  const [emEdicaoArea, setEmEdicaoArea] = useState<Set<number>>(new Set());
+  const [emEdicaoReceita, setEmEdicaoReceita] = useState<Set<number>>(new Set());
+  const [emEdicaoPagamentoBanco, setEmEdicaoPagamentoBanco] = useState<Set<number>>(new Set());
+  const [emEdicaoSaldoBanco, setEmEdicaoSaldoBanco] = useState<Set<number>>(new Set());
+
+  // Áreas ordenadas de acordo com a sequência definida
+  const areaOptionsOrdenadas = useMemo(() => {
+    return [...areaOptions].sort((a, b) => {
+      const ordemA = obterOrdemArea(a.nome);
+      const ordemB = obterOrdemArea(b.nome);
+      if (ordemA !== ordemB) {
+        return ordemA - ordemB;
+      }
+      return a.nome.localeCompare(b.nome, 'pt-BR');
+    });
+  }, [areaOptions]);
 
   const [processando, setProcessando] = useState<RegistroProcesso>({
     area: false,
@@ -1514,24 +1580,24 @@ const SaldoDiarioPage: React.FC = () => {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-lg border border-gray-200 bg-white/80 p-3 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Pagamentos por Área</p>
-            <p className="mt-2 text-xl font-semibold text-gray-900">{formatCurrency(totalPagamentosArea)}</p>
-            <p className="mt-1 text-xs text-gray-400">Valores já registrados</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Saldo Inicial</p>
+            <p className="mt-2 text-xl font-semibold text-gray-900">{formatCurrency(totalSaldos - totalReceitas + totalPagamentosArea + totalPagamentosBanco)}</p>
+            <p className="mt-1 text-xs text-gray-400">Saldo do dia anterior</p>
           </div>
           <div className="rounded-lg border border-gray-200 bg-white/80 p-3 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Receitas por Conta</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Receitas</p>
             <p className="mt-2 text-xl font-semibold text-gray-900">{formatCurrency(totalReceitas)}</p>
-            <p className="mt-1 text-xs text-gray-400">Receitas consolidadas</p>
+            <p className="mt-1 text-xs text-gray-400">Entradas do dia</p>
           </div>
           <div className="rounded-lg border border-gray-200 bg-white/80 p-3 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Pagamentos por Banco</p>
-            <p className="mt-2 text-xl font-semibold text-gray-900">{formatCurrency(totalPagamentosBanco)}</p>
-            <p className="mt-1 text-xs text-gray-400">Saídas bancárias do dia</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Pagamentos</p>
+            <p className="mt-2 text-xl font-semibold text-gray-900">{formatCurrency(totalPagamentosArea + totalPagamentosBanco)}</p>
+            <p className="mt-1 text-xs text-gray-400">Saídas do dia</p>
           </div>
           <div className="rounded-lg border border-gray-200 bg-white/80 p-3 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Saldo por Banco</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Saldo Final</p>
             <p className="mt-2 text-xl font-semibold text-gray-900">{formatCurrency(totalSaldos)}</p>
-            <p className="mt-1 text-xs text-gray-400">Saldos registrados</p>
+            <p className="mt-1 text-xs text-gray-400">Saldo final do dia</p>
           </div>
         </div>
 
@@ -1586,7 +1652,7 @@ const SaldoDiarioPage: React.FC = () => {
                           </td>
                         </tr>
                       ) : (
-                        areaOptions.map((area) => {
+                        areaOptionsOrdenadas.map((area) => {
                           const registro = pagamentosAreaPorAreaId.get(area.id);
                           return (
                             <tr key={area.id}>
@@ -1603,8 +1669,8 @@ const SaldoDiarioPage: React.FC = () => {
                                       [area.id]: event.target.value,
                                     }))
                                   }
-                                  disabled={processando.area || !edicaoLiberada}
-                                  helperText={helperValor(pagamentosAreaForm[area.id])}
+                                  disabled={processando.area || !edicaoLiberada || !!registro}
+                                  helperText={registro ? "Campo desabilitado - valor já registrado" : helperValor(pagamentosAreaForm[area.id])}
                                   fullWidth
                                 />
                               </td>
@@ -1619,35 +1685,75 @@ const SaldoDiarioPage: React.FC = () => {
                                         {formatarData(registro.data)}
                                       </span>
                                     </div>
-                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-                                      <Input
-                                        type="text"
-                                        inputMode="decimal"
-                                        value={pagamentosAreaEdicao[registro.id] ?? ''}
-                                        onChange={(event) =>
-                                          setPagamentosAreaEdicao((prev) => ({
-                                            ...prev,
-                                            [registro.id]: event.target.value,
-                                          }))
-                                        }
-                                        disabled={
-                                          !edicaoLiberada ||
-                                          registroEditando.area === registro.id ||
-                                          registroExcluindo.area === registro.id
-                                        }
-                                        helperText={helperValor(pagamentosAreaEdicao[registro.id])}
-                                        className="sm:w-44"
-                                      />
+                                    {emEdicaoArea.has(registro.id) ? (
+                                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                                        <Input
+                                          type="text"
+                                          inputMode="decimal"
+                                          value={pagamentosAreaEdicao[registro.id] ?? ''}
+                                          onChange={(event) =>
+                                            setPagamentosAreaEdicao((prev) => ({
+                                              ...prev,
+                                              [registro.id]: event.target.value,
+                                            }))
+                                          }
+                                          disabled={
+                                            !edicaoLiberada ||
+                                            registroEditando.area === registro.id ||
+                                            registroExcluindo.area === registro.id
+                                          }
+                                          helperText={helperValor(pagamentosAreaEdicao[registro.id])}
+                                          className="sm:w-44"
+                                        />
+                                        <div className="flex gap-2">
+                                          <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => handleAtualizarPagamentoAreaExistente(registro)}
+                                            disabled={!edicaoLiberada}
+                                            loading={registroEditando.area === registro.id}
+                                          >
+                                            Salvar edição
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                              setEmEdicaoArea(prev => {
+                                                const novo = new Set(prev);
+                                                novo.delete(registro.id);
+                                                return novo;
+                                              });
+                                              setPagamentosAreaEdicao((prev) => {
+                                                const novo = { ...prev };
+                                                delete novo[registro.id];
+                                                return novo;
+                                              });
+                                            }}
+                                            disabled={registroEditando.area === registro.id}
+                                          >
+                                            Cancelar
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ) : (
                                       <div className="flex gap-2">
                                         <Button
                                           type="button"
                                           variant="secondary"
                                           size="sm"
-                                          onClick={() => handleAtualizarPagamentoAreaExistente(registro)}
+                                          onClick={() => {
+                                            setEmEdicaoArea(prev => new Set(prev).add(registro.id));
+                                            setPagamentosAreaEdicao((prev) => ({
+                                              ...prev,
+                                              [registro.id]: formatarValorParaInput(registro.valor),
+                                            }));
+                                          }}
                                           disabled={!edicaoLiberada}
-                                          loading={registroEditando.area === registro.id}
                                         >
-                                          Salvar
+                                          Editar
                                         </Button>
                                         <Button
                                           type="button"
@@ -1660,7 +1766,7 @@ const SaldoDiarioPage: React.FC = () => {
                                           Excluir
                                         </Button>
                                       </div>
-                                    </div>
+                                    )}
                                   </div>
                                 ) : (
                                   <span className="text-sm text-gray-400">Nenhum valor registrado</span>

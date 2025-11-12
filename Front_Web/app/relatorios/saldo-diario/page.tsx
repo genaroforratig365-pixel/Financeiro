@@ -53,7 +53,7 @@ type ReceitaRow = {
 type SaldoBancoRow = {
   sdb_saldo?: unknown;
   sdb_ban_id?: unknown;
-  ban_bancos?: MaybeArray<{ ban_nome?: unknown } | null>;
+  ban_bancos?: MaybeArray<{ ban_nome?: unknown; ban_numero_conta?: unknown } | null>;
 };
 
 type CategoriaReceita = 'depositos' | 'titulos' | 'outras';
@@ -127,6 +127,35 @@ const toString = (value: unknown, fallback = ''): string => {
 
 const arredondar = (valor: number): number => Math.round(valor * 100) / 100;
 
+const obterOrdemArea = (nomeArea: string): number => {
+  const nomeNormalizado = nomeArea.trim().toUpperCase();
+  const ordemAreas: Record<string, number> = {
+    'GASTO COM MATERIAL E CONSUMO': 1,
+    'GASTO RH': 2,
+    'GASTO FINANCEIRO E FISCAL': 3,
+    'GASTO LOGISTICA': 4,
+    'GASTO COMERCIAL': 5,
+    'GASTO MARKETING': 6,
+    'GASTO LOJA DE FABRICA': 7,
+    'GASTO TI': 8,
+    'GASTO DIRETORIA': 9,
+    'GASTO COMPRAS': 10,
+    'GASTO INVESTIMENTO': 11,
+    'GASTO DALLAS': 12,
+    'TRANSFERÊNCIA PARA APLICAÇÃO': 13,
+  };
+
+  // Procura pela chave exata ou que contenha o texto
+  for (const [chave, ordem] of Object.entries(ordemAreas)) {
+    if (nomeNormalizado === chave || nomeNormalizado.includes(chave)) {
+      return ordem;
+    }
+  }
+
+  // Se não encontrou, retorna um valor alto para aparecer no final
+  return 999;
+};
+
 const obterCategoriaReceita = (codigo: string | null | undefined): CategoriaReceita => {
   if (!codigo) {
     return 'outras';
@@ -164,7 +193,8 @@ const calcularPercentual = (previsto: number, realizado: number): number | null 
   if (Math.abs(previsto) < 0.0001) {
     return null;
   }
-  return ((realizado - previsto) / previsto) * 100;
+  const diferenca = previsto - realizado;
+  return (diferenca / previsto) * 100;
 };
 
 const formatarPercentual = (valor: number | null): string => {
@@ -177,16 +207,26 @@ const formatarPercentual = (valor: number | null): string => {
 
 const converterMapaParaLinhas = (
   mapa: Map<string, { titulo: string; previsto: number; realizado: number }>,
+  ordenarPorArea: boolean = false,
 ): LinhaComparativa[] =>
   Array.from(mapa.entries())
     .map(([chave, item]) => {
       const previsto = arredondar(item.previsto);
       const realizado = arredondar(item.realizado);
-      const desvio = arredondar(realizado - previsto);
+      const desvio = arredondar(previsto - realizado);
       const percentual = calcularPercentual(previsto, realizado);
       return { chave, titulo: item.titulo, previsto, realizado, desvio, percentual };
     })
-    .sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR'));
+    .sort((a, b) => {
+      if (ordenarPorArea) {
+        const ordemA = obterOrdemArea(a.titulo);
+        const ordemB = obterOrdemArea(b.titulo);
+        if (ordemA !== ordemB) {
+          return ordemA - ordemB;
+        }
+      }
+      return a.titulo.localeCompare(b.titulo, 'pt-BR');
+    });
 
 const somarPrevisto = (linhas: LinhaTabela[]): number =>
   arredondar(
@@ -268,7 +308,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
             .eq('rec_data', data),
           supabase
             .from('sdb_saldo_banco')
-            .select('sdb_saldo, sdb_ban_id, ban_bancos(ban_nome)')
+            .select('sdb_saldo, sdb_ban_id, ban_bancos(ban_nome, ban_numero_conta)')
             .eq('sdb_data', data),
         ]);
 
@@ -356,17 +396,19 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
 
         normalizeRelation(saldosBancarios).forEach((item) => {
           const bancoRel = normalizeRelation(item.ban_bancos)[0];
-          const bancoTitulo = bancoRel?.ban_nome ? toString(bancoRel.ban_nome) : 'Banco não informado';
+          const bancoNome = bancoRel?.ban_nome ? toString(bancoRel.ban_nome) : 'Banco não informado';
+          const bancoConta = bancoRel?.ban_numero_conta ? toString(bancoRel.ban_numero_conta) : '';
+          const bancoTitulo = bancoConta ? `${bancoNome} / ${bancoConta}` : bancoNome;
           const bancoId = toString(item.sdb_ban_id, 'sem-banco');
-          const chave = `${bancoId}-${bancoTitulo.toLowerCase()}`;
+          const chave = `${bancoId}-${bancoNome.toLowerCase()}`;
           const existente = mapaBancos.get(chave) ?? { titulo: bancoTitulo, previsto: 0, realizado: 0 };
           existente.realizado += arredondar(toNumber(item.sdb_saldo));
           mapaBancos.set(chave, existente);
         });
 
-        const gastos = converterMapaParaLinhas(mapaGastos);
-        const receitasComparativo = converterMapaParaLinhas(mapaReceitas);
-        const bancos = converterMapaParaLinhas(mapaBancos);
+        const gastos = converterMapaParaLinhas(mapaGastos, true);
+        const receitasComparativo = converterMapaParaLinhas(mapaReceitas, false);
+        const bancos = converterMapaParaLinhas(mapaBancos, false);
 
         const totalDespesasPrevistas = somarPrevisto(gastos);
         const totalDespesasRealizadas = somarRealizado(gastos);
@@ -460,7 +502,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
         layout === 'comparativo' ? somarPrevisto(linhasParaComparativo) : 0;
       const totalRealizado =
         layout === 'comparativo' ? somarRealizado(linhasParaComparativo) : somarRealizado(linhas);
-      const totalDesvio = layout === 'comparativo' ? arredondar(totalRealizado - totalPrevisto) : 0;
+      const totalDesvio = layout === 'comparativo' ? arredondar(totalPrevisto - totalRealizado) : 0;
       const totalPercentual =
         layout === 'comparativo' ? calcularPercentual(totalPrevisto, totalRealizado) : null;
       const colSpan = layout === 'comparativo' ? 5 : 2;
@@ -474,16 +516,16 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
             <thead>
               {layout === 'comparativo' ? (
                 <tr>
-                  <th>Categoria</th>
-                  <th>Previsto</th>
-                  <th>Realizado</th>
-                  <th>Desvio</th>
-                  <th>% Desvio</th>
+                  <th className="text-center">Categoria</th>
+                  <th className="text-center">Previsto</th>
+                  <th className="text-center">Realizado</th>
+                  <th className="text-center">Desvio</th>
+                  <th className="text-center">% Desvio</th>
                 </tr>
               ) : (
                 <tr>
-                  <th>Banco / Conta</th>
-                  <th>Realizado</th>
+                  <th className="text-center">Banco / Conta</th>
+                  <th className="text-center">Realizado</th>
                 </tr>
               )}
             </thead>
@@ -605,23 +647,23 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
     }
 
     const doc = new jsPDF('portrait', 'mm', 'a4');
-    const margemHorizontal = 14;
+    const margemHorizontal = 10;
     const larguraUtil = doc.internal.pageSize.getWidth() - margemHorizontal * 2;
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.text('Saldo Diário', margemHorizontal, 14);
+    doc.setFontSize(12);
+    doc.text('Saldo Diário', margemHorizontal, 12);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.text(`Data de referência: ${formatarDataPt(relatorio.data)}`, margemHorizontal, 20);
+    doc.setFontSize(8);
+    doc.text(`Data: ${formatarDataPt(relatorio.data)}`, margemHorizontal, 17);
 
-    const resumoLinha = `Receitas: ${formatCurrency(relatorio.resumo.totalReceitasRealizadas)}  |  Despesas: ${formatCurrency(relatorio.resumo.totalDespesasRealizadas)}  |  Resultado: ${formatCurrency(relatorio.resumo.resultadoRealizado)}  |  Saldos em Bancos: ${formatCurrency(relatorio.resumo.bancosRealizados)}`;
-    doc.setFontSize(9);
+    const resumoLinha = `Rec: ${formatCurrency(relatorio.resumo.totalReceitasRealizadas)} | Desp: ${formatCurrency(relatorio.resumo.totalDespesasRealizadas)} | Result: ${formatCurrency(relatorio.resumo.resultadoRealizado)} | Bancos: ${formatCurrency(relatorio.resumo.bancosRealizados)}`;
+    doc.setFontSize(7);
     const resumoQuebrado = doc.splitTextToSize(resumoLinha, larguraUtil);
-    doc.text(resumoQuebrado, margemHorizontal, 26);
+    doc.text(resumoQuebrado, margemHorizontal, 21);
 
-    let posicaoAtual = 26 + resumoQuebrado.length * 5;
+    let posicaoAtual = 21 + resumoQuebrado.length * 3.5;
 
     type TabelaPdfOptions = {
       layout?: 'comparativo' | 'realizado';
@@ -635,10 +677,10 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
       linhas: LinhaTabela[],
       { layout = 'comparativo', accent = 'azul', totalLabel, showTotals }: TabelaPdfOptions = {},
     ) => {
-      posicaoAtual += 8;
+      posicaoAtual += 4;
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
+      doc.setFontSize(9);
       doc.text(titulo, margemHorizontal, posicaoAtual);
 
       const cabecalho =
@@ -684,7 +726,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
         layout === 'comparativo' ? somarPrevisto(linhasParaComparativo) : 0;
       const totalRealizado =
         layout === 'comparativo' ? somarRealizado(linhasParaComparativo) : somarRealizado(linhas);
-      const totalDesvio = layout === 'comparativo' ? arredondar(totalRealizado - totalPrevisto) : 0;
+      const totalDesvio = layout === 'comparativo' ? arredondar(totalPrevisto - totalRealizado) : 0;
       const totalPercentual =
         layout === 'comparativo' ? calcularPercentual(totalPrevisto, totalRealizado) : null;
       const deveMostrarTotais = (showTotals ?? layout === 'comparativo') && linhasParaExibir.length > 0;
@@ -703,16 +745,17 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
           : undefined;
 
       autoTable(doc, {
-        startY: posicaoAtual + 2,
+        startY: posicaoAtual + 1.5,
         head: cabecalho,
         body: corpo,
         foot: rodape,
         theme: 'grid',
-        styles: { fontSize: 8, cellPadding: 2, halign: 'right' },
+        styles: { fontSize: 6.5, cellPadding: 1, halign: 'right' },
         headStyles: {
           fillColor: tabelaAccentPdfColors[accent] ?? tabelaAccentPdfColors.azul,
           textColor: 255,
           fontStyle: 'bold',
+          halign: 'center',
         },
         bodyStyles: { halign: 'right' },
         alternateRowStyles: { fillColor: [248, 250, 252] },

@@ -88,7 +88,7 @@ const AuditoriaSaldosDiariosPage: React.FC = () => {
           supabase
             .from('pvi_previsao_itens')
             .select('pvi_data, pvi_tipo, pvi_valor')
-            .in('pvi_tipo', ['saldo_diario', 'saldo_acumulado'])
+            .in('pvi_tipo', ['saldo_diario', 'saldo_final', 'saldo', 'saldo_acumulado'])
             .gte('pvi_data', inicio)
             .lte('pvi_data', fim),
         ]);
@@ -116,11 +116,28 @@ const AuditoriaSaldosDiariosPage: React.FC = () => {
         });
 
         const mapaPrevisao = new Map<string, number>();
+        const prioridadeTipos: Record<string, number> = {
+          'saldo_final': 1,
+          'saldo': 2,
+          'saldo_diario': 3,
+          'saldo_acumulado': 4,
+        };
         previsoes.forEach((item) => {
           const valor = Number(item.pvi_valor ?? 0);
           const existente = mapaPrevisao.get(item.pvi_data);
-          if (item.pvi_tipo === 'saldo_diario' || existente === undefined) {
+          const tipoAtual = String(item.pvi_tipo);
+          const prioridadeAtual = prioridadeTipos[tipoAtual] ?? 999;
+
+          // Se não existe ou se o tipo atual tem prioridade maior (número menor)
+          if (existente === undefined) {
             mapaPrevisao.set(item.pvi_data, valor);
+          } else {
+            // Atualiza apenas se encontrar um tipo com prioridade maior
+            const tiposExistentes = previsoes.filter(p => p.pvi_data === item.pvi_data);
+            const menorPrioridade = Math.min(...tiposExistentes.map(p => prioridadeTipos[String(p.pvi_tipo)] ?? 999));
+            if (prioridadeAtual === menorPrioridade) {
+              mapaPrevisao.set(item.pvi_data, valor);
+            }
           }
         });
 
