@@ -125,6 +125,21 @@ export async function POST(request: NextRequest) {
         // SALDO POR BANCO
         if (tipoImportacao === 'saldo_banco') {
           if (linha.valorRealizado > 0) {
+            const { error: insertError } = await supabase.from('sdb_saldo_banco').insert({
+              sdb_data: data,
+              sdb_ban_id: mapeamentoId,
+              sdb_saldo: linha.valorRealizado,
+              sdb_usr_id: usuario.usr_id,
+            });
+            if (insertError) throw insertError;
+            sucesso++;
+          }
+          continue;
+        }
+
+        // PAGAMENTO POR BANCO
+        if (tipoImportacao === 'pagamento_banco') {
+          if (linha.valorRealizado > 0) {
             const { error: insertError } = await supabase.from('pbk_pagamentos_banco').insert({
               pbk_data: data,
               pbk_ban_id: mapeamentoId,

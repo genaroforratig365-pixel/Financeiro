@@ -34,6 +34,7 @@ const TIPOS_IMPORTACAO = [
   { value: 'pagamento_area', label: 'Pagamento por Área (Realizado)' },
   { value: 'previsao_area', label: 'Previsão por Área' },
   { value: 'saldo_banco', label: 'Saldo por Banco' },
+  { value: 'pagamento_banco', label: 'Pagamento por Banco' },
   { value: 'receita_tipo', label: 'Receita por Tipo (Realizado)' },
   { value: 'previsao_receita', label: 'Previsão de Receita' },
 ];
@@ -240,7 +241,7 @@ export default function ImportarDadosGrid() {
 
   const obterOpcoesMapeamento = (tipo: string): OpcaoMapeamento[] => {
     if (tipo === 'pagamento_area' || tipo === 'previsao_area') return AREAS;
-    if (tipo === 'saldo_banco') return BANCOS;
+    if (tipo === 'saldo_banco' || tipo === 'pagamento_banco') return BANCOS;
     if (tipo === 'receita_tipo' || tipo === 'previsao_receita') return TIPOS_RECEITA;
     return [];
   };
@@ -436,7 +437,7 @@ export default function ImportarDadosGrid() {
                         <option key={opt.id} value={opt.id}>[{opt.id}] {opt.nome}</option>
                       ))
                     }
-                    {linhas.some(l => l.incluir && l.tipoImportacao === 'saldo_banco') &&
+                    {linhas.some(l => l.incluir && (l.tipoImportacao === 'saldo_banco' || l.tipoImportacao === 'pagamento_banco')) &&
                       BANCOS.map(opt => (
                         <option key={opt.id} value={opt.id}>[{opt.id}] {opt.nome}</option>
                       ))
