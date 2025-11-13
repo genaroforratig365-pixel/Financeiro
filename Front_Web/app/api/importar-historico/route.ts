@@ -164,12 +164,31 @@ function converterValor(valor: any): number {
 
 export async function POST(request: NextRequest) {
   try {
-    // Verifica autenticação
-    const { userId } = getUserSession();
+    // Recebe o arquivo e dados do usuário
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
+    const userId = formData.get('userId') as string;
+    const userName = formData.get('userName') as string;
+
+    if (!file) {
+      return NextResponse.json(
+        { error: 'Nenhum arquivo enviado' },
+        { status: 400 }
+      );
+    }
+
     if (!userId) {
       return NextResponse.json(
         { error: 'Usuário não autenticado' },
         { status: 401 }
+      );
+    }
+
+    // Verifica se o usuário é Genaro
+    if (userName?.toUpperCase() !== 'GENARO') {
+      return NextResponse.json(
+        { error: 'Apenas o usuário Genaro tem permissão para importar dados' },
+        { status: 403 }
       );
     }
 
@@ -184,17 +203,6 @@ export async function POST(request: NextRequest) {
     if (userError || !usuario) {
       return NextResponse.json(
         { error: 'Erro ao obter usuário' },
-        { status: 400 }
-      );
-    }
-
-    // Recebe o arquivo
-    const formData = await request.formData();
-    const file = formData.get('file') as File;
-
-    if (!file) {
-      return NextResponse.json(
-        { error: 'Nenhum arquivo enviado' },
         { status: 400 }
       );
     }

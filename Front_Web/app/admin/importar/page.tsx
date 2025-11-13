@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Header } from '@/components/layout';
 import { Button, Card } from '@/components/ui';
+import { getUserSession } from '@/lib/userSession';
 
 type ResultadoImportacao = {
   success: boolean;
@@ -18,6 +19,7 @@ export default function ImportarHistoricoPage() {
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [importando, setImportando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoImportacao | null>(null);
+  const session = getUserSession();
 
   const handleArquivoSelecionado = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -37,8 +39,12 @@ export default function ImportarHistoricoPage() {
     setResultado(null);
 
     try {
+      const session = getUserSession();
+
       const formData = new FormData();
       formData.append('file', arquivo);
+      formData.append('userId', session.userId);
+      formData.append('userName', session.userName || '');
 
       const response = await fetch('/api/importar-historico', {
         method: 'POST',
@@ -80,6 +86,17 @@ export default function ImportarHistoricoPage() {
       />
 
       <div className="page-content space-y-6">
+        {/* Aviso de Permissão */}
+        {session.userName?.toUpperCase() !== 'GENARO' && (
+          <Card title="⚠️ Permissão Necessária" variant="danger">
+            <div className="text-error-700">
+              <p className="font-semibold">Acesso restrito!</p>
+              <p className="mt-2">Apenas o usuário <strong>Genaro</strong> tem permissão para importar dados históricos.</p>
+              <p className="mt-2 text-sm">Usuário atual: <strong>{session.displayName}</strong></p>
+            </div>
+          </Card>
+        )}
+
         {/* Instruções */}
         <Card title="📋 Instruções">
           <div className="space-y-4 text-sm text-gray-700">
@@ -156,7 +173,7 @@ export default function ImportarHistoricoPage() {
               <Button
                 variant="primary"
                 onClick={handleImportar}
-                disabled={!arquivo || importando}
+                disabled={!arquivo || importando || session.userName?.toUpperCase() !== 'GENARO'}
                 loading={importando}
               >
                 {importando ? 'Importando...' : 'Importar Dados'}
