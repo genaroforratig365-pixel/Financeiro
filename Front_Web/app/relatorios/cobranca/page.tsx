@@ -870,56 +870,93 @@ const RelatorioCobrancaPage: React.FC = () => {
               </>
             )}
 
-            {/* Totais Consolidados */}
-            <Card title="Totais consolidados" subtitle="Resumo final com distribuição por categoria">
-              <div className="space-y-4">
+            {/* Resumo Final Detalhado */}
+            <Card title="Resumo Final" subtitle={`Consolidação completa do dia ${formatarDataPt(relatorio.data)}`}>
+              <div className="space-y-6">
+                {/* Resumo por Categoria */}
                 <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-bold text-gray-800 uppercase">Receitas</h3>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-700">Receitas realizadas</span>
-                      <span className="font-semibold text-success-700">{formatCurrency(relatorio.totais.realizado)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-700">Valor da previsão</span>
-                      <span className="font-semibold text-gray-900">{formatCurrency(relatorio.totais.previsto)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-700">Diferença</span>
-                      <span
-                        className={`font-semibold ${
-                          relatorio.totais.diferenca >= 0 ? 'text-success-700' : 'text-error-600'
-                        }`}
-                      >
-                        {formatCurrency(relatorio.totais.diferenca)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-bold text-gray-800 uppercase">Distribuição</h3>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-700">Títulos</span>
-                      <div className="flex items-center gap-3">
-                        <span className="font-semibold text-gray-900">{formatCurrency(relatorio.totais.titulosTotal)}</span>
-                        <span className="text-xs font-medium text-primary-600 bg-primary-50 px-2 py-1 rounded">
+                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <h3 className="text-sm font-bold text-blue-900 uppercase mb-3">Receitas em Títulos</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-blue-800">Total Realizado:</span>
+                        <span className="font-bold text-blue-900">{formatCurrency(relatorio.totais.titulosTotal)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-blue-700">Percentual do Total:</span>
+                        <span className="font-semibold text-blue-800 bg-blue-100 px-2 py-1 rounded">
                           {relatorio.totais.percentualTitulos.toFixed(1)}%
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-700">Depósitos</span>
-                      <div className="flex items-center gap-3">
-                        <span className="font-semibold text-gray-900">{formatCurrency(relatorio.totais.depositosTotal)}</span>
-                        <span className="text-xs font-medium text-primary-600 bg-primary-50 px-2 py-1 rounded">
+                  </div>
+
+                  <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                    <h3 className="text-sm font-bold text-green-900 uppercase mb-3">Receitas em Depósitos</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-green-800">Total Realizado:</span>
+                        <span className="font-bold text-green-900">{formatCurrency(relatorio.totais.depositosTotal)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-green-700">Percentual do Total:</span>
+                        <span className="font-semibold text-green-800 bg-green-100 px-2 py-1 rounded">
                           {relatorio.totais.percentualDepositos.toFixed(1)}%
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between text-sm pt-2 border-t border-gray-200">
-                      <span className="font-bold text-gray-800">Total categorizado</span>
-                      <span className="font-bold text-success-700">
-                        {formatCurrency(relatorio.totais.titulosTotal + relatorio.totais.depositosTotal)}
-                      </span>
+                  </div>
+                </div>
+
+                {/* Comparativo Previsto x Realizado */}
+                <div className="bg-gray-50 rounded-lg p-6 border border-gray-300">
+                  <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="text-xl">📊</span>
+                    Comparativo do Dia
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="grid md:grid-cols-3 gap-4">
+                      <div className="bg-white rounded p-4 border border-gray-200">
+                        <div className="text-xs font-semibold text-gray-600 uppercase mb-1">Receitas Previstas</div>
+                        <div className="text-2xl font-bold text-gray-900">{formatCurrency(relatorio.totais.previsto)}</div>
+                      </div>
+                      <div className="bg-white rounded p-4 border border-gray-200">
+                        <div className="text-xs font-semibold text-gray-600 uppercase mb-1">Receitas Realizadas</div>
+                        <div className="text-2xl font-bold text-success-700">{formatCurrency(relatorio.totais.realizado)}</div>
+                      </div>
+                      <div className="bg-white rounded p-4 border border-gray-200">
+                        <div className="text-xs font-semibold text-gray-600 uppercase mb-1">Diferença</div>
+                        <div className={`text-2xl font-bold ${relatorio.totais.diferenca >= 0 ? 'text-success-700' : 'text-error-600'}`}>
+                          {formatCurrency(relatorio.totais.diferenca)}
+                        </div>
+                        {relatorio.totais.previsto > 0 && (
+                          <div className="mt-1 text-xs font-medium text-gray-600">
+                            {((relatorio.totais.realizado / relatorio.totais.previsto) * 100).toFixed(1)}% do previsto
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Total Geral */}
+                <div className="bg-primary-50 rounded-lg p-6 border-2 border-primary-300">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold text-primary-900">Total Geral Realizado</h3>
+                      <p className="text-sm text-primary-700 mt-1">Soma de todas as categorias</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-bold text-primary-900">
+                        {formatCurrency(relatorio.totais.realizado)}
+                      </div>
+                      {relatorio.totais.previsto > 0 && (
+                        <div className="mt-2 inline-flex items-center gap-2 bg-primary-100 px-3 py-1 rounded-full">
+                          <span className="text-xs font-semibold text-primary-800">
+                            Cobertura: {((relatorio.totais.realizado / relatorio.totais.previsto) * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
