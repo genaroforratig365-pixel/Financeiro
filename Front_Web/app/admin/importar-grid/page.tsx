@@ -73,6 +73,29 @@ export default function ImportarDadosGrid() {
   const [importando, setImportando] = useState(false);
   const session = getUserSession();
 
+  // Função para converter data do Excel para DD/MM/YYYY
+  const converterDataExcel = (data: any): string => {
+    if (!data) return '';
+
+    // Se já é string no formato correto
+    if (typeof data === 'string' && data.includes('/')) {
+      return data;
+    }
+
+    // Se é número (serial do Excel)
+    if (typeof data === 'number') {
+      const excelEpoch = new Date(1899, 11, 30);
+      const msPerDay = 86400000;
+      const date = new Date(excelEpoch.getTime() + data * msPerDay);
+      const dia = String(date.getDate()).padStart(2, '0');
+      const mes = String(date.getMonth() + 1).padStart(2, '0');
+      const ano = date.getFullYear();
+      return `${dia}/${mes}/${ano}`;
+    }
+
+    return String(data);
+  };
+
   const handleArquivoSelecionado = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -88,17 +111,20 @@ export default function ImportarDadosGrid() {
       const worksheet = workbook.Sheets[sheetName];
       const dados = XLSX.utils.sheet_to_json(worksheet) as any[];
 
-      const linhasProcessadas: LinhaArquivo[] = dados.map((linha, index) => ({
-        id: `linha-${index}`,
-        Registro: linha.Registro || linha.data || linha.Data || '',
-        Area: linha.Area || linha.Área || linha.area || '',
-        Valor_Previsto: Number(linha.Valor_Previsto || linha.valorPrev || 0),
-        Valor_Realizado: Number(linha.Valor_Realizado || linha.valorRealizado || 0),
-        Origem: linha.Origem || linha.origem || '',
-        tipoImportacao: '',
-        mapeamentoId: null,
-        incluir: true,
-      }));
+      const linhasProcessadas: LinhaArquivo[] = dados.map((linha, index) => {
+        const dataRaw = linha.Registro || linha.data || linha.Data || '';
+        return {
+          id: `linha-${index}`,
+          Registro: converterDataExcel(dataRaw),
+          Area: linha.Area || linha.Área || linha.area || '',
+          Valor_Previsto: Number(linha.Valor_Previsto || linha.valorPrev || 0),
+          Valor_Realizado: Number(linha.Valor_Realizado || linha.valorRealizado || 0),
+          Origem: linha.Origem || linha.origem || '',
+          tipoImportacao: '',
+          mapeamentoId: null,
+          incluir: true,
+        };
+      });
 
       setLinhas(linhasProcessadas);
     } catch (error) {
@@ -130,28 +156,29 @@ export default function ImportarDadosGrid() {
     setLinhas(prev => prev.map(linha => ({ ...linha, incluir })));
   };
 
+  const [tipoEmLote, setTipoEmLote] = useState('');
+
   const handleAplicarEmLote = () => {
-    const tipoSelecionado = prompt('Digite o tipo de importação para todas as linhas selecionadas:\n\n1 = Pagamento por Área\n2 = Previsão por Área\n3 = Saldo por Banco\n4 = Receita por Tipo\n5 = Previsão de Receita');
+    if (!tipoEmLote) {
+      alert('Selecione um tipo de importação primeiro!');
+      return;
+    }
 
-    if (!tipoSelecionado) return;
+    const linhasSelecionadas = linhas.filter(l => l.incluir).length;
+    if (linhasSelecionadas === 0) {
+      alert('Selecione pelo menos uma linha primeiro!');
+      return;
+    }
 
-    const mapa: Record<string, string> = {
-      '1': 'pagamento_area',
-      '2': 'previsao_area',
-      '3': 'saldo_banco',
-      '4': 'receita_tipo',
-      '5': 'previsao_receita',
-    };
-
-    const tipo = mapa[tipoSelecionado];
-    if (!tipo) {
-      alert('Opção inválida!');
+    if (!confirm(`Aplicar "${TIPOS_IMPORTACAO.find(t => t.value === tipoEmLote)?.label}" em ${linhasSelecionadas} linhas?`)) {
       return;
     }
 
     setLinhas(prev => prev.map(linha =>
-      linha.incluir ? { ...linha, tipoImportacao: tipo } : linha
+      linha.incluir ? { ...linha, tipoImportacao: tipoEmLote, mapeamentoId: null } : linha
     ));
+
+    alert(`✅ Tipo aplicado em ${linhasSelecionadas} linhas!`);
   };
 
   const obterOpcoesMapeamento = (tipo: string): OpcaoMapeamento[] => {
@@ -273,26 +300,54 @@ export default function ImportarDadosGrid() {
         {linhas.length > 0 && (
           <Card title="2️⃣ Configurar Importação">
             <div className="space-y-4">
+              {/* Instruções */}
+              <div className="bg-yellow-50 p-3 rounded text-sm">
+                <p className="font-semibold text-yellow-900 mb-1">📋 Como configurar:</p>
+                <ol className="list-decimal ml-5 text-yellow-800 space-y-1">
+                  <li>Use "Aplicar em Lote" para definir o tipo de importação para todas as linhas selecionadas</li>
+                  <li>Ajuste tipos individuais se necessário usando o dropdown de cada linha</li>
+                  <li>Após definir o tipo, configure o "Mapear Para" de cada linha</li>
+                  <li>Revise e clique em "Confirmar e Importar"</li>
+                </ol>
+              </div>
+
               {/* Ações em Lote */}
-              <div className="flex gap-3 pb-4 border-b">
-                <Button
-                  variant="secondary"
-                  onClick={() => handleSelecionarTodos(true)}
-                >
-                  ✓ Marcar Todos
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => handleSelecionarTodos(false)}
-                >
-                  ✗ Desmarcar Todos
-                </Button>
-                <Button
-                  variant="primary"
-                  onClick={handleAplicarEmLote}
-                >
-                  ⚡ Aplicar Tipo em Lote
-                </Button>
+              <div className="pb-4 border-b space-y-3">
+                <div className="flex gap-3">
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleSelecionarTodos(true)}
+                  >
+                    ✓ Marcar Todos
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleSelecionarTodos(false)}
+                  >
+                    ✗ Desmarcar Todos
+                  </Button>
+                </div>
+
+                <div className="flex gap-3 items-center bg-blue-50 p-3 rounded">
+                  <label className="font-semibold text-sm text-blue-900 whitespace-nowrap">
+                    ⚡ Aplicar em Lote:
+                  </label>
+                  <select
+                    value={tipoEmLote}
+                    onChange={(e) => setTipoEmLote(e.target.value)}
+                    className="flex-1 border rounded px-3 py-2 text-sm"
+                  >
+                    {TIPOS_IMPORTACAO.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <Button
+                    variant="primary"
+                    onClick={handleAplicarEmLote}
+                  >
+                    ⚡ Aplicar nas Selecionadas
+                  </Button>
+                </div>
               </div>
 
               {/* Tabela de Dados */}
@@ -341,7 +396,7 @@ export default function ImportarDadosGrid() {
                           </select>
                         </td>
                         <td className="border p-2">
-                          {linha.tipoImportacao && (
+                          {linha.tipoImportacao ? (
                             <select
                               value={linha.mapeamentoId || ''}
                               onChange={(e) => handleMapeamentoChange(linha.id, Number(e.target.value))}
@@ -355,6 +410,10 @@ export default function ImportarDadosGrid() {
                                 </option>
                               ))}
                             </select>
+                          ) : (
+                            <span className="text-xs text-gray-400 italic">
+                              Selecione o tipo primeiro
+                            </span>
                           )}
                         </td>
                       </tr>
