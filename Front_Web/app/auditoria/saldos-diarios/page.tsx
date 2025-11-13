@@ -79,25 +79,43 @@ const AuditoriaSaldosDiariosPage: React.FC = () => {
         setErro(null);
         const supabase = getSupabaseClient();
 
-        const [saldosRes, previsaoRes] = await Promise.all([
+        // Buscar saldos de um dia antes do início para calcular saldo inicial
+        const dataObj = new Date(inicio + 'T00:00:00');
+        dataObj.setDate(dataObj.getDate() - 1);
+        const inicioAnterior = dataObj.toISOString().split('T')[0];
+
+        const [saldosRes, receitasRes, pagamentosAreaRes, pagamentosBancoRes] = await Promise.all([
           supabase
             .from('sdb_saldo_banco')
             .select('sdb_data, sdb_saldo, sdb_ban_id, ban_bancos(ban_nome)')
-            .gte('sdb_data', inicio)
+            .gte('sdb_data', inicioAnterior)
             .lte('sdb_data', fim),
           supabase
-            .from('pvi_previsao_itens')
-            .select('pvi_data, pvi_tipo, pvi_valor')
-            .in('pvi_tipo', ['saldo_diario', 'saldo_final', 'saldo', 'saldo_acumulado'])
-            .gte('pvi_data', inicio)
-            .lte('pvi_data', fim),
+            .from('rec_receitas')
+            .select('rec_data, rec_valor')
+            .gte('rec_data', inicio)
+            .lte('rec_data', fim),
+          supabase
+            .from('pag_pagamentos_area')
+            .select('pag_data, pag_valor')
+            .gte('pag_data', inicio)
+            .lte('pag_data', fim),
+          supabase
+            .from('pbk_pagamentos_banco')
+            .select('pbk_data, pbk_valor')
+            .gte('pbk_data', inicio)
+            .lte('pbk_data', fim),
         ]);
 
         if (saldosRes.error) throw saldosRes.error;
-        if (previsaoRes.error) throw previsaoRes.error;
+        if (receitasRes.error) throw receitasRes.error;
+        if (pagamentosAreaRes.error) throw pagamentosAreaRes.error;
+        if (pagamentosBancoRes.error) throw pagamentosBancoRes.error;
 
         const saldos = (saldosRes.data as SaldoBancoRow[] | null) ?? [];
-        const previsoes = (previsaoRes.data as PrevisaoSaldoRow[] | null) ?? [];
+        const receitas = receitasRes.data ?? [];
+        const pagamentosArea = pagamentosAreaRes.data ?? [];
+        const pagamentosBanco = pagamentosBancoRes.data ?? [];
 
         const bancosUnicos = Array.from(
           new Set(
@@ -115,30 +133,21 @@ const AuditoriaSaldosDiariosPage: React.FC = () => {
           mapaSaldosPorData.set(item.sdb_data, mapaDia);
         });
 
-        const mapaPrevisao = new Map<string, number>();
-        const prioridadeTipos: Record<string, number> = {
-          'saldo_final': 1,
-          'saldo': 2,
-          'saldo_diario': 3,
-          'saldo_acumulado': 4,
-        };
-        previsoes.forEach((item) => {
-          const valor = Number(item.pvi_valor ?? 0);
-          const existente = mapaPrevisao.get(item.pvi_data);
-          const tipoAtual = String(item.pvi_tipo);
-          const prioridadeAtual = prioridadeTipos[tipoAtual] ?? 999;
+        // Criar mapas de receitas e despesas por data
+        const mapaReceitas = new Map<string, number>();
+        receitas.forEach((item: any) => {
+          const valor = Number(item.rec_valor ?? 0);
+          mapaReceitas.set(item.rec_data, (mapaReceitas.get(item.rec_data) ?? 0) + valor);
+        });
 
-          // Se não existe ou se o tipo atual tem prioridade maior (número menor)
-          if (existente === undefined) {
-            mapaPrevisao.set(item.pvi_data, valor);
-          } else {
-            // Atualiza apenas se encontrar um tipo com prioridade maior
-            const tiposExistentes = previsoes.filter(p => p.pvi_data === item.pvi_data);
-            const menorPrioridade = Math.min(...tiposExistentes.map(p => prioridadeTipos[String(p.pvi_tipo)] ?? 999));
-            if (prioridadeAtual === menorPrioridade) {
-              mapaPrevisao.set(item.pvi_data, valor);
-            }
-          }
+        const mapaDespesas = new Map<string, number>();
+        pagamentosArea.forEach((item: any) => {
+          const valor = Number(item.pag_valor ?? 0);
+          mapaDespesas.set(item.pag_data, (mapaDespesas.get(item.pag_data) ?? 0) + valor);
+        });
+        pagamentosBanco.forEach((item: any) => {
+          const valor = Number(item.pbk_valor ?? 0);
+          mapaDespesas.set(item.pbk_data, (mapaDespesas.get(item.pbk_data) ?? 0) + valor);
         });
 
         const datas = gerarIntervaloDatas(inicio, fim);
@@ -152,7 +161,21 @@ const AuditoriaSaldosDiariosPage: React.FC = () => {
               bancosDia[nome] = valor;
               somaBancos += valor;
             });
-            const saldoRegistrado = Number((mapaPrevisao.get(data) ?? 0).toFixed(2));
+
+            // Calcular saldo inicial (soma dos saldos do dia anterior)
+            const dataObj = new Date(data + 'T00:00:00');
+            dataObj.setDate(dataObj.getDate() - 1);
+            const dataAnterior = dataObj.toISOString().split('T')[0];
+            const mapaDiaAnterior = mapaSaldosPorData.get(dataAnterior) ?? new Map<string, number>();
+            let saldoInicial = 0;
+            bancosUnicos.forEach((nome) => {
+              saldoInicial += Number(mapaDiaAnterior.get(nome) ?? 0);
+            });
+
+            // Calcular saldo final registrado: saldo inicial + receitas - despesas
+            const receitas = Number(mapaReceitas.get(data) ?? 0);
+            const despesas = Number(mapaDespesas.get(data) ?? 0);
+            const saldoRegistrado = Number((saldoInicial + receitas - despesas).toFixed(2));
             const diferenca = Number((somaBancos - saldoRegistrado).toFixed(2));
             const possuiDados = somaBancos !== 0 || saldoRegistrado !== 0;
             if (!possuiDados) {

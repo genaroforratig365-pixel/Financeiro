@@ -10,6 +10,60 @@ type LinhaImportacao = {
   mapeamentoId: number;
 };
 
+// Função para buscar ou criar uma área no banco de dados
+async function obterOuCriarArea(
+  supabase: any,
+  nomeArea: string,
+  usrId: string
+): Promise<number | null> {
+  try {
+    // Primeiro tenta buscar pelo nome exato
+    const { data: areaExistente, error: selectError } = await supabase
+      .from('are_areas')
+      .select('are_id')
+      .eq('are_usr_id', usrId)
+      .eq('are_nome', nomeArea)
+      .maybeSingle();
+
+    if (areaExistente) {
+      return areaExistente.are_id;
+    }
+
+    // Se não encontrou, cria nova área
+    const codigo = nomeArea
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9\s]/g, '')
+      .split(/\s+/)
+      .map(p => p.substring(0, 3))
+      .join('_')
+      .substring(0, 20);
+
+    const { data: novaArea, error: insertError } = await supabase
+      .from('are_areas')
+      .insert({
+        are_codigo: codigo,
+        are_nome: nomeArea,
+        are_descricao: 'Criada automaticamente via importação',
+        are_ativo: true,
+        are_usr_id: usrId,
+      })
+      .select('are_id')
+      .single();
+
+    if (insertError) {
+      console.error('[obterOuCriarArea] Erro ao criar área:', insertError);
+      return null;
+    }
+
+    return novaArea.are_id;
+  } catch (err) {
+    console.error('[obterOuCriarArea] Exceção:', err);
+    return null;
+  }
+}
+
 function converterData(data: string): string | null {
   if (!data) return null;
 
@@ -97,9 +151,18 @@ export async function POST(request: NextRequest) {
         // PAGAMENTO POR ÁREA (REALIZADO)
         if (tipoImportacao === 'pagamento_area') {
           if (linha.valorRealizado > 0) {
+            // Busca ou cria a área baseada no nome
+            const areId = await obterOuCriarArea(supabase, linha.area, usuario.usr_id);
+
+            if (!areId) {
+              erros.push(`Erro na linha "${linha.area}": Não foi possível obter/criar a área`);
+              erro++;
+              continue;
+            }
+
             const { error: insertError } = await supabase.from('pag_pagamentos_area').insert({
               pag_data: data,
-              pag_are_id: mapeamentoId,
+              pag_are_id: areId,
               pag_valor: linha.valorRealizado,
               pag_usr_id: usuario.usr_id,
             });
@@ -112,6 +175,15 @@ export async function POST(request: NextRequest) {
         // PREVISÃO POR ÁREA
         if (tipoImportacao === 'previsao_area') {
           if (linha.valorPrevisto > 0) {
+            // Busca ou cria a área baseada no nome
+            const areId = await obterOuCriarArea(supabase, linha.area, usuario.usr_id);
+
+            if (!areId) {
+              erros.push(`Erro na linha "${linha.area}": Não foi possível obter/criar a área`);
+              erro++;
+              continue;
+            }
+
             // Calcular início e fim da semana (segunda a sexta)
             const dataObj = new Date(data);
             const diaSemana = dataObj.getDay(); // 0=domingo, 1=segunda, ..., 6=sábado
@@ -160,7 +232,7 @@ export async function POST(request: NextRequest) {
             const { error: insertError } = await supabase.from('pvi_previsao_itens').insert({
               pvi_pvs_id: pvs_id,
               pvi_data: data,
-              pvi_are_id: mapeamentoId,
+              pvi_are_id: areId,
               pvi_valor: linha.valorPrevisto,
               pvi_tipo: 'gasto',
               pvi_categoria: linha.area,

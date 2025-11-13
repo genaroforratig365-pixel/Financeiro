@@ -462,9 +462,13 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
           saldoFinalPrevisto = arredondar(saldoInicialPrevisto + resultadoPrevisto);
         }
 
-        const saldoFinalRealizado = arredondar(totalBancosRealizados);
         // Usar o saldo anterior baseado na última data disponível nos registros bancários
         const saldoInicialRealizado = arredondar(saldoAnteriorCalculado);
+
+        // Calcular saldo final do dia: saldo anterior + receitas realizadas - despesas realizadas
+        const saldoFinalRealizado = arredondar(
+          saldoInicialRealizado + totalReceitasRealizadas - totalDespesasRealizadas
+        );
 
         setRelatorio({
           data,

@@ -768,46 +768,6 @@ const PagamentosPage: React.FC = () => {
               </Card>
 
               <Card
-                title="Evolução Diária por Área de Despesa (Realizado)"
-                subtitle="Selecione as áreas para comparar a tendência diária"
-              >
-                {chavesAreas.length === 0 ? (
-                  <p className="text-sm text-gray-500">Nenhuma série disponível para o período informado.</p>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap gap-2">
-                      {chavesAreas.map((area) => (
-                        <Button
-                          key={area}
-                          variant={areasSelecionadas.includes(area) ? 'primary' : 'ghost'}
-                          size="sm"
-                          onClick={() => handleToggleArea(area)}
-                          className="whitespace-nowrap"
-                        >
-                          <span
-                            className="inline-block h-2 w-2 rounded-full"
-                            style={{ backgroundColor: areaCores.get(area) ?? coresPadrao[0] }}
-                          />
-                          <span>{area}</span>
-                        </Button>
-                      ))}
-                    </div>
-                    {linhasAreas.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-500">
-                        Selecione ao menos uma área para visualizar a evolução diária.
-                      </div>
-                    ) : (
-                      <SimpleLineChart
-                        labels={intervaloDatas.map((data) => formatarDataCurta(data))}
-                        series={linhasAreas}
-                      />
-                    )}
-                  </div>
-                )}
-              </Card>
-            </div>
-
-            <Card
               title="Evolução Diária de Saldo por Banco (Realizado)"
               subtitle="Ative ou desative bancos para ajustar a visualização"
             >
@@ -845,6 +805,46 @@ const PagamentosPage: React.FC = () => {
                 </div>
               )}
             </Card>
+            </div>
+
+            <Card
+                title="Evolução Diária por Área de Despesa (Realizado)"
+                subtitle="Selecione as áreas para comparar a tendência diária"
+              >
+                {chavesAreas.length === 0 ? (
+                  <p className="text-sm text-gray-500">Nenhuma série disponível para o período informado.</p>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                      {chavesAreas.map((area) => (
+                        <Button
+                          key={area}
+                          variant={areasSelecionadas.includes(area) ? 'primary' : 'ghost'}
+                          size="sm"
+                          onClick={() => handleToggleArea(area)}
+                          className="whitespace-nowrap"
+                        >
+                          <span
+                            className="inline-block h-2 w-2 rounded-full"
+                            style={{ backgroundColor: areaCores.get(area) ?? coresPadrao[0] }}
+                          />
+                          <span>{area}</span>
+                        </Button>
+                      ))}
+                    </div>
+                    {linhasAreas.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-500">
+                        Selecione ao menos uma área para visualizar a evolução diária.
+                      </div>
+                    ) : (
+                      <SimpleLineChart
+                        labels={intervaloDatas.map((data) => formatarDataCurta(data))}
+                        series={linhasAreas}
+                      />
+                    )}
+                  </div>
+                )}
+              </Card>
           </>
         )}
       </div>
