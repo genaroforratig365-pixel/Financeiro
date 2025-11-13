@@ -81,9 +81,10 @@ export async function POST(request: NextRequest) {
     // Processa cada linha
     for (const linha of linhas) {
       try {
+        console.log(`[DEBUG] Linha recebida:`, JSON.stringify(linha));
         const data = converterData(linha.data);
         if (!data) {
-          erros.push(`Data inválida: ${linha.data}`);
+          erros.push(`Data inválida: "${linha.data}" (tipo: ${typeof linha.data})`);
           erro++;
           continue;
         }

@@ -299,6 +299,9 @@ export default function ImportarDadosGrid() {
         mapeamentoId: l.mapeamentoId,
       }));
 
+      console.log('[IMPORTAÇÃO] Primeira linha a ser enviada:', linhasParaImportar[0]);
+      console.log('[IMPORTAÇÃO] Total de linhas:', linhasParaImportar.length);
+
       const response = await fetch('/api/importar-dados-grid', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
