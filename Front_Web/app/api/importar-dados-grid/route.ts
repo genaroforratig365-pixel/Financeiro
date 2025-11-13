@@ -111,7 +111,53 @@ export async function POST(request: NextRequest) {
         // PREVISÃO POR ÁREA
         if (tipoImportacao === 'previsao_area') {
           if (linha.valorPrevisto > 0) {
+            // Calcular início e fim da semana (segunda a sexta)
+            const dataObj = new Date(data);
+            const diaSemana = dataObj.getDay(); // 0=domingo, 1=segunda, ..., 6=sábado
+            const diasAteSegunda = diaSemana === 0 ? -6 : 1 - diaSemana;
+            const diasAteSexta = diaSemana === 0 ? -2 : 5 - diaSemana;
+
+            const segundaFeira = new Date(dataObj);
+            segundaFeira.setDate(dataObj.getDate() + diasAteSegunda);
+            const pvs_semana_inicio = segundaFeira.toISOString().split('T')[0];
+
+            const sextaFeira = new Date(dataObj);
+            sextaFeira.setDate(dataObj.getDate() + diasAteSexta);
+            const pvs_semana_fim = sextaFeira.toISOString().split('T')[0];
+
+            // Buscar ou criar semana
+            let { data: semanaExistente, error: semanaSelectError } = await supabase
+              .from('pvs_semanas')
+              .select('pvs_id')
+              .eq('pvs_usr_id', usuario.usr_id)
+              .eq('pvs_semana_inicio', pvs_semana_inicio)
+              .single();
+
+            let pvs_id: number;
+
+            if (semanaSelectError || !semanaExistente) {
+              // Criar nova semana
+              const { data: novaSemana, error: semanaInsertError } = await supabase
+                .from('pvs_semanas')
+                .insert({
+                  pvs_usr_id: usuario.usr_id,
+                  pvs_semana_inicio,
+                  pvs_semana_fim,
+                  pvs_status: 'importado',
+                  pvs_observacao: 'Criado automaticamente via importação',
+                })
+                .select('pvs_id')
+                .single();
+
+              if (semanaInsertError || !novaSemana) throw semanaInsertError;
+              pvs_id = novaSemana.pvs_id;
+            } else {
+              pvs_id = semanaExistente.pvs_id;
+            }
+
+            // Inserir item de previsão
             const { error: insertError } = await supabase.from('pvi_previsao_itens').insert({
+              pvi_pvs_id: pvs_id,
               pvi_data: data,
               pvi_are_id: mapeamentoId,
               pvi_valor: linha.valorPrevisto,
@@ -182,12 +228,58 @@ export async function POST(request: NextRequest) {
         // PREVISÃO DE RECEITA
         if (tipoImportacao === 'previsao_receita') {
           if (linha.valorPrevisto > 0) {
+            // Calcular início e fim da semana (segunda a sexta)
+            const dataObj = new Date(data);
+            const diaSemana = dataObj.getDay(); // 0=domingo, 1=segunda, ..., 6=sábado
+            const diasAteSegunda = diaSemana === 0 ? -6 : 1 - diaSemana;
+            const diasAteSexta = diaSemana === 0 ? -2 : 5 - diaSemana;
+
+            const segundaFeira = new Date(dataObj);
+            segundaFeira.setDate(dataObj.getDate() + diasAteSegunda);
+            const pvs_semana_inicio = segundaFeira.toISOString().split('T')[0];
+
+            const sextaFeira = new Date(dataObj);
+            sextaFeira.setDate(dataObj.getDate() + diasAteSexta);
+            const pvs_semana_fim = sextaFeira.toISOString().split('T')[0];
+
+            // Buscar ou criar semana
+            let { data: semanaExistente, error: semanaSelectError } = await supabase
+              .from('pvs_semanas')
+              .select('pvs_id')
+              .eq('pvs_usr_id', usuario.usr_id)
+              .eq('pvs_semana_inicio', pvs_semana_inicio)
+              .single();
+
+            let pvs_id: number;
+
+            if (semanaSelectError || !semanaExistente) {
+              // Criar nova semana
+              const { data: novaSemana, error: semanaInsertError } = await supabase
+                .from('pvs_semanas')
+                .insert({
+                  pvs_usr_id: usuario.usr_id,
+                  pvs_semana_inicio,
+                  pvs_semana_fim,
+                  pvs_status: 'importado',
+                  pvs_observacao: 'Criado automaticamente via importação',
+                })
+                .select('pvs_id')
+                .single();
+
+              if (semanaInsertError || !novaSemana) throw semanaInsertError;
+              pvs_id = novaSemana.pvs_id;
+            } else {
+              pvs_id = semanaExistente.pvs_id;
+            }
+
+            // Inserir item de previsão
             const { error: insertError } = await supabase.from('pvi_previsao_itens').insert({
+              pvi_pvs_id: pvs_id,
               pvi_data: data,
               pvi_valor: linha.valorPrevisto,
               pvi_tipo: 'receita',
               pvi_categoria: linha.area,
-              pvi_ctr_id: mapeamentoId, // ID do tipo de receita
+              pvi_tpr_id: mapeamentoId, // ID do tipo de receita
               pvi_usr_id: usuario.usr_id,
             });
             if (insertError) throw insertError;
