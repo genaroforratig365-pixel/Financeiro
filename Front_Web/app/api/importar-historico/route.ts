@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
-import { getSupabaseClient, getOrCreateUser } from '@/lib/supabaseClient';
-import { getUserSession } from '@/lib/userSession';
+import { getSupabaseServer, getOrCreateUser } from '@/lib/supabaseClient';
 
 // Mapeamento de áreas para IDs do banco
 const AREAS_MAP: Record<string, number> = {
@@ -192,7 +191,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseServer();
 
     // Obtém o usuário
     const { data: usuario, error: userError } = await getOrCreateUser(
