@@ -34,6 +34,40 @@ const AREAS_MAP: Record<string, number> = {
   'APLICACAO': 13,
 };
 
+// Mapeamento de bancos para IDs
+const BANCOS_MAP: Record<string, number> = {
+  'BANCO DO BRASIL': 1,
+  'BB': 1,
+  'BRADESCO': 2,
+  'BANRISUL': 3,
+  'CAIXA': 4,
+  'CAIXA ECONOMICA': 4,
+  'CAIXA ECONÔMICA': 4,
+  'SANTANDER': 5,
+  'ITAU': 6,
+  'ITAÚ': 6,
+  'SICOOB': 7,
+  'SICREDI': 8,
+};
+
+// Mapeamento de tipos de receita para IDs de conta
+const RECEITAS_MAP: Record<string, number> = {
+  'RECEITAS EM TITULOS': 1, // Código 200
+  'RECEITAS EM TÍTULOS': 1,
+  'TITULOS': 1,
+  'TÍTULOS': 1,
+  'BOLETOS': 1,
+  'RECEITAS EM DEPOSITOS': 2, // Código 201
+  'RECEITAS EM DEPÓSITOS': 2,
+  'DEPOSITOS': 2,
+  'DEPÓSITOS': 2,
+  'PIX': 2,
+  'OUTRAS RECEITAS': 3, // Código 202
+  'OUTRAS': 3,
+  'RESGATE APLICAÇÃO': 3,
+  'RESGATE APLICACAO': 3,
+};
+
 function normalizarNome(nome: string): string {
   return nome.trim().toUpperCase();
 }
@@ -48,6 +82,42 @@ function obterIdArea(nomeArea: string): number | null {
 
   // Procura parcial
   for (const [chave, id] of Object.entries(AREAS_MAP)) {
+    if (normalizado.includes(chave) || chave.includes(normalizado)) {
+      return id;
+    }
+  }
+
+  return null;
+}
+
+function obterIdBanco(nomeBanco: string): number | null {
+  const normalizado = normalizarNome(nomeBanco);
+
+  // Procura exata
+  if (BANCOS_MAP[normalizado]) {
+    return BANCOS_MAP[normalizado];
+  }
+
+  // Procura parcial
+  for (const [chave, id] of Object.entries(BANCOS_MAP)) {
+    if (normalizado.includes(chave) || chave.includes(normalizado)) {
+      return id;
+    }
+  }
+
+  return null;
+}
+
+function obterIdContaReceita(tipoReceita: string): number | null {
+  const normalizado = normalizarNome(tipoReceita);
+
+  // Procura exata
+  if (RECEITAS_MAP[normalizado]) {
+    return RECEITAS_MAP[normalizado];
+  }
+
+  // Procura parcial
+  for (const [chave, id] of Object.entries(RECEITAS_MAP)) {
     if (normalizado.includes(chave) || chave.includes(normalizado)) {
       return id;
     }
@@ -229,19 +299,57 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Outros tipos que precisam de mapeamento
+        // RECEITAS POR TIPO - REALIZADO
         if (origem.includes('receitas por tipo')) {
-          avisos.push(`Receita por tipo ignorada (necessário mapear conta): ${area} - ${data}`);
+          const contaId = obterIdContaReceita(area);
+          if (contaId && valorReal > 0) {
+            const { error: insertError } = await supabase.from('rec_receitas').insert({
+              rec_data: data,
+              rec_ctr_id: contaId,
+              rec_valor: valorReal,
+              rec_usr_id: usuario.usr_id,
+            });
+            if (insertError) throw insertError;
+            sucesso++;
+          } else if (!contaId) {
+            avisos.push(`Tipo de receita não encontrado: ${area}`);
+          }
           continue;
         }
 
+        // SALDOS BANCÁRIOS
         if (origem.includes('saldo por banco')) {
-          avisos.push(`Saldo bancário ignorado (necessário mapear banco): ${area} - ${data}`);
+          const bancoId = obterIdBanco(area);
+          if (bancoId && valorReal > 0) {
+            const { error: insertError } = await supabase.from('sdb_saldo_banco').insert({
+              sdb_data: data,
+              sdb_ban_id: bancoId,
+              sdb_saldo: valorReal,
+              sdb_usr_id: usuario.usr_id,
+            });
+            if (insertError) throw insertError;
+            sucesso++;
+          } else if (!bancoId) {
+            avisos.push(`Banco não encontrado: ${area}`);
+          }
           continue;
         }
 
+        // PAGAMENTOS POR BANCO
         if (origem.includes('pagamento por banco')) {
-          avisos.push(`Pagamento bancário ignorado (necessário mapear banco): ${area} - ${data}`);
+          const bancoId = obterIdBanco(area);
+          if (bancoId && valorReal > 0) {
+            const { error: insertError } = await supabase.from('pbk_pagamentos_banco').insert({
+              pbk_data: data,
+              pbk_ban_id: bancoId,
+              pbk_valor: valorReal,
+              pbk_usr_id: usuario.usr_id,
+            });
+            if (insertError) throw insertError;
+            sucesso++;
+          } else if (!bancoId) {
+            avisos.push(`Banco não encontrado: ${area}`);
+          }
           continue;
         }
 

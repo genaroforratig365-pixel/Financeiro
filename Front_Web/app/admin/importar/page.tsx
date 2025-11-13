@@ -90,16 +90,37 @@ export default function ImportarHistoricoPage() {
             <p>
               <strong>2. Tipos de Origem suportados:</strong>
             </p>
-            <ul className="list-disc ml-6 space-y-1">
-              <li><code className="bg-gray-100 px-2 py-1 rounded">Ajuste de Saldo de Aplicação</code> ou <code className="bg-gray-100 px-2 py-1 rounded">Saldo Inicial</code></li>
-              <li><code className="bg-gray-100 px-2 py-1 rounded">Previsão por Área</code> (valores previstos de gastos)</li>
-              <li><code className="bg-gray-100 px-2 py-1 rounded">Pagamentos por Área</code> (valores realizados de gastos)</li>
-              <li><code className="bg-gray-100 px-2 py-1 rounded">Previsão de Receitas</code> (valores previstos de receitas)</li>
-            </ul>
-            <p className="text-yellow-700 bg-yellow-50 p-3 rounded">
-              ⚠️ <strong>Nota:</strong> Receitas por tipo, saldos bancários e pagamentos por banco
-              precisam de mapeamento manual e serão ignorados na importação automática.
-            </p>
+            <div className="space-y-3">
+              <div>
+                <p className="font-semibold text-gray-700 mb-1">Saldos e Gastos:</p>
+                <ul className="list-disc ml-6 space-y-1">
+                  <li><code className="bg-gray-100 px-2 py-1 rounded text-xs">Ajuste de Saldo de Aplicação</code> ou <code className="bg-gray-100 px-2 py-1 rounded text-xs">Saldo Inicial</code></li>
+                  <li><code className="bg-gray-100 px-2 py-1 rounded text-xs">Previsão por Área</code> (valores previstos de gastos)</li>
+                  <li><code className="bg-gray-100 px-2 py-1 rounded text-xs">Pagamentos por Área</code> (valores realizados de gastos)</li>
+                </ul>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-700 mb-1">Receitas:</p>
+                <ul className="list-disc ml-6 space-y-1">
+                  <li><code className="bg-gray-100 px-2 py-1 rounded text-xs">Previsão de Receitas</code> (valores previstos)</li>
+                  <li><code className="bg-gray-100 px-2 py-1 rounded text-xs">Receitas por Tipo</code> (valores realizados - títulos, depósitos, outras)</li>
+                </ul>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-700 mb-1">Operações Bancárias:</p>
+                <ul className="list-disc ml-6 space-y-1">
+                  <li><code className="bg-gray-100 px-2 py-1 rounded text-xs">Saldo por Banco</code> (saldos bancários)</li>
+                  <li><code className="bg-gray-100 px-2 py-1 rounded text-xs">Pagamento por Banco</code> (débitos/pagamentos)</li>
+                </ul>
+              </div>
+            </div>
+            <div className="text-green-700 bg-green-50 p-3 rounded mt-3">
+              <p className="font-semibold">✅ Mapeamentos Automáticos:</p>
+              <p className="text-sm mt-1">
+                <strong>Bancos:</strong> BB, Banco do Brasil, Bradesco, Banrisul, Caixa, Santander, Itaú, Sicoob, Sicredi<br/>
+                <strong>Receitas:</strong> Títulos/Boletos, Depósitos/PIX, Outras Receitas/Resgate Aplicação
+              </p>
+            </div>
           </div>
         </Card>
 
@@ -248,6 +269,27 @@ export default function ImportarHistoricoPage() {
                   <td className="px-4 py-2">377856.93</td>
                   <td className="px-4 py-2">0</td>
                   <td className="px-4 py-2">Previsão de Receitas</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-2">20/03/2025</td>
+                  <td className="px-4 py-2">RECEITAS EM TITULOS</td>
+                  <td className="px-4 py-2">0</td>
+                  <td className="px-4 py-2">406409.11</td>
+                  <td className="px-4 py-2">Receitas por Tipo</td>
+                </tr>
+                <tr className="bg-gray-50">
+                  <td className="px-4 py-2">20/03/2025</td>
+                  <td className="px-4 py-2">BANCO DO BRASIL</td>
+                  <td className="px-4 py-2">0</td>
+                  <td className="px-4 py-2">605.52</td>
+                  <td className="px-4 py-2">Saldo por Banco</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-2">20/03/2025</td>
+                  <td className="px-4 py-2">BRADESCO</td>
+                  <td className="px-4 py-2">0</td>
+                  <td className="px-4 py-2">71.15</td>
+                  <td className="px-4 py-2">Pagamento por Banco</td>
                 </tr>
               </tbody>
             </table>

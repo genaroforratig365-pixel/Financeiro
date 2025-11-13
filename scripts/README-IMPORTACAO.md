@@ -58,19 +58,30 @@ O campo **Origem** determina como os dados serão importados:
 - **Origem**: "Receitas por Tipo"
 - **Uso**: Valor_Realizado
 - **Destino**: Tabela `rec_receitas`
-- **Nota**: Necessário mapear contas de receita manualmente
+- **Tipos reconhecidos**:
+  - RECEITAS EM TITULOS / TÍTULOS / BOLETOS → Conta ID 1
+  - RECEITAS EM DEPOSITOS / DEPÓSITOS / PIX → Conta ID 2
+  - OUTRAS RECEITAS / RESGATE APLICAÇÃO → Conta ID 3
 
 #### 6. Saldos Bancários
 - **Origem**: "Saldo por Banco"
 - **Uso**: Valor_Realizado
 - **Destino**: Tabela `sdb_saldo_banco`
-- **Nota**: Necessário mapear bancos manualmente
+- **Bancos reconhecidos**:
+  - BANCO DO BRASIL / BB → Banco ID 1
+  - BRADESCO → Banco ID 2
+  - BANRISUL → Banco ID 3
+  - CAIXA / CAIXA ECONÔMICA → Banco ID 4
+  - SANTANDER → Banco ID 5
+  - ITAÚ / ITAU → Banco ID 6
+  - SICOOB → Banco ID 7
+  - SICREDI → Banco ID 8
 
 #### 7. Pagamentos por Banco
 - **Origem**: "Pagamento por Banco"
 - **Uso**: Valor_Realizado
 - **Destino**: Tabela `pbk_pagamentos_banco`
-- **Nota**: Necessário mapear bancos manualmente
+- **Bancos**: Mesma lista acima
 
 ## 🚀 Como Usar
 
@@ -114,17 +125,15 @@ O script exibirá:
 - **Valor_Previsto**: Usado apenas para registros de previsão (relatórios semanais)
 - **Valor_Realizado**: Usado para registros de saldo diário (valores reais executados)
 
-### Mapeamentos Necessários
+### Mapeamentos Automáticos
 
-Alguns tipos de registro precisam de IDs de referência que devem ser configurados manualmente:
+O sistema reconhece automaticamente:
 
-1. **Receitas por Tipo**: Necessário mapear `rec_ctr_id` (conta de receita)
-2. **Saldos Bancários**: Necessário mapear `sdb_ban_id` (banco)
-3. **Pagamentos por Banco**: Necessário mapear `pbk_ban_id` (banco)
+1. **Áreas de Negócio**: 13 áreas mapeadas (Material e Consumo, RH, Financeiro, etc.)
+2. **Bancos**: 8 instituições financeiras (BB, Bradesco, Banrisul, Caixa, etc.)
+3. **Tipos de Receita**: 3 categorias (Títulos, Depósitos, Outras)
 
-Para esses casos, você pode:
-- Editar o script `importar-dados.ts` e adicionar os mapeamentos
-- Ou importar esses dados manualmente pelo sistema
+Se um nome não for reconhecido, será registrado um aviso no resultado da importação.
 
 ## 📊 Exemplo Completo
 
