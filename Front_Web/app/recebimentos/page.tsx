@@ -77,7 +77,6 @@ export default function RecebimentosPage() {
               ctr_id,
               ctr_nome,
               ctr_codigo,
-              ctr_tpr_id,
               ctr_ban_id
             )
           `)
@@ -92,25 +91,15 @@ export default function RecebimentosPage() {
           throw error;
         }
 
-        // Buscar tipos de receita e bancos separadamente
-        const tiposIds = new Set<number>();
+        // Buscar bancos separadamente
         const bancosIds = new Set<number>();
 
         (data || []).forEach((rec: any) => {
           const conta = Array.isArray(rec.ctr_contas_receita)
             ? rec.ctr_contas_receita[0]
             : rec.ctr_contas_receita;
-          if (conta?.ctr_tpr_id) tiposIds.add(conta.ctr_tpr_id);
           if (conta?.ctr_ban_id) bancosIds.add(conta.ctr_ban_id);
         });
-
-        // Buscar tipos
-        const { data: tiposData } = await supabase
-          .from('tpr_tipos_receita')
-          .select('tpr_id, tpr_nome, tpr_codigo')
-          .in('tpr_id', Array.from(tiposIds));
-
-        const tiposMap = new Map((tiposData || []).map((t: any) => [t.tpr_id, t]));
 
         // Buscar bancos
         const { data: bancosData } = await supabase
@@ -126,7 +115,6 @@ export default function RecebimentosPage() {
             ? rec.ctr_contas_receita[0]
             : rec.ctr_contas_receita;
 
-          const tipo = conta?.ctr_tpr_id ? tiposMap.get(conta.ctr_tpr_id) : null;
           const banco = conta?.ctr_ban_id ? bancosMap.get(conta.ctr_ban_id) : null;
 
           return {
@@ -139,11 +127,7 @@ export default function RecebimentosPage() {
               ctr_nome: conta.ctr_nome,
               ctr_codigo: conta.ctr_codigo
             } : null,
-            tipo_receita: tipo ? {
-              tpr_id: tipo.tpr_id,
-              tpr_nome: tipo.tpr_nome,
-              tpr_codigo: tipo.tpr_codigo || ''
-            } : null,
+            tipo_receita: null, // Temporariamente desabilitado até migration ser aplicada
             banco: banco ? {
               ban_id: banco.ban_id,
               ban_nome: banco.ban_nome
@@ -172,16 +156,16 @@ export default function RecebimentosPage() {
     const categorias = new Map<string, number>();
 
     receitas.forEach(rec => {
-      const codigo = rec.tipo_receita?.tpr_codigo || '';
+      const conta = rec.conta_receita?.ctr_codigo || '';
 
-      // Classificar por código de tipo
-      if (codigo.startsWith('301')) {
+      // Classificar por código de conta de receita
+      if (conta.startsWith('301')) {
         categorias.set('Receita Prevista', (categorias.get('Receita Prevista') || 0) + rec.rec_valor);
-      } else if (codigo.startsWith('302')) {
+      } else if (conta.startsWith('302')) {
         categorias.set('Atrasados', (categorias.get('Atrasados') || 0) + rec.rec_valor);
-      } else if (codigo.startsWith('303')) {
+      } else if (conta.startsWith('303')) {
         categorias.set('Adiantados', (categorias.get('Adiantados') || 0) + rec.rec_valor);
-      } else if (codigo.startsWith('304')) {
+      } else if (conta.startsWith('304')) {
         categorias.set('Exportação', (categorias.get('Exportação') || 0) + rec.rec_valor);
       } else {
         categorias.set('Outros', (categorias.get('Outros') || 0) + rec.rec_valor);
@@ -223,19 +207,19 @@ export default function RecebimentosPage() {
       .sort((a, b) => b.valor - a.valor);
   }, [receitas]);
 
-  // Dados para gráfico por tipo de receita
-  const dadosGraficoTipos = useMemo((): DadosGrafico[] => {
-    const mapa = new Map<string, number>();
-
-    receitas.forEach(rec => {
-      const tipo = rec.tipo_receita?.tpr_nome || 'Sem tipo';
-      mapa.set(tipo, (mapa.get(tipo) || 0) + rec.rec_valor);
-    });
-
-    return Array.from(mapa.entries())
-      .map(([nome, valor]) => ({ nome, valor }))
-      .sort((a, b) => b.valor - a.valor);
-  }, [receitas]);
+  // Dados para gráfico por tipo de receita (temporariamente desabilitado)
+  // const dadosGraficoTipos = useMemo((): DadosGrafico[] => {
+  //   const mapa = new Map<string, number>();
+  //
+  //   receitas.forEach(rec => {
+  //     const tipo = rec.tipo_receita?.tpr_nome || 'Sem tipo';
+  //     mapa.set(tipo, (mapa.get(tipo) || 0) + rec.rec_valor);
+  //   });
+  //
+  //   return Array.from(mapa.entries())
+  //     .map(([nome, valor]) => ({ nome, valor }))
+  //     .sort((a, b) => b.valor - a.valor);
+  // }, [receitas]);
 
   const formatarData = (data: string) => {
     const [ano, mes, dia] = data.split('-');
@@ -357,7 +341,7 @@ export default function RecebimentosPage() {
               {renderGraficoBarras(dadosGraficoContas, 'Recebimentos por Conta')}
             </div>
 
-            {renderGraficoBarras(dadosGraficoTipos, 'Recebimentos por Tipo de Receita')}
+            {/* {renderGraficoBarras(dadosGraficoTipos, 'Recebimentos por Tipo de Receita')} */}
 
             {/* Lista Detalhada */}
             <Card title="Lista Completa de Recebimentos">

@@ -36,7 +36,7 @@ const navigationSections: NavSection[] = [
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M3 3h18M9 3v18m6-18v18M3 9h18M3 15h18"
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
             />
           </svg>
         ),
@@ -50,7 +50,7 @@ const navigationSections: NavSection[] = [
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2m3-4h-8m0 0l3 3m-3-3l3-3"
+              d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
             />
           </svg>
         ),
@@ -64,7 +64,7 @@ const navigationSections: NavSection[] = [
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"
+              d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
         ),
@@ -78,7 +78,7 @@ const navigationSections: NavSection[] = [
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
             />
           </svg>
         ),
@@ -98,13 +98,13 @@ const navigationSections: NavSection[] = [
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M3 18v-6a3 3 0 013-3h3m6 9h3a3 3 0 003-3V9m-6 9V9a3 3 0 00-3-3H9m6 0V6a3 3 0 00-3-3H9a3 3 0 00-3 3v3"
+              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
             />
           </svg>
         ),
       },
       {
-        label: 'Lançamento de Cobrança',
+        label: 'Cobrança',
         href: '/cobrancas',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -112,7 +112,7 @@ const navigationSections: NavSection[] = [
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M3 7h18M3 12h18M3 17h12"
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
             />
           </svg>
         ),
@@ -126,7 +126,7 @@ const navigationSections: NavSection[] = [
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M3 5h18M5 5v14m14-14v14M8 9h8m-8 4h5m-5 4h4"
+              d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
             />
           </svg>
         ),
@@ -146,7 +146,7 @@ const navigationSections: NavSection[] = [
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M4 4h16M4 8h16M5 4v16a1 1 0 001 1h12a1 1 0 001-1V4M8 12h4m-4 4h8"
+              d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
             />
           </svg>
         ),
@@ -160,7 +160,7 @@ const navigationSections: NavSection[] = [
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M9 17v-2a2 2 0 012-2h6m3 7V7a2 2 0 00-2-2H7a2 2 0 00-2 2v14m7-7a2 2 0 01-2-2V7"
+              d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
             />
           </svg>
         ),
@@ -174,7 +174,7 @@ const navigationSections: NavSection[] = [
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"
+              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
             />
           </svg>
         ),
@@ -194,7 +194,7 @@ const navigationSections: NavSection[] = [
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M9 12l2 2 4-4m5 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
             />
           </svg>
         ),
@@ -308,41 +308,36 @@ export const Sidebar: React.FC = () => {
     return pathname.startsWith(href);
   };
 
-  const getSectionColorClasses = (color?: string) => {
-    switch (color) {
-      case 'blue':
-        return 'bg-blue-50 border-blue-200';
-      case 'green':
-        return 'bg-green-50 border-green-200';
-      case 'purple':
-        return 'bg-purple-50 border-purple-200';
-      case 'yellow':
-        return 'bg-yellow-50 border-yellow-200';
-      case 'indigo':
-        return 'bg-indigo-50 border-indigo-200';
-      case 'red':
-        return 'bg-red-50 border-red-200';
-      default:
-        return 'bg-gray-50 border-gray-200';
+  const getSectionColorClasses = (index: number) => {
+    // Alternar entre branco e vermelho
+    if (index % 2 === 0) {
+      // Fundo branco, texto vermelho
+      return 'bg-white border-red-200';
+    } else {
+      // Fundo vermelho, texto branco
+      return 'bg-red-600 border-red-700';
     }
   };
 
-  const getTitleColorClass = (color?: string) => {
-    switch (color) {
-      case 'blue':
-        return 'text-blue-700';
-      case 'green':
-        return 'text-green-700';
-      case 'purple':
-        return 'text-purple-700';
-      case 'yellow':
-        return 'text-yellow-700';
-      case 'indigo':
-        return 'text-indigo-700';
-      case 'red':
-        return 'text-red-700';
-      default:
-        return 'text-gray-500';
+  const getTitleColorClass = (index: number) => {
+    if (index % 2 === 0) {
+      return 'text-red-700';
+    } else {
+      return 'text-white';
+    }
+  };
+
+  const getItemColorClass = (index: number, active: boolean) => {
+    if (index % 2 === 0) {
+      // Quadro branco
+      return active
+        ? 'bg-red-50 text-red-700 shadow-sm'
+        : 'text-gray-700 hover:bg-red-50 hover:text-red-700 hover:shadow-sm';
+    } else {
+      // Quadro vermelho
+      return active
+        ? 'bg-red-700 text-white shadow-sm'
+        : 'text-white hover:bg-red-700 hover:shadow-sm';
     }
   };
 
@@ -362,9 +357,9 @@ export const Sidebar: React.FC = () => {
       {/* Navigation */}
       <div className="sidebar__scroll">
         <nav className="p-4 space-y-4 pb-6">
-          {navigationSections.map((section) => (
-            <div key={section.title} className={`rounded-lg border p-3 ${getSectionColorClasses(section.color)}`}>
-              <h3 className={`px-2 text-xs font-bold uppercase tracking-wider mb-2 ${getTitleColorClass(section.color)}`}>
+          {navigationSections.map((section, sectionIndex) => (
+            <div key={section.title} className={`rounded-lg border p-3 ${getSectionColorClasses(sectionIndex)}`}>
+              <h3 className={`px-2 text-xs font-bold uppercase tracking-wider mb-2 ${getTitleColorClass(sectionIndex)}`}>
                 {section.title}
               </h3>
               <ul className="space-y-1">
@@ -375,11 +370,7 @@ export const Sidebar: React.FC = () => {
                       className={`
                         flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium
                         transition-colors duration-150
-                        ${
-                          isActive(item.href)
-                            ? 'bg-primary-50 text-primary-700 shadow-sm'
-                            : 'text-gray-700 hover:bg-white hover:text-gray-900 hover:shadow-sm'
-                        }
+                        ${getItemColorClass(sectionIndex, isActive(item.href))}
                       `}
                     >
                       {item.icon}

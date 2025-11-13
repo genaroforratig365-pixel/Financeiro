@@ -165,18 +165,27 @@ const SimpleLineChart: React.FC<{
         />
         {[0.25, 0.5, 0.75, 1].map((fracao) => {
           const y = height - paddingY - fracao * (height - paddingY * 2);
+          const valor = maxValor * fracao;
           return (
-            <line
-              // eslint-disable-next-line react/no-array-index-key
-              key={fracao}
-              x1={paddingX}
-              y1={y}
-              x2={width - paddingX}
-              y2={y}
-              stroke="#f1f5f9"
-              strokeWidth={1}
-              strokeDasharray="4 4"
-            />
+            <g key={fracao}>
+              <line
+                x1={paddingX}
+                y1={y}
+                x2={width - paddingX}
+                y2={y}
+                stroke="#f1f5f9"
+                strokeWidth={1}
+                strokeDasharray="4 4"
+              />
+              <text
+                x={paddingX - 6}
+                y={y + 4}
+                textAnchor="end"
+                className="text-[13px] fill-gray-600 font-medium"
+              >
+                {formatCurrency(valor)}
+              </text>
+            </g>
           );
         })}
         {series.map((serie) => {
@@ -222,7 +231,7 @@ const SimpleLineChart: React.FC<{
               x={x}
               y={height - paddingY + 20}
               textAnchor="middle"
-              className="text-[11px] fill-gray-500"
+              className="text-[13px] fill-gray-600 font-medium"
             >
               {label}
             </text>
@@ -768,46 +777,6 @@ const PagamentosPage: React.FC = () => {
               </Card>
 
               <Card
-                title="Evolução Diária por Área de Despesa (Realizado)"
-                subtitle="Selecione as áreas para comparar a tendência diária"
-              >
-                {chavesAreas.length === 0 ? (
-                  <p className="text-sm text-gray-500">Nenhuma série disponível para o período informado.</p>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap gap-2">
-                      {chavesAreas.map((area) => (
-                        <Button
-                          key={area}
-                          variant={areasSelecionadas.includes(area) ? 'primary' : 'ghost'}
-                          size="sm"
-                          onClick={() => handleToggleArea(area)}
-                          className="whitespace-nowrap"
-                        >
-                          <span
-                            className="inline-block h-2 w-2 rounded-full"
-                            style={{ backgroundColor: areaCores.get(area) ?? coresPadrao[0] }}
-                          />
-                          <span>{area}</span>
-                        </Button>
-                      ))}
-                    </div>
-                    {linhasAreas.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-500">
-                        Selecione ao menos uma área para visualizar a evolução diária.
-                      </div>
-                    ) : (
-                      <SimpleLineChart
-                        labels={intervaloDatas.map((data) => formatarDataCurta(data))}
-                        series={linhasAreas}
-                      />
-                    )}
-                  </div>
-                )}
-              </Card>
-            </div>
-
-            <Card
               title="Evolução Diária de Saldo por Banco (Realizado)"
               subtitle="Ative ou desative bancos para ajustar a visualização"
             >
@@ -845,6 +814,46 @@ const PagamentosPage: React.FC = () => {
                 </div>
               )}
             </Card>
+            </div>
+
+            <Card
+                title="Evolução Diária por Área de Despesa (Realizado)"
+                subtitle="Selecione as áreas para comparar a tendência diária"
+              >
+                {chavesAreas.length === 0 ? (
+                  <p className="text-sm text-gray-500">Nenhuma série disponível para o período informado.</p>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                      {chavesAreas.map((area) => (
+                        <Button
+                          key={area}
+                          variant={areasSelecionadas.includes(area) ? 'primary' : 'ghost'}
+                          size="sm"
+                          onClick={() => handleToggleArea(area)}
+                          className="whitespace-nowrap"
+                        >
+                          <span
+                            className="inline-block h-2 w-2 rounded-full"
+                            style={{ backgroundColor: areaCores.get(area) ?? coresPadrao[0] }}
+                          />
+                          <span>{area}</span>
+                        </Button>
+                      ))}
+                    </div>
+                    {linhasAreas.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-500">
+                        Selecione ao menos uma área para visualizar a evolução diária.
+                      </div>
+                    ) : (
+                      <SimpleLineChart
+                        labels={intervaloDatas.map((data) => formatarDataCurta(data))}
+                        series={linhasAreas}
+                      />
+                    )}
+                  </div>
+                )}
+              </Card>
           </>
         )}
       </div>

@@ -293,6 +293,7 @@ const SaldoDiarioPage: React.FC = () => {
   const [receitas, setReceitas] = useState<Receita[]>([]);
   const [pagamentosBanco, setPagamentosBanco] = useState<PagamentoBanco[]>([]);
   const [saldosBanco, setSaldosBanco] = useState<SaldoBanco[]>([]);
+  const [saldosBancoDiaAnterior, setSaldosBancoDiaAnterior] = useState<SaldoBanco[]>([]);
 
   const [areaOptions, setAreaOptions] = useState<AreaOption[]>([]);
   const [contaOptions, setContaOptions] = useState<ContaOption[]>([]);
@@ -480,7 +481,12 @@ const SaldoDiarioPage: React.FC = () => {
     async (data: string) => {
       const supabase = getSupabaseClient();
 
-      const [pagAreaRes, recRes, pagBancoRes, saldoRes] = await Promise.all([
+      // Calcular dia anterior
+      const dataObj = new Date(data + 'T00:00:00');
+      dataObj.setDate(dataObj.getDate() - 1);
+      const dataAnterior = dataObj.toISOString().split('T')[0];
+
+      const [pagAreaRes, recRes, pagBancoRes, saldoRes, saldoDiaAnteriorRes] = await Promise.all([
         supabase
           .from('pag_pagamentos_area')
           .select('pag_id, pag_valor, pag_data, pag_are_id, are_areas(are_nome)')
@@ -505,17 +511,25 @@ const SaldoDiarioPage: React.FC = () => {
           .eq('sdb_data', data)
           .order('sdb_criado_em', { ascending: false })
           .limit(100),
+        supabase
+          .from('sdb_saldo_banco')
+          .select('sdb_id, sdb_saldo, sdb_data, sdb_ban_id, ban_bancos(ban_nome)')
+          .eq('sdb_data', dataAnterior)
+          .order('sdb_criado_em', { ascending: false })
+          .limit(100),
       ]);
 
       if (pagAreaRes.error) throw pagAreaRes.error;
       if (recRes.error) throw recRes.error;
       if (pagBancoRes.error) throw pagBancoRes.error;
       if (saldoRes.error) throw saldoRes.error;
+      if (saldoDiaAnteriorRes.error) throw saldoDiaAnteriorRes.error;
 
       setPagamentosArea(mapPagamentosArea(pagAreaRes.data as MaybeArray<PagamentoAreaRow | null>));
       setReceitas(mapReceitas(recRes.data as MaybeArray<ReceitaRow | null>));
       setPagamentosBanco(mapPagamentosBanco(pagBancoRes.data as MaybeArray<PagamentoBancoRow | null>));
       setSaldosBanco(mapSaldosBanco(saldoRes.data as MaybeArray<SaldoBancoRow | null>));
+      setSaldosBancoDiaAnterior(mapSaldosBanco(saldoDiaAnteriorRes.data as MaybeArray<SaldoBancoRow | null>));
     },
     []
   );
@@ -1652,6 +1666,10 @@ const SaldoDiarioPage: React.FC = () => {
     () => saldosBanco.reduce((sum, s) => sum + Number(s.valor), 0),
     [saldosBanco]
   );
+  const totalSaldosDiaAnterior = useMemo(
+    () => saldosBancoDiaAnterior.reduce((sum, s) => sum + Number(s.valor), 0),
+    [saldosBancoDiaAnterior]
+  );
 
   const totalFormArea = useMemo(
     () =>
@@ -1827,8 +1845,8 @@ const SaldoDiarioPage: React.FC = () => {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-lg border border-gray-200 bg-white/80 p-3 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Saldo Inicial</p>
-            <p className="mt-2 text-xl font-semibold text-gray-900">{formatCurrency(totalSaldos - totalReceitas + totalPagamentosArea + totalPagamentosBanco)}</p>
-            <p className="mt-1 text-xs text-gray-400">Saldo do dia anterior</p>
+            <p className="mt-2 text-xl font-semibold text-gray-900">{formatCurrency(totalSaldosDiaAnterior)}</p>
+            <p className="mt-1 text-xs text-gray-400">Soma dos saldos dos bancos do dia anterior</p>
           </div>
           <div className="rounded-lg border border-gray-200 bg-white/80 p-3 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Receitas</p>
