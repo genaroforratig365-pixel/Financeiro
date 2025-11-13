@@ -1,0 +1,184 @@
+{
+  "comentario": "Arquivo de configuração para importação de dados históricos",
+  "versao": "1.0",
+  "instrucoes": "Este arquivo contém todos os mapeamentos DE-PARA para importação. Você pode editar os IDs e nomes conforme necessário.",
+
+  "areas": {
+    "descricao": "Mapeamento de nomes de áreas para IDs da tabela are_areas",
+    "mapeamento": {
+      "GASTO COM MATERIAL E CONSUMO": 1,
+      "MATERIAL E CONSUMO": 1,
+      "GASTO RH": 2,
+      "RH": 2,
+      "GASTO FINANCEIRO E FISCAL": 3,
+      "FINANCEIRO E FISCAL": 3,
+      "GASTO LOGISTICA": 4,
+      "LOGISTICA": 4,
+      "GASTO COMERCIAL": 5,
+      "COMERCIAL": 5,
+      "GASTO MARKETING": 6,
+      "MARKETING": 6,
+      "GASTO LOJA DE FABRICA": 7,
+      "LOJA DE FABRICA": 7,
+      "GASTO TI": 8,
+      "TI": 8,
+      "GASTO DIRETORIA": 9,
+      "DIRETORIA": 9,
+      "GASTO COMPRAS": 10,
+      "COMPRAS": 10,
+      "GASTO INVESTIMENTO": 11,
+      "INVESTIMENTO": 11,
+      "GASTO DALLAS": 12,
+      "DALLAS": 12,
+      "TRANSFERÊNCIA PARA APLICAÇÃO": 13,
+      "TRANSFERENCIA PARA APLICACAO": 13,
+      "APLICACAO": 13
+    }
+  },
+
+  "bancos": {
+    "descricao": "Mapeamento de nomes de bancos para IDs da tabela ban_bancos",
+    "nota": "Para 'Saldo por Banco' - usa tabela pbk_pagamentos_banco",
+    "mapeamento": {
+      "BANCO DO BRASIL": 1,
+      "BB": 1,
+      "BRADESCO": 2,
+      "BANRISUL": 3,
+      "CAIXA": 4,
+      "CAIXA ECONOMICA": 4,
+      "CAIXA ECONÔMICA": 4,
+      "SANTANDER": 5,
+      "ITAU": 6,
+      "ITAÚ": 6,
+      "SICOOB": 7,
+      "SICREDI": 8
+    }
+  },
+
+  "tiposReceita": {
+    "descricao": "Mapeamento de tipos de receita para IDs da tabela ctr_contas_receita",
+    "nota": "Para 'Receitas por Tipo' - usa tabela rec_receitas",
+    "mapeamento": {
+      "RECEITAS EM TITULOS": 1,
+      "RECEITAS EM TÍTULOS": 1,
+      "TITULOS": 1,
+      "TÍTULOS": 1,
+      "BOLETOS": 1,
+      "RECEITAS EM DEPOSITOS": 2,
+      "RECEITAS EM DEPÓSITOS": 2,
+      "DEPOSITOS": 2,
+      "DEPÓSITOS": 2,
+      "PIX": 2,
+      "OUTRAS RECEITAS": 3,
+      "OUTRAS": 3,
+      "RESGATE APLICAÇÃO": 3,
+      "RESGATE APLICACAO": 3
+    }
+  },
+
+  "regrasImportacao": {
+    "descricao": "Regras de importação por tipo de origem",
+    "regras": [
+      {
+        "origem": "Pagamentos por Área",
+        "tabelaDestino": "pag_pagamentos_area",
+        "camposUsados": ["Registro (data)", "Area", "Valor_Realizado"],
+        "camposIgnorados": ["Valor_Previsto"],
+        "mapeamento": "areas",
+        "campo_data": "pag_data",
+        "campo_valor": "pag_valor",
+        "campo_referencia": "pag_are_id"
+      },
+      {
+        "origem": "Previsão por Área",
+        "tabelaDestino": "pvi_previsao_itens",
+        "tipo": "gasto",
+        "camposUsados": ["Registro (data)", "Area", "Valor_Previsto"],
+        "camposIgnorados": ["Valor_Realizado"],
+        "mapeamento": "areas",
+        "campo_data": "pvi_data",
+        "campo_valor": "pvi_valor",
+        "campo_referencia": "pvi_are_id"
+      },
+      {
+        "origem": "Saldo por Banco",
+        "tabelaDestino": "pbk_pagamentos_banco",
+        "camposUsados": ["Registro (data)", "Area (nome do banco)", "Valor_Realizado"],
+        "camposIgnorados": ["Valor_Previsto"],
+        "mapeamento": "bancos",
+        "campo_data": "pbk_data",
+        "campo_valor": "pbk_valor",
+        "campo_referencia": "pbk_ban_id",
+        "bancosAceitos": ["BANCO DO BRASIL", "BANRISUL", "BRADESCO"]
+      },
+      {
+        "origem": "Receitas por Tipo",
+        "tabelaDestino": "rec_receitas",
+        "camposUsados": ["Registro (data)", "Area (tipo de receita)", "Valor_Realizado"],
+        "camposIgnorados": ["Valor_Previsto"],
+        "mapeamento": "tiposReceita",
+        "campo_data": "rec_data",
+        "campo_valor": "rec_valor",
+        "campo_referencia": "rec_ctr_id",
+        "tiposAceitos": ["RECEITAS EM TITULOS", "RECEITAS EM DEPÓSITOS", "OUTRAS RECEITAS", "RESGATE APLICACAO"]
+      },
+      {
+        "origem": "Previsão Receitas",
+        "tabelaDestino": "pvi_previsao_itens",
+        "tipo": "receita",
+        "camposUsados": ["Registro (data)", "Area (tipo de receita)", "Valor_Previsto"],
+        "camposIgnorados": ["Valor_Realizado"],
+        "mapeamento": "tiposReceita",
+        "campo_data": "pvi_data",
+        "campo_valor": "pvi_valor",
+        "campo_categoria": "pvi_categoria"
+      }
+    ]
+  },
+
+  "exemplosArquivo": {
+    "descricao": "Exemplos de como os dados devem estar no arquivo Excel/CSV",
+    "exemplos": [
+      {
+        "Registro": "20/03/2025",
+        "Area": "GASTO COM MATERIAL E CONSUMO",
+        "Valor_Previsto": "142616.69",
+        "Valor_Realizado": "0",
+        "Origem": "Previsão por Área",
+        "resultado": "Insere em pvi_previsao_itens com pvi_are_id=1, pvi_valor=142616.69, pvi_tipo='gasto'"
+      },
+      {
+        "Registro": "20/03/2025",
+        "Area": "GASTO COM MATERIAL E CONSUMO",
+        "Valor_Previsto": "0",
+        "Valor_Realizado": "152385.68",
+        "Origem": "Pagamentos por Área",
+        "resultado": "Insere em pag_pagamentos_area com pag_are_id=1, pag_valor=152385.68"
+      },
+      {
+        "Registro": "20/03/2025",
+        "Area": "BANCO DO BRASIL",
+        "Valor_Previsto": "0",
+        "Valor_Realizado": "605.52",
+        "Origem": "Saldo por Banco",
+        "resultado": "Insere em pbk_pagamentos_banco com pbk_ban_id=1, pbk_valor=605.52"
+      },
+      {
+        "Registro": "20/03/2025",
+        "Area": "RECEITAS EM TITULOS",
+        "Valor_Previsto": "0",
+        "Valor_Realizado": "406409.11",
+        "Origem": "Receitas por Tipo",
+        "resultado": "Insere em rec_receitas com rec_ctr_id=1, rec_valor=406409.11"
+      },
+      {
+        "Registro": "20/03/2025",
+        "Area": "RECEITAS EM TITULOS",
+        "Valor_Previsto": "377856.93",
+        "Valor_Realizado": "0",
+        "Origem": "Previsão Receitas",
+        "resultado": "Insere em pvi_previsao_itens com pvi_valor=377856.93, pvi_tipo='receita', pvi_categoria='RECEITAS EM TITULOS'"
+      }
+    ]
+  }
+}
