@@ -21,10 +21,21 @@ function assertEnv() {
 }
 
 /** Cliente para uso em Server Components / Route Handlers */
-export function getSupabaseServer() {
+export function getSupabaseServer(options?: { userId?: string }) {
   assertEnv();
+
+  const headers: Record<string, string> = {};
+
+  // Include x-user-id header if provided (required for RLS policies)
+  if (options?.userId) {
+    headers['x-user-id'] = options.userId;
+  }
+
   return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     db: { schema: SCHEMA },
+    global: {
+      headers: Object.keys(headers).length > 0 ? headers : undefined,
+    },
   });
 }
 

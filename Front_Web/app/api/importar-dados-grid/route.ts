@@ -59,7 +59,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getSupabaseServer();
+    // Pass userId in headers for RLS policy validation
+    const supabase = getSupabaseServer({ userId });
 
     // Obtém o usuário
     const { data: usuario, error: userError } = await getOrCreateUser(
