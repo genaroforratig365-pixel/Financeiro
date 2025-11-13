@@ -304,10 +304,10 @@ export default function ImportarDadosGrid() {
               <div className="bg-yellow-50 p-3 rounded text-sm">
                 <p className="font-semibold text-yellow-900 mb-1">📋 Como configurar:</p>
                 <ol className="list-decimal ml-5 text-yellow-800 space-y-1">
-                  <li>Use "Aplicar em Lote" para definir o tipo de importação para todas as linhas selecionadas</li>
+                  <li>Use &quot;Aplicar em Lote&quot; para definir o tipo de importação para todas as linhas selecionadas</li>
                   <li>Ajuste tipos individuais se necessário usando o dropdown de cada linha</li>
-                  <li>Após definir o tipo, configure o "Mapear Para" de cada linha</li>
-                  <li>Revise e clique em "Confirmar e Importar"</li>
+                  <li>Após definir o tipo, configure o &quot;Mapear Para&quot; de cada linha</li>
+                  <li>Revise e clique em &quot;Confirmar e Importar&quot;</li>
                 </ol>
               </div>
 
