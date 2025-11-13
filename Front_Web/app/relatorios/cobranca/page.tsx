@@ -320,14 +320,14 @@ const RelatorioCobrancaPage: React.FC = () => {
           tipos: Map<string, { nome: string; previsto: number; realizado: number }>;
         };
 
-        const bancosMap = new Map<string, BancoAcumulado>();
+        const bancosAcumuladosMap = new Map<string, BancoAcumulado>();
 
         contasMap.forEach((conta) => {
           if (conta.previsto === 0 && conta.realizado === 0) {
             return;
           }
 
-          const banco = bancosMap.get(conta.bancoId) ?? {
+          const banco = bancosAcumuladosMap.get(conta.bancoId) ?? {
             nome: conta.bancoNome,
             previsto: 0,
             realizado: 0,
@@ -348,10 +348,10 @@ const RelatorioCobrancaPage: React.FC = () => {
           tipo.previsto += conta.previsto;
           tipo.realizado += conta.realizado;
           banco.tipos.set(conta.tipoId, tipo);
-          bancosMap.set(conta.bancoId, banco);
+          bancosAcumuladosMap.set(conta.bancoId, banco);
         });
 
-        const bancos: BancoResumo[] = Array.from(bancosMap.entries())
+        const bancos: BancoResumo[] = Array.from(bancosAcumuladosMap.entries())
           .map(([id, banco]) => {
             const tipos: TipoResumo[] = Array.from(banco.tipos.entries())
               .map(([tipoId, tipo]) => {
