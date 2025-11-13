@@ -35,17 +35,10 @@ const AREAS_MAP: Record<string, number> = {
 
 // Mapeamento de bancos para IDs
 const BANCOS_MAP: Record<string, number> = {
-  'BANCO DO BRASIL': 1,
-  'BB': 1,
-  'BRADESCO': 2,
+  'BANCO DO BRASIL': 4,
+  'BB': 4,
+  'BRADESCO': 5,
   'BANRISUL': 3,
-  'CAIXA': 4,
-  'CAIXA ECONOMICA': 4,
-  'CAIXA ECONÔMICA': 4,
-  'SANTANDER': 5,
-  'ITAU': 6,
-  'ITAÚ': 6,
-  'SICOOB': 7,
   'SICREDI': 8,
 };
 
@@ -328,11 +321,11 @@ export async function POST(request: NextRequest) {
         if (origem.includes('saldo por banco')) {
           const bancoId = obterIdBanco(area);
           if (bancoId && valorReal > 0) {
-            const { error: insertError } = await supabase.from('sdb_saldo_banco').insert({
-              sdb_data: data,
-              sdb_ban_id: bancoId,
-              sdb_saldo: valorReal,
-              sdb_usr_id: usuario.usr_id,
+            const { error: insertError } = await supabase.from('pbk_pagamentos_banco').insert({
+              pbk_data: data,
+              pbk_ban_id: bancoId,
+              pbk_valor: valorReal,
+              pbk_usr_id: usuario.usr_id,
             });
             if (insertError) throw insertError;
             sucesso++;

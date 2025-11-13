@@ -89,13 +89,14 @@ Origem: Previsão por Área
 
 #### Mapeamento de Bancos → IDs:
 ```
-BANCO DO BRASIL → ID 1
-BB → ID 1
-BRADESCO → ID 2
 BANRISUL → ID 3
+BANCO DO BRASIL → ID 4
+BB → ID 4
+BRADESCO → ID 5
+SICREDI → ID 8
 ```
 
-**⚠️ IMPORTANTE:** Apenas estes 3 bancos serão considerados para "Saldo por Banco"
+**⚠️ IMPORTANTE:** Apenas estes 4 bancos serão considerados para "Saldo por Banco"
 
 #### Exemplo:
 ```
@@ -106,7 +107,7 @@ Origem: Saldo por Banco
 
 → Insere em pbk_pagamentos_banco:
   - pbk_data = 2025-03-20
-  - pbk_ban_id = 1 (Banco do Brasil)
+  - pbk_ban_id = 4 (Banco do Brasil)
   - pbk_valor = 605.52
   - pbk_usr_id = (usuário atual)
 ```

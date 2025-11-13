@@ -34,24 +34,21 @@
 
 ---
 
-## 🏦 BANCOS (3 itens - apenas estes!)
+## 🏦 BANCOS (4 itens - apenas estes!)
 
 | Nome no Arquivo | ID | Tabela Destino | ⚠️ Observação |
 |-----------------|:--:|----------------|---------------|
-| BANCO DO BRASIL | 1 | ban_bancos | Aceito |
-| BB | 1 | ban_bancos | Aceito |
-| BRADESCO | 2 | ban_bancos | Aceito |
-| BANRISUL | 3 | ban_bancos | Aceito |
-| ~~CAIXA~~ | 4 | ban_bancos | ❌ NÃO usar |
-| ~~SANTANDER~~ | 5 | ban_bancos | ❌ NÃO usar |
-| ~~ITAÚ~~ | 6 | ban_bancos | ❌ NÃO usar |
-| ~~SICOOB~~ | 7 | ban_bancos | ❌ NÃO usar |
-| ~~SICREDI~~ | 8 | ban_bancos | ❌ NÃO usar |
+| BANRISUL | 3 | ban_bancos | ✅ Aceito |
+| BANCO DO BRASIL | 4 | ban_bancos | ✅ Aceito |
+| BB | 4 | ban_bancos | ✅ Aceito |
+| BRADESCO | 5 | ban_bancos | ✅ Aceito |
+| SICREDI | 8 | ban_bancos | ✅ Aceito |
 
 **⚠️ IMPORTANTE:** Para "Saldo por Banco", considerar APENAS:
-- Banco do Brasil (ID 1)
-- Bradesco (ID 2)
 - Banrisul (ID 3)
+- Banco do Brasil (ID 4)
+- Bradesco (ID 5)
+- Sicredi (ID 8)
 
 ---
 
