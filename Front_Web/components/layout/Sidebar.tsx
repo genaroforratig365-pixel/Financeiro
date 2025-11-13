@@ -308,37 +308,22 @@ export const Sidebar: React.FC = () => {
     return pathname.startsWith(href);
   };
 
-  const getSectionColorClasses = (index: number) => {
-    // Alternar entre branco e vermelho
-    if (index % 2 === 0) {
-      // Fundo branco, texto vermelho
-      return 'bg-white border-red-200';
-    } else {
-      // Fundo vermelho, texto branco
-      return 'bg-red-600 border-red-700';
-    }
+  const getSectionColorClasses = () => {
+    // Todas as seções com fundo vermelho
+    return 'bg-red-600 border-red-700';
   };
 
-  const getTitleColorClass = (index: number) => {
-    if (index % 2 === 0) {
-      return 'text-red-700';
-    } else {
-      return 'text-white';
-    }
+  const getTitleColorClass = () => {
+    // Todos os títulos em branco
+    return 'text-white';
   };
 
-  const getItemColorClass = (index: number, active: boolean) => {
-    if (index % 2 === 0) {
-      // Quadro branco
-      return active
-        ? 'bg-red-50 text-red-700 shadow-sm'
-        : 'text-gray-700 hover:bg-red-50 hover:text-red-700 hover:shadow-sm';
-    } else {
-      // Quadro vermelho
-      return active
-        ? 'bg-red-700 text-white shadow-sm'
-        : 'text-white hover:bg-red-700 hover:shadow-sm';
-    }
+  const getItemColorClass = (active: boolean) => {
+    // Fundo vermelho, texto branco
+    // Quando ativo, fica branco com texto vermelho
+    return active
+      ? 'bg-white text-red-600 shadow-sm font-semibold'
+      : 'text-white hover:bg-red-700 hover:shadow-sm';
   };
 
   return (
@@ -357,9 +342,9 @@ export const Sidebar: React.FC = () => {
       {/* Navigation */}
       <div className="sidebar__scroll">
         <nav className="p-4 space-y-4 pb-6">
-          {navigationSections.map((section, sectionIndex) => (
-            <div key={section.title} className={`rounded-lg border p-3 ${getSectionColorClasses(sectionIndex)}`}>
-              <h3 className={`px-2 text-xs font-bold uppercase tracking-wider mb-2 ${getTitleColorClass(sectionIndex)}`}>
+          {navigationSections.map((section) => (
+            <div key={section.title} className={`rounded-lg border p-3 ${getSectionColorClasses()}`}>
+              <h3 className={`px-2 text-xs font-bold uppercase tracking-wider mb-2 ${getTitleColorClass()}`}>
                 {section.title}
               </h3>
               <ul className="space-y-1">
@@ -370,7 +355,7 @@ export const Sidebar: React.FC = () => {
                       className={`
                         flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium
                         transition-colors duration-150
-                        ${getItemColorClass(sectionIndex, isActive(item.href))}
+                        ${getItemColorClass(isActive(item.href))}
                       `}
                     >
                       {item.icon}
