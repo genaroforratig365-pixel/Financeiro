@@ -104,7 +104,7 @@ const navigationSections: NavSection[] = [
         ),
       },
       {
-        label: 'Lançamento de Cobrança',
+        label: 'Cobrança',
         href: '/cobrancas',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

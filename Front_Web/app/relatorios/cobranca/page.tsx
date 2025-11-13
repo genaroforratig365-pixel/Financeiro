@@ -334,20 +334,11 @@ const RelatorioCobrancaPage: React.FC = () => {
               .filter((tipo) => tipo.realizado !== 0)
               .sort((a, b) => b.realizado - a.realizado);
 
-            // Soma apenas os tipos "prevista" no comparativo
-            const previsto = arredondar(
-              tipos
-                .filter((t) => t.nome.trim().toUpperCase().includes('PREVIS'))
-                .reduce((acc, t) => acc + t.previsto, 0)
-            );
-            const realizadoPrevista = arredondar(
-              tipos
-                .filter((t) => t.nome.trim().toUpperCase().includes('PREVIS'))
-                .reduce((acc, t) => acc + t.realizado, 0)
-            );
+            // Soma TODOS os tipos no comparativo (não apenas "prevista")
+            const previsto = arredondar(banco.previsto);
             const realizado = arredondar(banco.realizado);
-            const diferenca = arredondar(realizadoPrevista - previsto);
-            const percentual = previsto > 0 ? arredondar((realizadoPrevista / previsto) * 100) : 0;
+            const diferenca = arredondar(realizado - previsto);
+            const percentual = previsto > 0 ? arredondar((realizado / previsto) * 100) : 0;
 
             return {
               id,
@@ -362,24 +353,17 @@ const RelatorioCobrancaPage: React.FC = () => {
           .filter((banco) => banco.previsto !== 0 || banco.realizado !== 0)
           .sort((a, b) => b.realizado - a.realizado || a.nome.localeCompare(b.nome, 'pt-BR'));
 
+        // Totais consolidados: soma TODOS os valores previstos e realizados
         const totalPrevisto = arredondar(bancos.reduce((acc, banco) => acc + banco.previsto, 0));
-        const totalRealizadoPrevista = arredondar(
-          bancos.reduce((acc, banco) => {
-            const realizadoPrevista = banco.tipos
-              .filter((t) => t.nome.trim().toUpperCase().includes('PREVIS'))
-              .reduce((sum, t) => sum + t.realizado, 0);
-            return acc + realizadoPrevista;
-          }, 0)
-        );
         const totalRealizado = arredondar(bancos.reduce((acc, banco) => acc + banco.realizado, 0));
-        const diferenca = arredondar(totalRealizadoPrevista - totalPrevisto);
+        const diferenca = arredondar(totalRealizado - totalPrevisto);
 
         setRelatorio({
           data,
           bancos,
           totais: {
             previsto: totalPrevisto,
-            realizado: totalRealizadoPrevista,
+            realizado: totalRealizado,
             diferenca,
           },
         });
@@ -511,9 +495,9 @@ const RelatorioCobrancaPage: React.FC = () => {
     autoTable(doc, {
       startY: posY + 4,
       body: [
-        ['Receitas realizadas (previstas)', formatCurrency(relatorio.totais.realizado)],
-        ['Valor da previsão de receitas', formatCurrency(relatorio.totais.previsto)],
-        ['Diferença entre receitas e previsão', formatCurrency(relatorio.totais.diferenca)],
+        ['Receitas realizadas', formatCurrency(relatorio.totais.realizado)],
+        ['Valor da previsão de receita', formatCurrency(relatorio.totais.previsto)],
+        ['Diferença entre receita e previsão', formatCurrency(relatorio.totais.diferenca)],
       ],
       styles: { fontSize: 9, cellPadding: 2, halign: 'right' },
       columnStyles: { 0: { halign: 'left', fontStyle: 'bold' } },
@@ -772,15 +756,15 @@ const RelatorioCobrancaPage: React.FC = () => {
             <Card title="Totais consolidados" subtitle="Resumo final das receitas previstas e realizadas no dia">
               <div className="space-y-3 text-sm text-gray-700">
                 <div className="flex items-center justify-between">
-                  <span>Receitas realizadas (apenas previstas)</span>
+                  <span>Receitas realizadas</span>
                   <span className="font-semibold text-success-700">{formatCurrency(relatorio.totais.realizado)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>Valor da previsão de receitas</span>
+                  <span>Valor da previsão de receita</span>
                   <span className="font-semibold">{formatCurrency(relatorio.totais.previsto)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>Diferença entre receitas e previsão</span>
+                  <span>Diferença entre receita e previsão</span>
                   <span
                     className={`font-semibold ${
                       relatorio.totais.diferenca >= 0 ? 'text-success-700' : 'text-error-600'
