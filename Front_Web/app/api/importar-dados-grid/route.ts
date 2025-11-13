@@ -187,6 +187,7 @@ export async function POST(request: NextRequest) {
               pvi_valor: linha.valorPrevisto,
               pvi_tipo: 'receita',
               pvi_categoria: linha.area,
+              pvi_ctr_id: mapeamentoId, // ID do tipo de receita
               pvi_usr_id: usuario.usr_id,
             });
             if (insertError) throw insertError;
