@@ -40,6 +40,193 @@ interface AreaOption {
   nome: string;
 }
 
+interface DadosGrafico {
+  data: string;
+  previsto: number;
+  realizado: number;
+}
+
+// Componente de Barras Verticais
+const BarrasVerticaisChart: React.FC<{
+  dados: DadosGrafico[];
+  corPrevisto: string;
+  corRealizado: string;
+  labelPrevisto?: string;
+  labelRealizado?: string;
+}> = ({ dados, corPrevisto, corRealizado, labelPrevisto = 'Previsto', labelRealizado = 'Realizado' }) => {
+  const width = 600;
+  const height = 300;
+  const paddingX = 60;
+  const paddingY = 40;
+  const barWidth = dados.length > 0 ? Math.min(40, (width - paddingX * 2) / (dados.length * 2.5)) : 40;
+  const gap = barWidth * 0.3;
+
+  const valores = dados.flatMap(d => [d.previsto, d.realizado]);
+  const maxValor = valores.length ? Math.max(...valores, 0) : 0;
+  const maxArredondado = Math.ceil(maxValor / 50000) * 50000 || 100000;
+  const escalaY = maxArredondado > 0 ? (height - paddingY * 2) / maxArredondado : 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-4 text-sm justify-center">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded" style={{ backgroundColor: corPrevisto }}></div>
+          <span>{labelPrevisto}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded" style={{ backgroundColor: corRealizado }}></div>
+          <span>{labelRealizado}</span>
+        </div>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full">
+        {/* Eixos */}
+        <line x1={paddingX} y1={height - paddingY} x2={width - paddingX} y2={height - paddingY} stroke="#d1d5db" strokeWidth={2} />
+        <line x1={paddingX} y1={paddingY} x2={paddingX} y2={height - paddingY} stroke="#d1d5db" strokeWidth={2} />
+
+        {/* Linhas de grade Y */}
+        {Array.from({ length: 5 }, (_, i) => i).map((step) => {
+          const valor = (maxArredondado / 4) * step;
+          const y = height - paddingY - (valor * escalaY);
+          return (
+            <g key={step}>
+              <line x1={paddingX} y1={y} x2={width - paddingX} y2={y} stroke="#f1f5f9" strokeWidth={1} strokeDasharray="4 4" />
+              <text x={paddingX - 8} y={y + 4} textAnchor="end" className="text-[11px] fill-gray-600">
+                {formatCurrency(valor)}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Barras */}
+        {dados.map((item, idx) => {
+          const x = paddingX + (idx * (barWidth * 2 + gap * 3)) + gap;
+          const alturaP = item.previsto * escalaY;
+          const alturaR = item.realizado * escalaY;
+
+          return (
+            <g key={idx}>
+              {/* Barra Previsto */}
+              <rect
+                x={x}
+                y={height - paddingY - alturaP}
+                width={barWidth}
+                height={alturaP}
+                fill={corPrevisto}
+                rx={2}
+              />
+              {/* Barra Realizado */}
+              <rect
+                x={x + barWidth + gap}
+                y={height - paddingY - alturaR}
+                width={barWidth}
+                height={alturaR}
+                fill={corRealizado}
+                rx={2}
+              />
+              {/* Label data */}
+              <text
+                x={x + barWidth + gap / 2}
+                y={height - paddingY + 20}
+                textAnchor="middle"
+                className="text-[11px] fill-gray-600"
+              >
+                {item.data}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+};
+
+// Componente de Linhas
+const LinhasChart: React.FC<{
+  dados: DadosGrafico[];
+  corPrevisto: string;
+  corRealizado: string;
+  labelPrevisto?: string;
+  labelRealizado?: string;
+}> = ({ dados, corPrevisto, corRealizado, labelPrevisto = 'Previsto', labelRealizado = 'Realizado' }) => {
+  const width = 600;
+  const height = 300;
+  const paddingX = 60;
+  const paddingY = 40;
+  const passoX = dados.length > 1 ? (width - paddingX * 2) / (dados.length - 1) : 0;
+
+  const valores = dados.flatMap(d => [d.previsto, d.realizado]);
+  const maxValor = valores.length ? Math.max(...valores, 0) : 0;
+  const maxArredondado = Math.ceil(maxValor / 50000) * 50000 || 100000;
+  const escalaY = maxArredondado > 0 ? (height - paddingY * 2) / maxArredondado : 0;
+
+  const pontosPrevisto = dados.map((item, idx) => {
+    const x = paddingX + passoX * idx;
+    const y = height - paddingY - item.previsto * escalaY;
+    return `${x},${y}`;
+  }).join(' ');
+
+  const pontosRealizado = dados.map((item, idx) => {
+    const x = paddingX + passoX * idx;
+    const y = height - paddingY - item.realizado * escalaY;
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-4 text-sm justify-center">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded" style={{ backgroundColor: corPrevisto }}></div>
+          <span>{labelPrevisto}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded" style={{ backgroundColor: corRealizado }}></div>
+          <span>{labelRealizado}</span>
+        </div>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full">
+        {/* Eixos */}
+        <line x1={paddingX} y1={height - paddingY} x2={width - paddingX} y2={height - paddingY} stroke="#d1d5db" strokeWidth={2} />
+        <line x1={paddingX} y1={paddingY} x2={paddingX} y2={height - paddingY} stroke="#d1d5db" strokeWidth={2} />
+
+        {/* Linhas de grade Y */}
+        {Array.from({ length: 5 }, (_, i) => i).map((step) => {
+          const valor = (maxArredondado / 4) * step;
+          const y = height - paddingY - (valor * escalaY);
+          return (
+            <g key={step}>
+              <line x1={paddingX} y1={y} x2={width - paddingX} y2={y} stroke="#f1f5f9" strokeWidth={1} strokeDasharray="4 4" />
+              <text x={paddingX - 8} y={y + 4} textAnchor="end" className="text-[11px] fill-gray-600">
+                {formatCurrency(valor)}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Linhas */}
+        <polyline points={pontosPrevisto} fill="none" stroke={corPrevisto} strokeWidth={3} strokeLinejoin="round" />
+        <polyline points={pontosRealizado} fill="none" stroke={corRealizado} strokeWidth={3} strokeLinejoin="round" />
+
+        {/* Pontos */}
+        {dados.map((item, idx) => {
+          const x = paddingX + passoX * idx;
+          const yP = height - paddingY - item.previsto * escalaY;
+          const yR = height - paddingY - item.realizado * escalaY;
+
+          return (
+            <g key={idx}>
+              <circle cx={x} cy={yP} r={4} fill={corPrevisto} stroke="#fff" strokeWidth={2} />
+              <circle cx={x} cy={yR} r={4} fill={corRealizado} stroke="#fff" strokeWidth={2} />
+              <text x={x} y={height - paddingY + 20} textAnchor="middle" className="text-[11px] fill-gray-600">
+                {item.data}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+};
+
 export default function PrevistoRealizadoPage() {
   const [carregando, setCarregando] = useState(true);
   const [previsoes, setPrevisoes] = useState<PrevisaoItem[]>([]);
@@ -49,6 +236,7 @@ export default function PrevistoRealizadoPage() {
   const [areas, setAreas] = useState<AreaOption[]>([]);
   const [areaFiltro, setAreaFiltro] = useState<number | null>(null);
   const [tipoFiltro, setTipoFiltro] = useState<'todos' | 'receita' | 'gasto'>('todos');
+  const [tipoGrafico, setTipoGrafico] = useState<'linhas' | 'barras'>('barras');
 
   useEffect(() => {
     // Define período padrão: semana atual
@@ -485,80 +673,69 @@ export default function PrevistoRealizadoPage() {
               </Card>
             </div>
 
+            {/* Seletor de Tipo de Gráfico */}
+            <Card>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">Visualização dos Gráficos</h3>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setTipoGrafico('barras')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      tipoGrafico === 'barras'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Barras Verticais
+                  </button>
+                  <button
+                    onClick={() => setTipoGrafico('linhas')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      tipoGrafico === 'linhas'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Linhas
+                  </button>
+                </div>
+              </div>
+            </Card>
+
             {/* Gráficos Comparativos */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Gráfico de Receitas */}
               <Card title="Receitas - Previsto x Realizado">
-                <div className="space-y-4">
-                  <div className="flex gap-4 text-sm mb-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-blue-500 rounded"></div>
-                      <span>Previsto</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-success-500 rounded"></div>
-                      <span>Realizado</span>
-                    </div>
-                  </div>
-                  {dadosGraficoReceitas.map((item, idx) => (
-                    <div key={idx} className="space-y-1">
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>{item.data}</span>
-                        <div className="flex gap-3">
-                          <span>P: {formatCurrency(item.previsto)}</span>
-                          <span>R: {formatCurrency(item.realizado)}</span>
-                        </div>
-                      </div>
-                      <div className="flex gap-1 h-6">
-                        <div
-                          className="bg-blue-500 rounded"
-                          style={{ width: `${(item.previsto / maxValorGrafico) * 100}%` }}
-                        ></div>
-                        <div
-                          className="bg-success-500 rounded"
-                          style={{ width: `${(item.realizado / maxValorGrafico) * 100}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                {tipoGrafico === 'barras' ? (
+                  <BarrasVerticaisChart
+                    dados={dadosGraficoReceitas}
+                    corPrevisto="#3b82f6"
+                    corRealizado="#10b981"
+                  />
+                ) : (
+                  <LinhasChart
+                    dados={dadosGraficoReceitas}
+                    corPrevisto="#3b82f6"
+                    corRealizado="#10b981"
+                  />
+                )}
               </Card>
 
               {/* Gráfico de Despesas */}
               <Card title="Despesas - Previsto x Realizado">
-                <div className="space-y-4">
-                  <div className="flex gap-4 text-sm mb-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-orange-500 rounded"></div>
-                      <span>Previsto</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-error-500 rounded"></div>
-                      <span>Realizado</span>
-                    </div>
-                  </div>
-                  {dadosGraficoDespesas.map((item, idx) => (
-                    <div key={idx} className="space-y-1">
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>{item.data}</span>
-                        <div className="flex gap-3">
-                          <span>P: {formatCurrency(item.previsto)}</span>
-                          <span>R: {formatCurrency(item.realizado)}</span>
-                        </div>
-                      </div>
-                      <div className="flex gap-1 h-6">
-                        <div
-                          className="bg-orange-500 rounded"
-                          style={{ width: `${(item.previsto / maxValorGrafico) * 100}%` }}
-                        ></div>
-                        <div
-                          className="bg-error-500 rounded"
-                          style={{ width: `${(item.realizado / maxValorGrafico) * 100}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                {tipoGrafico === 'barras' ? (
+                  <BarrasVerticaisChart
+                    dados={dadosGraficoDespesas}
+                    corPrevisto="#f97316"
+                    corRealizado="#ef4444"
+                  />
+                ) : (
+                  <LinhasChart
+                    dados={dadosGraficoDespesas}
+                    corPrevisto="#f97316"
+                    corRealizado="#ef4444"
+                  />
+                )}
               </Card>
             </div>
 
