@@ -626,18 +626,18 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
         const datas = obterDatasDaSemana(semanaSelecionada);
         if (datas.length === 0) return;
 
-        // Data anterior ao início da semana (domingo da semana anterior)
-        const dataInicio = new Date(`${datas[0]}T00:00:00`);
-        dataInicio.setDate(dataInicio.getDate() - 1);
-        const dataAnterior = dataInicio.toISOString().split('T')[0];
+        // Primeiro dia da semana selecionada
+        const dataInicio = datas[0];
 
         const supabase = getSupabaseClient();
 
-        // Buscar saldos de todos os bancos na data anterior
+        // Buscar os saldos mais recentes ANTES do início da semana
+        // Agrupamos por banco e pegamos a data mais recente de cada um
         const { data: saldos, error } = await supabase
           .from('sdb_saldo_banco')
-          .select('sdb_saldo')
-          .eq('sdb_data', dataAnterior);
+          .select('sdb_ban_id, sdb_saldo, sdb_data')
+          .lt('sdb_data', dataInicio)
+          .order('sdb_data', { ascending: false });
 
         if (error) {
           console.error('Erro ao buscar saldo bancário anterior:', error);
@@ -645,8 +645,18 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
           return;
         }
 
-        // Somar todos os saldos bancários
-        const totalSaldo = (saldos || []).reduce((acc, item) => acc + (Number(item.sdb_saldo) || 0), 0);
+        // Pegar o saldo mais recente de cada banco
+        const saldosPorBanco = new Map<number, number>();
+        (saldos || []).forEach((item: any) => {
+          const bancoId = Number(item.sdb_ban_id);
+          if (!saldosPorBanco.has(bancoId)) {
+            // Primeiro registro deste banco (o mais recente por causa da ordenação)
+            saldosPorBanco.set(bancoId, Number(item.sdb_saldo) || 0);
+          }
+        });
+
+        // Somar todos os saldos bancários mais recentes
+        const totalSaldo = Array.from(saldosPorBanco.values()).reduce((acc, saldo) => acc + saldo, 0);
         setSaldoBancarioAnterior(totalSaldo);
       } catch (erro) {
         console.error('Erro ao calcular saldo bancário anterior:', erro);
