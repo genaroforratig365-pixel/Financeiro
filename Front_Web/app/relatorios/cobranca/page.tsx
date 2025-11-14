@@ -204,10 +204,12 @@ const RelatorioCobrancaPage: React.FC = () => {
         type ContaResumo = {
           chave: string;
           contaNome: string;
+          contaCodigo: string;
           bancoId: string;
           bancoNome: string;
           tipoId: string;
           tipoNome: string;
+          tipoCodigo: string;
           previsto: number;
           realizado: number;
         };
@@ -222,6 +224,7 @@ const RelatorioCobrancaPage: React.FC = () => {
 
           const contaRel = normalizeRelation(item.ctr_contas_receita)[0];
           const contaNome = contaRel?.ctr_nome ? toString(contaRel.ctr_nome) : 'Conta não informada';
+          const contaCodigo = contaRel?.ctr_codigo ? toString(contaRel.ctr_codigo) : '';
           const contaId = toNumber(item.pvi_ctr_id, 0);
           const contaChave = construirChave(contaId, contaNome, 'conta');
 
@@ -233,16 +236,19 @@ const RelatorioCobrancaPage: React.FC = () => {
 
           const tipoRel = normalizeRelation(item.tpr_tipos_receita)[0];
           const tipoNome = tipoRel?.tpr_nome ? toString(tipoRel.tpr_nome) : contaNome;
+          const tipoCodigo = tipoRel?.tpr_codigo ? toString(tipoRel.tpr_codigo) : '';
           const tipoIdNumero = toNumber(tipoRel?.tpr_id, NaN);
           const tipoChave = construirChave(tipoIdNumero, tipoNome, 'tipo');
 
           const existente = contasMap.get(contaChave) ?? {
             chave: contaChave,
             contaNome,
+            contaCodigo,
             bancoId: bancoChave,
             bancoNome,
             tipoId: tipoChave,
             tipoNome,
+            tipoCodigo,
             previsto: 0,
             realizado: 0,
           };
@@ -252,6 +258,8 @@ const RelatorioCobrancaPage: React.FC = () => {
           existente.bancoNome = bancoNome;
           existente.tipoId = tipoChave;
           existente.tipoNome = tipoNome;
+          existente.contaCodigo = contaCodigo;
+          existente.tipoCodigo = tipoCodigo;
           contasMap.set(contaChave, existente);
         });
 
@@ -263,6 +271,7 @@ const RelatorioCobrancaPage: React.FC = () => {
 
           const contaRel = normalizeRelation(item.ctr_contas_receita)[0];
           const contaNome = contaRel?.ctr_nome ? toString(contaRel.ctr_nome) : 'Conta não informada';
+          const contaCodigo = contaRel?.ctr_codigo ? toString(contaRel.ctr_codigo) : '';
           const contaId = toNumber(item.cob_ctr_id, 0);
           const contaChave = construirChave(contaId, contaNome, 'conta');
 
@@ -274,16 +283,19 @@ const RelatorioCobrancaPage: React.FC = () => {
 
           const tipoRel = normalizeRelation(item.tpr_tipos_receita)[0];
           const tipoNome = tipoRel?.tpr_nome ? toString(tipoRel.tpr_nome) : contaNome;
+          const tipoCodigo = tipoRel?.tpr_codigo ? toString(tipoRel.tpr_codigo) : '';
           const tipoIdNumero = toNumber(tipoRel?.tpr_id, NaN);
           const tipoChave = construirChave(tipoIdNumero, tipoNome, 'tipo');
 
           const existente = contasMap.get(contaChave) ?? {
             chave: contaChave,
             contaNome,
+            contaCodigo,
             bancoId: bancoChave,
             bancoNome,
             tipoId: tipoChave,
             tipoNome,
+            tipoCodigo,
             previsto: 0,
             realizado: 0,
           };
@@ -293,6 +305,8 @@ const RelatorioCobrancaPage: React.FC = () => {
           existente.bancoNome = bancoNome;
           existente.tipoId = tipoChave;
           existente.tipoNome = tipoNome;
+          existente.contaCodigo = contaCodigo;
+          existente.tipoCodigo = tipoCodigo;
           contasMap.set(contaChave, existente);
         });
 
@@ -383,10 +397,12 @@ const RelatorioCobrancaPage: React.FC = () => {
         const bancosCategorizadosMap = new Map<string, BancoCategoriaAcumulado>();
 
         contasMap.forEach((conta) => {
-          const contaCodigo = toString(conta.contaNome).toUpperCase();
+          const contaCodigo = toString(conta.contaCodigo);
           const contaNome = toString(conta.contaNome).toUpperCase();
+          const tipoCodigo = toString(conta.tipoCodigo);
+          const tipoNome = toString(conta.tipoNome).toUpperCase();
 
-          // Identificar se é Títulos ou Depósitos
+          // Identificar se é Títulos ou Depósitos baseado no código ou nome da CONTA DE RECEITA
           const ehTitulos = contaNome.includes('TÍTULO') || contaNome.includes('TITULO') || contaCodigo.startsWith('301');
           const ehDepositos = contaNome.includes('DEPÓSITO') || contaNome.includes('DEPOSITO') || contaCodigo.startsWith('302') || contaCodigo.startsWith('303');
 
@@ -400,9 +416,8 @@ const RelatorioCobrancaPage: React.FC = () => {
             depositos: { receitaPrevista: 0, outrasReceitas: 0 },
           };
 
-          // Identificar se é Receita Prevista ou Outras Receitas
-          const tipoNomeUpper = toString(conta.tipoNome).toUpperCase();
-          const ehReceitaPrevista = tipoNomeUpper.includes('PREVIS') || tipoNomeUpper.includes('301');
+          // Identificar se é Receita Prevista ou Outras Receitas baseado no TIPO DE RECEITA
+          const ehReceitaPrevista = tipoNome.includes('PREVIS') || tipoCodigo === '301' || tipoCodigo.startsWith('301');
 
           if (ehTitulos) {
             if (ehReceitaPrevista) {
@@ -549,8 +564,9 @@ const RelatorioCobrancaPage: React.FC = () => {
 
     posY = (doc as any).lastAutoTable.finalY + 10;
 
-    // Receitas em Títulos
-    if (relatorio.bancosCategorizado.length > 0) {
+    // Receitas em Títulos (só mostra se houver títulos)
+    const temTitulos = relatorio.bancosCategorizado.some(b => b.titulos.total > 0);
+    if (temTitulos) {
       if (posY > doc.internal.pageSize.getHeight() - 60) {
         doc.addPage();
         posY = 20;
@@ -584,8 +600,11 @@ const RelatorioCobrancaPage: React.FC = () => {
       });
 
       posY += 4;
+    }
 
-      // Receitas em Depósitos
+    // Receitas em Depósitos (só mostra se houver depósitos)
+    const temDepositos = relatorio.bancosCategorizado.some(b => b.depositos.total > 0);
+    if (temDepositos) {
       if (posY > doc.internal.pageSize.getHeight() - 60) {
         doc.addPage();
         posY = 20;
@@ -957,13 +976,14 @@ const RelatorioCobrancaPage: React.FC = () => {
               </Card>
             </div>
 
-            {/* Títulos Section */}
-            {relatorio.bancosCategorizado.length > 0 && (
-              <>
-                <div className="mt-6">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">Receitas em Títulos</h2>
-                  <div className="grid gap-4 md:grid-cols-3">
-                    {relatorio.bancosCategorizado.map((banco) => (
+            {/* Títulos Section - só mostra se houver títulos */}
+            {relatorio.bancosCategorizado.some(b => b.titulos.total > 0) && (
+              <div className="mt-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Receitas em Títulos</h2>
+                <div className="grid gap-4 md:grid-cols-3">
+                  {relatorio.bancosCategorizado
+                    .filter(banco => banco.titulos.total > 0)
+                    .map((banco) => (
                       <Card key={`titulos-${banco.id}`} title={banco.nome}>
                         <div className="space-y-3">
                           <div className="flex justify-between items-center">
@@ -989,14 +1009,18 @@ const RelatorioCobrancaPage: React.FC = () => {
                         </div>
                       </Card>
                     ))}
-                  </div>
                 </div>
+              </div>
+            )}
 
-                {/* Depósitos Section */}
-                <div className="mt-6">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">Receitas em Depósitos</h2>
-                  <div className="grid gap-4 md:grid-cols-3">
-                    {relatorio.bancosCategorizado.map((banco) => (
+            {/* Depósitos Section - só mostra se houver depósitos */}
+            {relatorio.bancosCategorizado.some(b => b.depositos.total > 0) && (
+              <div className="mt-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Receitas em Depósitos</h2>
+                <div className="grid gap-4 md:grid-cols-3">
+                  {relatorio.bancosCategorizado
+                    .filter(banco => banco.depositos.total > 0)
+                    .map((banco) => (
                       <Card key={`depositos-${banco.id}`} title={banco.nome}>
                         <div className="space-y-3">
                           <div className="flex justify-between items-center">
@@ -1022,9 +1046,8 @@ const RelatorioCobrancaPage: React.FC = () => {
                         </div>
                       </Card>
                     ))}
-                  </div>
                 </div>
-              </>
+              </div>
             )}
 
             {/* Resumo Final Detalhado */}
