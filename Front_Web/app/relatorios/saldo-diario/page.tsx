@@ -224,7 +224,7 @@ const calcularPercentual = (previsto: number, realizado: number): number | null 
   if (Math.abs(previsto) < 0.0001) {
     return null;
   }
-  const diferenca = previsto - realizado;
+  const diferenca = realizado - previsto;
   return (diferenca / previsto) * 100;
 };
 
@@ -435,13 +435,17 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
 
           // Verificar se é área de aplicação
           const tituloNormalizado = titulo.trim().toUpperCase();
-          if (tituloNormalizado.includes('APLICACAO') || tituloNormalizado.includes('APLICAÇÃO')) {
-            aplicacoesRealizadas += valor;
-          }
+          const ehAplicacao = tituloNormalizado.includes('APLICACAO') || tituloNormalizado.includes('APLICAÇÃO');
 
-          const existente = mapaGastos.get(chave) ?? { titulo, previsto: 0, realizado: 0 };
-          existente.realizado += valor;
-          mapaGastos.set(chave, existente);
+          if (ehAplicacao) {
+            // Se for aplicação, apenas somar no total de aplicações (não adicionar em gastos por área)
+            aplicacoesRealizadas += valor;
+          } else {
+            // Se NÃO for aplicação, adicionar normalmente em gastos por área
+            const existente = mapaGastos.get(chave) ?? { titulo, previsto: 0, realizado: 0 };
+            existente.realizado += valor;
+            mapaGastos.set(chave, existente);
+          }
         });
 
         // Remover duplicatas usando um Set para rastrear rec_id únicos
