@@ -1482,6 +1482,7 @@ export default function LancamentoCobrancaPage() {
                       setBancoSelecionadoId(bancoId);
                       setMensagem(null);
                       console.log('Banco selecionado:', { bancoId, nome: bancos.find(b => b.id === bancoId)?.nome });
+                      console.log('Estrutura atual de valoresPorBanco:', valoresPorBanco);
                     }}
                     disabled={bancos.length === 0}
                   >
@@ -1500,6 +1501,37 @@ export default function LancamentoCobrancaPage() {
                   </div>
                 )}
               </div>
+
+              {/* Card de Debug - Mostra valores por banco */}
+              {Object.keys(valoresPorBanco).length > 0 && (
+                <div className="rounded-md bg-yellow-50 px-3 py-2 text-xs border border-yellow-300">
+                  <strong className="text-yellow-900">🔍 Debug - Valores digitados por banco:</strong>
+                  <div className="mt-2 space-y-1 font-mono text-xs">
+                    {Object.entries(valoresPorBanco).map(([bancoIdStr, contasValores]) => {
+                      const bancoId = Number(bancoIdStr);
+                      const bancoNome = bancos.find(b => b.id === bancoId)?.nome ?? 'Desconhecido';
+                      const totalBanco = Object.values(contasValores).reduce((accConta, tiposValores) => {
+                        return accConta + Object.values(tiposValores).reduce((accTipo, valorTexto) => {
+                          const resultado = avaliarValor(valorTexto);
+                          return accTipo + (resultado ?? 0);
+                        }, 0);
+                      }, 0);
+
+                      if (totalBanco === 0) return null;
+
+                      return (
+                        <div key={bancoIdStr} className="text-yellow-900">
+                          <strong>{bancoNome}</strong> (ID: {bancoId}) - Total: {formatCurrency(totalBanco)}
+                        </div>
+                      );
+                    }).filter(Boolean)}
+                  </div>
+                  <div className="mt-2 text-yellow-700">
+                    Este card mostra qual banco cada valor está associado antes de salvar.
+                    Se todos os valores aparecem no mesmo banco, há um problema na digitação.
+                  </div>
+                </div>
+              )}
             </div>
 
             {carregandoLancamentos ? (
