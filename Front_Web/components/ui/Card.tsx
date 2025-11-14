@@ -6,8 +6,8 @@
 import React from 'react';
 
 export interface CardProps {
-  title?: string;
-  subtitle?: string;
+  title?: React.ReactNode;
+  subtitle?: React.ReactNode;
   headerAction?: React.ReactNode;
   footer?: React.ReactNode;
   variant?: 'default' | 'primary' | 'danger' | 'success';

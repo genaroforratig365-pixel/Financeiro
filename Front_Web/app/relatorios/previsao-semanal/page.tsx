@@ -44,6 +44,7 @@ type PrevisaoItem = {
   categoria: string;
   valor: number;
   ordem: number;
+  areaCodigo?: string;
 };
 
 type ReportRow = {
@@ -67,7 +68,7 @@ type RelatorioDados = {
 };
 
 const agruparPorCategoria = (itens: PrevisaoItem[], datas: string[]): ReportRow[] => {
-  const mapa = new Map<string, { ordem: number; valores: Record<string, number> }>();
+  const mapa = new Map<string, { ordem: number; valores: Record<string, number>; areaCodigo: string }>();
 
   itens.forEach((item) => {
     const chave = item.categoria || 'Sem categoria';
@@ -75,18 +76,38 @@ const agruparPorCategoria = (itens: PrevisaoItem[], datas: string[]): ReportRow[
     if (existente) {
       existente.ordem = Math.min(existente.ordem, item.ordem ?? existente.ordem);
       existente.valores[item.data] = (existente.valores[item.data] ?? 0) + item.valor;
+      // Mantém o menor areaCodigo (se disponível)
+      if (item.areaCodigo && (!existente.areaCodigo || item.areaCodigo < existente.areaCodigo)) {
+        existente.areaCodigo = item.areaCodigo;
+      }
     } else {
       mapa.set(chave, {
         ordem: item.ordem ?? 0,
         valores: { [item.data]: item.valor },
+        areaCodigo: item.areaCodigo || '',
       });
     }
   });
 
   return Array.from(mapa.entries())
     .sort((a, b) => {
+      // Priorizar ordenação por areaCodigo se disponível
+      const areaCodigoA = a[1].areaCodigo;
+      const areaCodigoB = b[1].areaCodigo;
+
+      if (areaCodigoA && areaCodigoB) {
+        const codigoCompare = areaCodigoA.localeCompare(areaCodigoB, 'pt-BR', { numeric: true });
+        if (codigoCompare !== 0) return codigoCompare;
+      } else if (areaCodigoA && !areaCodigoB) {
+        return -1; // Itens com código de área vêm primeiro
+      } else if (!areaCodigoA && areaCodigoB) {
+        return 1;
+      }
+
+      // Fallback para ordem original
       const ordemDiff = a[1].ordem - b[1].ordem;
       if (ordemDiff !== 0) return ordemDiff;
+
       return a[0].localeCompare(b[0], 'pt-BR');
     })
     .map(([categoria, info]) => {
@@ -236,21 +257,28 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
         const supabase = getSupabaseClient();
         const { data, error } = await supabase
           .from('pvi_previsao_itens')
-          .select('pvi_id, pvi_data, pvi_tipo, pvi_categoria, pvi_valor, pvi_ordem, pvi_pvs_id')
+          .select('pvi_id, pvi_data, pvi_tipo, pvi_categoria, pvi_valor, pvi_ordem, pvi_pvs_id, pvi_are_id, are_areas(are_codigo)')
           .eq('pvi_pvs_id', semana.id)
-          .order('pvi_ordem', { ascending: true })
           .order('pvi_data', { ascending: true });
 
         if (error) throw error;
 
-        const itensBrutos: PrevisaoItem[] = (data ?? []).map((item) => ({
-          id: Number(item.pvi_id),
-          data: String(item.pvi_data ?? ''),
-          tipo: String(item.pvi_tipo ?? ''),
-          categoria: String(item.pvi_categoria ?? ''),
-          valor: Math.round(Number(item.pvi_valor ?? 0) * 100) / 100,
-          ordem: item.pvi_ordem !== null ? Number(item.pvi_ordem) : 0,
-        }));
+        const itensBrutos: PrevisaoItem[] = (data ?? []).map((item: any) => {
+          const areaRel = item.are_areas;
+          const areaCodigo = Array.isArray(areaRel)
+            ? (areaRel[0]?.are_codigo ?? '')
+            : (areaRel?.are_codigo ?? '');
+
+          return {
+            id: Number(item.pvi_id),
+            data: String(item.pvi_data ?? ''),
+            tipo: String(item.pvi_tipo ?? ''),
+            categoria: String(item.pvi_categoria ?? ''),
+            valor: Math.round(Number(item.pvi_valor ?? 0) * 100) / 100,
+            ordem: item.pvi_ordem !== null ? Number(item.pvi_ordem) : 0,
+            areaCodigo: areaCodigo,
+          };
+        });
 
         // Filtra apenas itens com datas dentro do período da semana selecionada
         const dataInicio = new Date(`${semana.inicio}T00:00:00`);
@@ -765,8 +793,8 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white/80">
-                      <tr className="bg-primary-50 text-primary-800">
-                        <td colSpan={relatorio.datas.length + 2} className="px-4 py-3 font-semibold">Receitas</td>
+                      <tr className="bg-green-100 text-green-900">
+                        <td colSpan={relatorio.datas.length + 2} className="px-4 py-3 font-bold text-base">RECEITAS</td>
                       </tr>
                       {relatorio.receitas.map((row) => (
                         <tr key={`receita-${row.categoria}`}>
@@ -781,7 +809,7 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
                           </td>
                         </tr>
                       ))}
-                      <tr className="bg-primary-50/70 font-semibold text-primary-900">
+                      <tr className="bg-green-50 font-bold text-green-900 border-t-2 border-green-200">
                         <td className="px-4 py-3">Total de Receitas</td>
                         {relatorio.datas.map((data) => (
                           <td key={data} className="px-4 py-3 text-right">
@@ -791,8 +819,13 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
                         <td className="px-4 py-3 text-right">{formatCurrency(totalReceitas)}</td>
                       </tr>
 
-                      <tr className="bg-error-50 text-error-800">
-                        <td colSpan={relatorio.datas.length + 2} className="px-4 py-3 font-semibold">Despesas</td>
+                      {/* Separador visual entre receitas e despesas */}
+                      <tr className="h-4">
+                        <td colSpan={relatorio.datas.length + 2} className="bg-gray-100"></td>
+                      </tr>
+
+                      <tr className="bg-red-100 text-red-900">
+                        <td colSpan={relatorio.datas.length + 2} className="px-4 py-3 font-bold text-base">DESPESAS</td>
                       </tr>
                       {relatorio.despesas.map((row) => (
                         <tr key={`despesa-${row.categoria}`}>
@@ -807,7 +840,7 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
                           </td>
                         </tr>
                       ))}
-                      <tr className="bg-error-50/70 font-semibold text-error-900">
+                      <tr className="bg-red-50 font-bold text-red-900 border-t-2 border-red-200">
                         <td className="px-4 py-3">Total de Despesas</td>
                         {relatorio.datas.map((data) => (
                           <td key={data} className="px-4 py-3 text-right">
@@ -817,8 +850,13 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
                         <td className="px-4 py-3 text-right">{formatCurrency(totalDespesas)}</td>
                       </tr>
 
+                      {/* Separador visual entre despesas e saldos */}
+                      <tr className="h-6">
+                        <td colSpan={relatorio.datas.length + 2} className="bg-gray-100"></td>
+                      </tr>
+
                       {relatorio.saldoInicial && (
-                        <tr className="bg-gray-50 font-semibold text-gray-800">
+                        <tr className="bg-blue-50 font-bold text-blue-900 border-t-2 border-blue-200">
                           <td className="px-4 py-3">{relatorio.saldoInicial.categoria}</td>
                           {relatorio.datas.map((data) => (
                             <td key={data} className="px-4 py-3 text-right">
@@ -830,7 +868,7 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
                       )}
 
                       {relatorio.saldoDiario && (
-                        <tr className="bg-gray-50 font-semibold text-gray-800">
+                        <tr className="bg-blue-50 font-bold text-blue-900">
                           <td className="px-4 py-3">{relatorio.saldoDiario.categoria}</td>
                           {relatorio.datas.map((data) => (
                             <td key={data} className="px-4 py-3 text-right">
@@ -842,7 +880,7 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
                       )}
 
                       {relatorio.saldoAcumulado && (
-                        <tr className="bg-gray-100 font-semibold text-gray-900">
+                        <tr className="bg-blue-100 font-bold text-blue-900 border-t-2 border-blue-300">
                           <td className="px-4 py-3">{relatorio.saldoAcumulado.categoria}</td>
                           {relatorio.datas.map((data) => (
                             <td key={data} className="px-4 py-3 text-right">

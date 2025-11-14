@@ -334,7 +334,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
             .eq('pag_data', data),
           supabase
             .from('rec_receitas')
-            .select('rec_valor, rec_ctr_id, ctr_contas_receita(ctr_nome, ctr_codigo)')
+            .select('rec_id, rec_valor, rec_ctr_id, ctr_contas_receita(ctr_nome, ctr_codigo)')
             .eq('rec_data', data),
           supabase
             .from('sdb_saldo_banco')
@@ -432,7 +432,19 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
           mapaGastos.set(chave, existente);
         });
 
-        normalizeRelation(receitas).forEach((item) => {
+        // Remover duplicatas usando um Set para rastrear rec_id únicos
+        const receitasUnicas = new Map<number, ReceitaRow>();
+        normalizeRelation(receitas).forEach((item: any) => {
+          const recId = item.rec_id;
+          if (recId && !receitasUnicas.has(recId)) {
+            receitasUnicas.set(recId, item);
+          } else if (!recId) {
+            // Se não tiver rec_id (improvável), adicionar mesmo assim
+            receitasUnicas.set(Math.random(), item);
+          }
+        });
+
+        Array.from(receitasUnicas.values()).forEach((item) => {
           const contaRel = normalizeRelation(item.ctr_contas_receita)[0];
           const codigo = contaRel?.ctr_codigo ? toString(contaRel.ctr_codigo) : null;
           // rec_receitas não tem pvi_tpr_id, então usa apenas o código da conta
