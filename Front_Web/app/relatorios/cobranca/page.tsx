@@ -664,8 +664,9 @@ const RelatorioCobrancaPage: React.FC = () => {
     doc.setTextColor(30, 64, 175); // blue-800
     doc.text(formatCurrency(relatorio.totais.previsto), margem + 2, posY + 10);
 
-    // Card 2: Realizado
+    // Card 2: Realizado (apenas receita prevista)
     const card2X = margem + cardWidth + 3;
+    const totalReceitaPrevista = relatorio.totais.titulosTotalReceitaPrevista + relatorio.totais.depositosTotalReceitaPrevista;
     doc.setDrawColor(34, 197, 94); // green
     doc.setFillColor(240, 253, 244); // green-50
     doc.roundedRect(card2X, posY, cardWidth, cardHeight, 2, 2, 'FD');
@@ -676,12 +677,12 @@ const RelatorioCobrancaPage: React.FC = () => {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(21, 128, 61); // green-700
-    doc.text(formatCurrency(relatorio.totais.realizado), card2X + 2, posY + 10);
+    doc.text(formatCurrency(totalReceitaPrevista), card2X + 2, posY + 10);
 
     // Card 3: Cobertura
     const card3X = card2X + cardWidth + 3;
     const cobertura = relatorio.totais.previsto > 0
-      ? ((relatorio.totais.realizado / relatorio.totais.previsto) * 100).toFixed(1)
+      ? ((totalReceitaPrevista / relatorio.totais.previsto) * 100).toFixed(1)
       : '0.0';
     doc.setDrawColor(147, 51, 234); // purple
     doc.setFillColor(250, 245, 255); // purple-50
@@ -1149,14 +1150,14 @@ const RelatorioCobrancaPage: React.FC = () => {
                       <div className="flex justify-between items-center bg-white border border-green-200 px-3 py-2 rounded">
                         <span className="text-gray-700 font-medium">Realizado:</span>
                         <span className="text-green-900 font-bold">
-                          {formatCurrency(relatorio.totais.realizado)}
+                          {formatCurrency(relatorio.totais.titulosTotalReceitaPrevista + relatorio.totais.depositosTotalReceitaPrevista)}
                         </span>
                       </div>
                       <div className="flex justify-between items-center bg-white border border-purple-200 px-3 py-2 rounded">
                         <span className="text-gray-700 font-medium">Cobertura:</span>
                         <span className="text-purple-900 font-bold text-base">
                           {relatorio.totais.previsto > 0
-                            ? `${((relatorio.totais.realizado / relatorio.totais.previsto) * 100).toFixed(1)}%`
+                            ? `${(((relatorio.totais.titulosTotalReceitaPrevista + relatorio.totais.depositosTotalReceitaPrevista) / relatorio.totais.previsto) * 100).toFixed(1)}%`
                             : '0%'
                           }
                         </span>
