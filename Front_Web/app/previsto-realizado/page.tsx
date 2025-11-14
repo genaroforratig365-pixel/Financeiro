@@ -688,10 +688,180 @@ export default function PrevistoRealizadoPage() {
               </Card>
             </div>
 
+            {/* Cards Detalhados por Área (quando área está selecionada) */}
+            {areaFiltro !== null && (
+              <>
+                <h2 className="text-xl font-bold text-gray-900 mt-8">
+                  Análise Detalhada - {areas.find(a => a.id === areaFiltro)?.nome}
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Card 1: Receitas da Área */}
+                  <Card title="Receitas - Detalhamento" variant="success">
+                    <div className="space-y-4">
+                      {/* Tabela de Receitas */}
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs">
+                          <thead className="bg-green-50">
+                            <tr>
+                              <th className="px-2 py-1 text-left font-semibold text-gray-700">Data</th>
+                              <th className="px-2 py-1 text-right font-semibold text-gray-700">Previsto</th>
+                              <th className="px-2 py-1 text-right font-semibold text-gray-700">Realizado</th>
+                              <th className="px-2 py-1 text-center font-semibold text-gray-700">Var.</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {dadosComparativos.map((item) => (
+                              <tr key={item.data} className="hover:bg-green-50">
+                                <td className="px-2 py-1 text-gray-900">{formatarData(item.data)}</td>
+                                <td className="px-2 py-1 text-right text-gray-600">
+                                  {formatCurrency(item.previsto_receitas)}
+                                </td>
+                                <td className="px-2 py-1 text-right font-semibold text-success-700">
+                                  {formatCurrency(item.realizado_receitas)}
+                                </td>
+                                <td className="px-2 py-1 text-center">
+                                  {renderVariacao(item.variacao_receitas, 'receita')}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="bg-green-100 font-bold">
+                            <tr>
+                              <td className="px-2 py-1 text-gray-900">Total</td>
+                              <td className="px-2 py-1 text-right text-gray-900">
+                                {formatCurrency(totais.previsto_receitas)}
+                              </td>
+                              <td className="px-2 py-1 text-right text-success-700">
+                                {formatCurrency(totais.realizado_receitas)}
+                              </td>
+                              <td className="px-2 py-1 text-center">
+                                {renderVariacao(
+                                  totais.previsto_receitas === 0
+                                    ? 0
+                                    : ((totais.realizado_receitas - totais.previsto_receitas) /
+                                        Math.abs(totais.previsto_receitas)) *
+                                      100,
+                                  'receita'
+                                )}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+
+                      {/* Gráfico de Receitas */}
+                      <div className="border-t pt-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                          Evolução no Período
+                        </h4>
+                        {tipoGrafico === 'barras' ? (
+                          <BarrasVerticaisChart
+                            dados={dadosGraficoReceitas}
+                            corPrevisto="#3b82f6"
+                            corRealizado="#10b981"
+                            labelPrevisto="Previsto"
+                            labelRealizado="Realizado"
+                          />
+                        ) : (
+                          <LinhasChart
+                            dados={dadosGraficoReceitas}
+                            corPrevisto="#3b82f6"
+                            corRealizado="#10b981"
+                            labelPrevisto="Previsto"
+                            labelRealizado="Realizado"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Card 2: Despesas da Área */}
+                  <Card title="Despesas - Detalhamento" variant="danger">
+                    <div className="space-y-4">
+                      {/* Tabela de Despesas */}
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs">
+                          <thead className="bg-red-50">
+                            <tr>
+                              <th className="px-2 py-1 text-left font-semibold text-gray-700">Data</th>
+                              <th className="px-2 py-1 text-right font-semibold text-gray-700">Previsto</th>
+                              <th className="px-2 py-1 text-right font-semibold text-gray-700">Realizado</th>
+                              <th className="px-2 py-1 text-center font-semibold text-gray-700">Var.</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {dadosComparativos.map((item) => (
+                              <tr key={item.data} className="hover:bg-red-50">
+                                <td className="px-2 py-1 text-gray-900">{formatarData(item.data)}</td>
+                                <td className="px-2 py-1 text-right text-gray-600">
+                                  {formatCurrency(item.previsto_despesas)}
+                                </td>
+                                <td className="px-2 py-1 text-right font-semibold text-error-700">
+                                  {formatCurrency(item.realizado_despesas)}
+                                </td>
+                                <td className="px-2 py-1 text-center">
+                                  {renderVariacao(item.variacao_despesas, 'despesa')}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="bg-red-100 font-bold">
+                            <tr>
+                              <td className="px-2 py-1 text-gray-900">Total</td>
+                              <td className="px-2 py-1 text-right text-gray-900">
+                                {formatCurrency(totais.previsto_despesas)}
+                              </td>
+                              <td className="px-2 py-1 text-right text-error-700">
+                                {formatCurrency(totais.realizado_despesas)}
+                              </td>
+                              <td className="px-2 py-1 text-center">
+                                {renderVariacao(
+                                  totais.previsto_despesas === 0
+                                    ? 0
+                                    : ((totais.realizado_despesas - totais.previsto_despesas) /
+                                        Math.abs(totais.previsto_despesas)) *
+                                      100,
+                                  'despesa'
+                                )}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+
+                      {/* Gráfico de Despesas */}
+                      <div className="border-t pt-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                          Evolução no Período
+                        </h4>
+                        {tipoGrafico === 'barras' ? (
+                          <BarrasVerticaisChart
+                            dados={dadosGraficoDespesas}
+                            corPrevisto="#f97316"
+                            corRealizado="#ef4444"
+                            labelPrevisto="Previsto"
+                            labelRealizado="Realizado"
+                          />
+                        ) : (
+                          <LinhasChart
+                            dados={dadosGraficoDespesas}
+                            corPrevisto="#f97316"
+                            corRealizado="#ef4444"
+                            labelPrevisto="Previsto"
+                            labelRealizado="Realizado"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              </>
+            )}
+
             {/* Seletor de Tipo de Gráfico */}
             <Card>
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Visualização dos Gráficos</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Visualização dos Gráficos Gerais</h3>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setTipoGrafico('barras')}
