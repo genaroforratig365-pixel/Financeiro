@@ -874,7 +874,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
         body: corpo,
         foot: rodape,
         theme: 'grid',
-        styles: { fontSize: 9, cellPadding: 1.5, halign: 'right', lineWidth: 0.5, lineColor: [0, 0, 0] },
+        styles: { fontSize: 9, cellPadding: 1.5, halign: 'right', lineWidth: 0.1, lineColor: [0, 0, 0] },
         headStyles: {
           fillColor: tabelaAccentPdfColors[accent] ?? tabelaAccentPdfColors.azul,
           textColor: 255,
