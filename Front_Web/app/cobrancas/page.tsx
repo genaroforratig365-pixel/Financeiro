@@ -61,6 +61,13 @@ type ResumoTipo = {
   total: number;
 };
 
+type ResumoContaReceita = {
+  titulosReceitaPrevista: number;
+  titulosOutrasReceitas: number;
+  depositosReceitaPrevista: number;
+  depositosOutrasReceitas: number;
+};
+
 const toISODate = (date: Date): string => date.toISOString().split('T')[0];
 
 const calcularRetroativo = (dias: number): string => {
@@ -461,6 +468,119 @@ export default function LancamentoCobrancaPage() {
       .filter(item => item.codigo.startsWith('301'))
       .reduce((acc, item) => acc + item.total, 0);
   }, [resumoLancadoPorTipo]);
+
+  // Resumo por Conta de Receita - Formulário (digitado)
+  const resumoContaReceitaFormulario = useMemo<ResumoContaReceita>(() => {
+    const resumo: ResumoContaReceita = {
+      titulosReceitaPrevista: 0,
+      titulosOutrasReceitas: 0,
+      depositosReceitaPrevista: 0,
+      depositosOutrasReceitas: 0,
+    };
+
+    Object.values(valoresPorBanco).forEach((contasValores) => {
+      Object.entries(contasValores).forEach(([contaIdTexto, tiposValores]) => {
+        const contaId = Number(contaIdTexto);
+        const conta = contasMap.get(contaId);
+        if (!conta) return;
+
+        const codigoConta = conta.codigo?.trim() || '';
+        const ehTitulo = codigoConta.startsWith('200');
+        const ehDeposito = codigoConta.startsWith('201');
+
+        Object.entries(tiposValores).forEach(([tipoIdTexto, valorTexto]) => {
+          const valorCalculado = avaliarValor(valorTexto);
+          if (valorCalculado === null || !Number.isFinite(valorCalculado) || valorCalculado <= 0) {
+            return;
+          }
+
+          const tipoId = Number(tipoIdTexto);
+          const tipo = tiposMap.get(tipoId);
+          if (!tipo) return;
+
+          const tipoNomeUpper = tipo.nome.toUpperCase();
+          const ehReceitaPrevista = tipoNomeUpper.includes('PREVIS') || tipo.codigo.startsWith('301');
+
+          if (ehTitulo) {
+            if (ehReceitaPrevista) {
+              resumo.titulosReceitaPrevista += valorCalculado;
+            } else {
+              resumo.titulosOutrasReceitas += valorCalculado;
+            }
+          } else if (ehDeposito) {
+            if (ehReceitaPrevista) {
+              resumo.depositosReceitaPrevista += valorCalculado;
+            } else {
+              resumo.depositosOutrasReceitas += valorCalculado;
+            }
+          }
+        });
+      });
+    });
+
+    return {
+      titulosReceitaPrevista: arredondar(resumo.titulosReceitaPrevista),
+      titulosOutrasReceitas: arredondar(resumo.titulosOutrasReceitas),
+      depositosReceitaPrevista: arredondar(resumo.depositosReceitaPrevista),
+      depositosOutrasReceitas: arredondar(resumo.depositosOutrasReceitas),
+    };
+  }, [valoresPorBanco, contasMap, tiposMap]);
+
+  // Resumo por Conta de Receita - Salvos (lançados)
+  const resumoContaReceitaSalvo = useMemo<ResumoContaReceita>(() => {
+    const resumo: ResumoContaReceita = {
+      titulosReceitaPrevista: 0,
+      titulosOutrasReceitas: 0,
+      depositosReceitaPrevista: 0,
+      depositosOutrasReceitas: 0,
+    };
+
+    Object.values(valoresSalvosPorBanco).forEach((contasValores) => {
+      Object.entries(contasValores).forEach(([contaIdTexto, tiposValores]) => {
+        const contaId = Number(contaIdTexto);
+        const conta = contasMap.get(contaId);
+        if (!conta) return;
+
+        const codigoConta = conta.codigo?.trim() || '';
+        const ehTitulo = codigoConta.startsWith('200');
+        const ehDeposito = codigoConta.startsWith('201');
+
+        Object.entries(tiposValores).forEach(([tipoIdTexto, valor]) => {
+          if (valor <= 0 || !Number.isFinite(valor)) {
+            return;
+          }
+
+          const tipoId = Number(tipoIdTexto);
+          const tipo = tiposMap.get(tipoId);
+          if (!tipo) return;
+
+          const tipoNomeUpper = tipo.nome.toUpperCase();
+          const ehReceitaPrevista = tipoNomeUpper.includes('PREVIS') || tipo.codigo.startsWith('301');
+
+          if (ehTitulo) {
+            if (ehReceitaPrevista) {
+              resumo.titulosReceitaPrevista += valor;
+            } else {
+              resumo.titulosOutrasReceitas += valor;
+            }
+          } else if (ehDeposito) {
+            if (ehReceitaPrevista) {
+              resumo.depositosReceitaPrevista += valor;
+            } else {
+              resumo.depositosOutrasReceitas += valor;
+            }
+          }
+        });
+      });
+    });
+
+    return {
+      titulosReceitaPrevista: arredondar(resumo.titulosReceitaPrevista),
+      titulosOutrasReceitas: arredondar(resumo.titulosOutrasReceitas),
+      depositosReceitaPrevista: arredondar(resumo.depositosReceitaPrevista),
+      depositosOutrasReceitas: arredondar(resumo.depositosOutrasReceitas),
+    };
+  }, [valoresSalvosPorBanco, contasMap, tiposMap]);
 
   const carregarLancamentosDia = useCallback(
     async (
@@ -997,9 +1117,9 @@ export default function LancamentoCobrancaPage() {
               </div>
             </div>
 
-            {/* Dois cards de resumo lado a lado - atualiza em tempo real conforme digitação */}
+            {/* Três cards de resumo lado a lado - atualiza em tempo real conforme digitação */}
             {(resumoFormularioPorBanco.length > 0 || resumoTiposFormulario.length > 0 || resumoLancadoPorBanco.length > 0 || resumoLancadoPorTipo.length > 0) && (
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-3">
                 <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
                   <div className="border-b border-red-200 bg-red-50 px-4 py-3">
                     <h3 className="text-base font-semibold text-red-800">🔴 Resumo por banco</h3>
@@ -1115,6 +1235,147 @@ export default function LancamentoCobrancaPage() {
                             </tr>
                           </tfoot>
                         </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+                  <div className="border-b border-red-200 bg-red-50 px-4 py-3">
+                    <h3 className="text-base font-semibold text-red-800">🔴 Resumo por Conta de Receita</h3>
+                    <p className="mt-1 text-xs text-red-600">
+                      Separação por Títulos e Depósitos
+                    </p>
+                  </div>
+                  <div className="px-4 py-3">
+                    {(resumoContaReceitaFormulario.titulosReceitaPrevista + resumoContaReceitaFormulario.titulosOutrasReceitas +
+                      resumoContaReceitaFormulario.depositosReceitaPrevista + resumoContaReceitaFormulario.depositosOutrasReceitas +
+                      resumoContaReceitaSalvo.titulosReceitaPrevista + resumoContaReceitaSalvo.titulosOutrasReceitas +
+                      resumoContaReceitaSalvo.depositosReceitaPrevista + resumoContaReceitaSalvo.depositosOutrasReceitas) === 0 ? (
+                      <p className="text-sm text-gray-500">Nenhum valor informado</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {/* Títulos */}
+                        <div className="border-b border-gray-200 pb-3">
+                          <h4 className="font-semibold text-gray-700 mb-2 text-sm">Títulos</h4>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Receita Prevista:</span>
+                              <div className="space-x-2">
+                                <span className="text-primary-700 font-medium">
+                                  {formatCurrency(resumoContaReceitaFormulario.titulosReceitaPrevista)}
+                                </span>
+                                <span className="text-gray-400">|</span>
+                                <span className="text-gray-900 font-medium">
+                                  {formatCurrency(resumoContaReceitaSalvo.titulosReceitaPrevista)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Outras Receitas:</span>
+                              <div className="space-x-2">
+                                <span className="text-primary-700 font-medium">
+                                  {formatCurrency(resumoContaReceitaFormulario.titulosOutrasReceitas)}
+                                </span>
+                                <span className="text-gray-400">|</span>
+                                <span className="text-gray-900 font-medium">
+                                  {formatCurrency(resumoContaReceitaSalvo.titulosOutrasReceitas)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between pt-1 border-t border-gray-100">
+                              <span className="text-gray-700 font-semibold">Total:</span>
+                              <div className="space-x-2">
+                                <span className="text-primary-800 font-bold">
+                                  {formatCurrency(resumoContaReceitaFormulario.titulosReceitaPrevista + resumoContaReceitaFormulario.titulosOutrasReceitas)}
+                                </span>
+                                <span className="text-gray-400">|</span>
+                                <span className="text-gray-900 font-bold">
+                                  {formatCurrency(resumoContaReceitaSalvo.titulosReceitaPrevista + resumoContaReceitaSalvo.titulosOutrasReceitas)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Depósitos */}
+                        <div className="border-b border-gray-200 pb-3">
+                          <h4 className="font-semibold text-gray-700 mb-2 text-sm">Depósitos</h4>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Receita Prevista:</span>
+                              <div className="space-x-2">
+                                <span className="text-primary-700 font-medium">
+                                  {formatCurrency(resumoContaReceitaFormulario.depositosReceitaPrevista)}
+                                </span>
+                                <span className="text-gray-400">|</span>
+                                <span className="text-gray-900 font-medium">
+                                  {formatCurrency(resumoContaReceitaSalvo.depositosReceitaPrevista)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Outras Receitas:</span>
+                              <div className="space-x-2">
+                                <span className="text-primary-700 font-medium">
+                                  {formatCurrency(resumoContaReceitaFormulario.depositosOutrasReceitas)}
+                                </span>
+                                <span className="text-gray-400">|</span>
+                                <span className="text-gray-900 font-medium">
+                                  {formatCurrency(resumoContaReceitaSalvo.depositosOutrasReceitas)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between pt-1 border-t border-gray-100">
+                              <span className="text-gray-700 font-semibold">Total:</span>
+                              <div className="space-x-2">
+                                <span className="text-primary-800 font-bold">
+                                  {formatCurrency(resumoContaReceitaFormulario.depositosReceitaPrevista + resumoContaReceitaFormulario.depositosOutrasReceitas)}
+                                </span>
+                                <span className="text-gray-400">|</span>
+                                <span className="text-gray-900 font-bold">
+                                  {formatCurrency(resumoContaReceitaSalvo.depositosReceitaPrevista + resumoContaReceitaSalvo.depositosOutrasReceitas)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Total Geral */}
+                        <div className="bg-gray-50 -mx-4 -mb-3 px-4 py-3 rounded-b-lg">
+                          <h4 className="font-semibold text-gray-900 mb-2 text-sm">Total Geral</h4>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Receita Prevista:</span>
+                              <div className="space-x-2">
+                                <span className="text-primary-700 font-medium">
+                                  {formatCurrency(resumoContaReceitaFormulario.titulosReceitaPrevista + resumoContaReceitaFormulario.depositosReceitaPrevista)}
+                                </span>
+                                <span className="text-gray-400">|</span>
+                                <span className="text-gray-900 font-medium">
+                                  {formatCurrency(resumoContaReceitaSalvo.titulosReceitaPrevista + resumoContaReceitaSalvo.depositosReceitaPrevista)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Outras Receitas:</span>
+                              <div className="space-x-2">
+                                <span className="text-primary-700 font-medium">
+                                  {formatCurrency(resumoContaReceitaFormulario.titulosOutrasReceitas + resumoContaReceitaFormulario.depositosOutrasReceitas)}
+                                </span>
+                                <span className="text-gray-400">|</span>
+                                <span className="text-gray-900 font-medium">
+                                  {formatCurrency(resumoContaReceitaSalvo.titulosOutrasReceitas + resumoContaReceitaSalvo.depositosOutrasReceitas)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="pt-2 mt-2 border-t border-gray-300 text-xs">
+                            <div className="flex items-center justify-between text-gray-500">
+                              <span className="italic">Digitado | Salvo</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
