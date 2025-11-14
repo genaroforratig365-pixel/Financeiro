@@ -231,6 +231,7 @@ export default function PrevistoRealizadoPage() {
   const [carregando, setCarregando] = useState(true);
   const [previsoes, setPrevisoes] = useState<PrevisaoItem[]>([]);
   const [saldos, setSaldos] = useState<SaldoRealizado[]>([]);
+  const [pagamentosRealizados, setPagamentosRealizados] = useState<any[]>([]);
   const [periodoInicio, setPeriodoInicio] = useState('');
   const [periodoFim, setPeriodoFim] = useState('');
   const [areas, setAreas] = useState<AreaOption[]>([]);
@@ -337,7 +338,7 @@ export default function PrevistoRealizadoPage() {
         // Buscar DESPESAS de pag_pagamentos_area
         const { data: pagamentosData, error: erroPagamentos } = await supabase
           .from('pag_pagamentos_area')
-          .select('pag_data, pag_valor')
+          .select('pag_data, pag_valor, pag_are_id')
           .gte('pag_data', periodoInicio)
           .lte('pag_data', periodoFim);
 
@@ -385,6 +386,7 @@ export default function PrevistoRealizadoPage() {
 
         setPrevisoes(previsoesFormatadas);
         setSaldos(saldosCalculados);
+        setPagamentosRealizados(pagamentosData || []);
       } catch (erro) {
         console.error('Erro ao carregar dados:', erro);
       } finally {
@@ -429,7 +431,13 @@ export default function PrevistoRealizadoPage() {
         .reduce((sum, p) => sum + p.valor, 0);
 
       const realizado_receitas = saldoData?.receitas || 0;
-      const realizado_despesas = saldoData?.despesas || 0;
+
+      // Filtrar despesas realizadas por área se houver filtro ativo
+      const realizado_despesas = areaFiltro !== null
+        ? pagamentosRealizados
+            .filter((pag: any) => pag.pag_data === data && pag.pag_are_id === areaFiltro)
+            .reduce((sum: number, pag: any) => sum + (Number(pag.pag_valor) || 0), 0)
+        : (saldoData?.despesas || 0);
 
       const saldo_previsto = previsto_receitas - previsto_despesas;
       const saldo_realizado = realizado_receitas - realizado_despesas;
@@ -452,7 +460,7 @@ export default function PrevistoRealizadoPage() {
         variacao_saldo: calcVariacao(saldo_realizado, saldo_previsto)
       };
     });
-  }, [previsoesFiltradas, saldos]);
+  }, [previsoesFiltradas, saldos, pagamentosRealizados, areaFiltro]);
 
   const totais = useMemo(() => {
     return dadosComparativos.reduce(
