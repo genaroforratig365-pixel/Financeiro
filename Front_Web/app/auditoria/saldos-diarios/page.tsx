@@ -84,7 +84,7 @@ const AuditoriaSaldosDiariosPage: React.FC = () => {
         dataObj.setDate(dataObj.getDate() - 1);
         const inicioAnterior = dataObj.toISOString().split('T')[0];
 
-        const [saldosRes, receitasRes, pagamentosAreaRes, pagamentosBancoRes] = await Promise.all([
+        const [saldosRes, receitasRes, pagamentosAreaRes, pagamentosBancoRes, saldosDiariosRes] = await Promise.all([
           supabase
             .from('sdb_saldo_banco')
             .select('sdb_data, sdb_saldo, sdb_ban_id, ban_bancos(ban_nome)')
@@ -98,24 +98,31 @@ const AuditoriaSaldosDiariosPage: React.FC = () => {
           supabase
             .from('pag_pagamentos_area')
             .select('pag_data, pag_valor')
-            .gte('pag_data', inicio)
-            .lte('pag_data', fim),
+            .gte('rec_data', inicio)
+            .lte('rec_data', fim),
           supabase
             .from('pbk_pagamentos_banco')
             .select('pbk_data, pbk_valor')
             .gte('pbk_data', inicio)
             .lte('pbk_data', fim),
+          supabase
+            .from('sdd_saldo_diario')
+            .select('sdd_data, sdd_saldo_final_realizado')
+            .gte('sdd_data', inicio)
+            .lte('sdd_data', fim),
         ]);
 
         if (saldosRes.error) throw saldosRes.error;
         if (receitasRes.error) throw receitasRes.error;
         if (pagamentosAreaRes.error) throw pagamentosAreaRes.error;
         if (pagamentosBancoRes.error) throw pagamentosBancoRes.error;
+        if (saldosDiariosRes.error) throw saldosDiariosRes.error;
 
         const saldos = (saldosRes.data as SaldoBancoRow[] | null) ?? [];
         const receitas = receitasRes.data ?? [];
         const pagamentosArea = pagamentosAreaRes.data ?? [];
         const pagamentosBanco = pagamentosBancoRes.data ?? [];
+        const saldosDiarios = saldosDiariosRes.data ?? [];
 
         const bancosUnicos = Array.from(
           new Set(
@@ -131,6 +138,13 @@ const AuditoriaSaldosDiariosPage: React.FC = () => {
           const mapaDia = mapaSaldosPorData.get(item.sdb_data) ?? new Map<string, number>();
           mapaDia.set(nome, (mapaDia.get(nome) ?? 0) + valor);
           mapaSaldosPorData.set(item.sdb_data, mapaDia);
+        });
+
+        // Criar mapa de saldos diários registrados (do resumo geral)
+        const mapaSaldosDiarios = new Map<string, number>();
+        saldosDiarios.forEach((item: any) => {
+          const valor = Number(item.sdd_saldo_final_realizado ?? 0);
+          mapaSaldosDiarios.set(item.sdd_data, valor);
         });
 
         // Criar mapas de receitas e despesas por data
@@ -162,20 +176,8 @@ const AuditoriaSaldosDiariosPage: React.FC = () => {
               somaBancos += valor;
             });
 
-            // Calcular saldo inicial (soma dos saldos do dia anterior)
-            const dataObj = new Date(data + 'T00:00:00');
-            dataObj.setDate(dataObj.getDate() - 1);
-            const dataAnterior = dataObj.toISOString().split('T')[0];
-            const mapaDiaAnterior = mapaSaldosPorData.get(dataAnterior) ?? new Map<string, number>();
-            let saldoInicial = 0;
-            bancosUnicos.forEach((nome) => {
-              saldoInicial += Number(mapaDiaAnterior.get(nome) ?? 0);
-            });
-
-            // Calcular saldo final registrado: saldo inicial + receitas - despesas
-            const receitas = Number(mapaReceitas.get(data) ?? 0);
-            const despesas = Number(mapaDespesas.get(data) ?? 0);
-            const saldoRegistrado = Number((saldoInicial + receitas - despesas).toFixed(2));
+            // Buscar saldo final registrado do resumo geral (tabela sdd_saldo_diario)
+            const saldoRegistrado = Number((mapaSaldosDiarios.get(data) ?? somaBancos).toFixed(2));
             const diferenca = Number((somaBancos - saldoRegistrado).toFixed(2));
             const possuiDados = somaBancos !== 0 || saldoRegistrado !== 0;
             if (!possuiDados) {
