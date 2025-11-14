@@ -60,9 +60,14 @@ type BancoResumo = {
   tipos: TipoResumo[];
 };
 
+type TipoValor = {
+  tipoId: string;
+  tipoNome: string;
+  valor: number;
+};
+
 type CategoriaResumo = {
-  receitaPrevista: number;
-  outrasReceitas: number;
+  tipos: TipoValor[];
   total: number;
 };
 
@@ -236,7 +241,6 @@ const RelatorioCobrancaPage: React.FC = () => {
           const contaNome = contaRel?.ctr_nome ? toString(contaRel.ctr_nome) : 'Conta não informada';
           const contaCodigo = contaRel?.ctr_codigo ? toString(contaRel.ctr_codigo) : '';
           const contaId = toNumber(item.pvi_ctr_id, 0);
-          const contaChave = construirChave(contaId, contaNome, 'conta');
 
           // IMPORTANTE: Usar pvi_ban_id diretamente e buscar no bancosMap
           const bancoIdNumero = toNumber(item.pvi_ban_id, NaN);
@@ -250,8 +254,11 @@ const RelatorioCobrancaPage: React.FC = () => {
           const tipoIdNumero = toNumber(tipoRel?.tpr_id, NaN);
           const tipoChave = construirChave(tipoIdNumero, tipoNome, 'tipo');
 
-          const existente = contasMap.get(contaChave) ?? {
-            chave: contaChave,
+          // CRÍTICO: Chave única deve ser banco + conta + tipo para não misturar bancos
+          const chaveUnica = `${bancoChave}-${contaId}-${tipoChave}`;
+
+          const existente = contasMap.get(chaveUnica) ?? {
+            chave: chaveUnica,
             contaNome,
             contaCodigo,
             bancoId: bancoChave,
@@ -264,13 +271,7 @@ const RelatorioCobrancaPage: React.FC = () => {
           };
 
           existente.previsto += valor;
-          existente.bancoId = bancoChave;
-          existente.bancoNome = bancoNome;
-          existente.tipoId = tipoChave;
-          existente.tipoNome = tipoNome;
-          existente.contaCodigo = contaCodigo;
-          existente.tipoCodigo = tipoCodigo;
-          contasMap.set(contaChave, existente);
+          contasMap.set(chaveUnica, existente);
         });
 
         cobrancas.forEach((item) => {
@@ -283,7 +284,6 @@ const RelatorioCobrancaPage: React.FC = () => {
           const contaNome = contaRel?.ctr_nome ? toString(contaRel.ctr_nome) : 'Conta não informada';
           const contaCodigo = contaRel?.ctr_codigo ? toString(contaRel.ctr_codigo) : '';
           const contaId = toNumber(item.cob_ctr_id, 0);
-          const contaChave = construirChave(contaId, contaNome, 'conta');
 
           // IMPORTANTE: Usar cob_ban_id diretamente e buscar no bancosMap
           const bancoIdNumero = toNumber(item.cob_ban_id, NaN);
@@ -297,8 +297,11 @@ const RelatorioCobrancaPage: React.FC = () => {
           const tipoIdNumero = toNumber(tipoRel?.tpr_id, NaN);
           const tipoChave = construirChave(tipoIdNumero, tipoNome, 'tipo');
 
-          const existente = contasMap.get(contaChave) ?? {
-            chave: contaChave,
+          // CRÍTICO: Chave única deve ser banco + conta + tipo para não misturar bancos
+          const chaveUnica = `${bancoChave}-${contaId}-${tipoChave}`;
+
+          const existente = contasMap.get(chaveUnica) ?? {
+            chave: chaveUnica,
             contaNome,
             contaCodigo,
             bancoId: bancoChave,
@@ -311,13 +314,7 @@ const RelatorioCobrancaPage: React.FC = () => {
           };
 
           existente.realizado += valor;
-          existente.bancoId = bancoChave;
-          existente.bancoNome = bancoNome;
-          existente.tipoId = tipoChave;
-          existente.tipoNome = tipoNome;
-          existente.contaCodigo = contaCodigo;
-          existente.tipoCodigo = tipoCodigo;
-          contasMap.set(contaChave, existente);
+          contasMap.set(chaveUnica, existente);
         });
 
         type BancoAcumulado = {
@@ -400,8 +397,8 @@ const RelatorioCobrancaPage: React.FC = () => {
         // Processar categorização por Títulos e Depósitos
         type BancoCategoriaAcumulado = {
           nome: string;
-          titulos: { receitaPrevista: number; outrasReceitas: number };
-          depositos: { receitaPrevista: number; outrasReceitas: number };
+          titulos: Map<string, { tipoNome: string; valor: number }>;
+          depositos: Map<string, { tipoNome: string; valor: number }>;
         };
 
         const bancosCategorizadosMap = new Map<string, BancoCategoriaAcumulado>();
@@ -409,8 +406,6 @@ const RelatorioCobrancaPage: React.FC = () => {
         contasMap.forEach((conta) => {
           const contaCodigo = toString(conta.contaCodigo);
           const contaNome = toString(conta.contaNome).toUpperCase();
-          const tipoCodigo = toString(conta.tipoCodigo);
-          const tipoNome = toString(conta.tipoNome).toUpperCase();
 
           // Identificar se é Títulos ou Depósitos baseado no código ou nome da CONTA DE RECEITA
           const ehTitulos = contaNome.includes('TÍTULO') || contaNome.includes('TITULO') || contaCodigo.startsWith('301');
@@ -422,45 +417,62 @@ const RelatorioCobrancaPage: React.FC = () => {
 
           const banco = bancosCategorizadosMap.get(conta.bancoId) ?? {
             nome: conta.bancoNome,
-            titulos: { receitaPrevista: 0, outrasReceitas: 0 },
-            depositos: { receitaPrevista: 0, outrasReceitas: 0 },
+            titulos: new Map(),
+            depositos: new Map(),
           };
 
-          // Identificar se é Receita Prevista ou Outras Receitas baseado no TIPO DE RECEITA
-          const ehReceitaPrevista = tipoNome.includes('PREVIS') || tipoCodigo === '301' || tipoCodigo.startsWith('301');
-
           if (ehTitulos) {
-            if (ehReceitaPrevista) {
-              banco.titulos.receitaPrevista += conta.realizado; // Usar realizado pois é o que foi cobrado
-            } else {
-              banco.titulos.outrasReceitas += conta.realizado;
-            }
+            const tipoExistente = banco.titulos.get(conta.tipoId) ?? {
+              tipoNome: conta.tipoNome,
+              valor: 0,
+            };
+            tipoExistente.valor += conta.realizado;
+            banco.titulos.set(conta.tipoId, tipoExistente);
           } else if (ehDepositos) {
-            if (ehReceitaPrevista) {
-              banco.depositos.receitaPrevista += conta.realizado;
-            } else {
-              banco.depositos.outrasReceitas += conta.realizado;
-            }
+            const tipoExistente = banco.depositos.get(conta.tipoId) ?? {
+              tipoNome: conta.tipoNome,
+              valor: 0,
+            };
+            tipoExistente.valor += conta.realizado;
+            banco.depositos.set(conta.tipoId, tipoExistente);
           }
 
           bancosCategorizadosMap.set(conta.bancoId, banco);
         });
 
         const bancosCategorizado: BancoCategorizado[] = Array.from(bancosCategorizadosMap.entries())
-          .map(([id, banco]) => ({
-            id,
-            nome: banco.nome,
-            titulos: {
-              receitaPrevista: arredondar(banco.titulos.receitaPrevista),
-              outrasReceitas: arredondar(banco.titulos.outrasReceitas),
-              total: arredondar(banco.titulos.receitaPrevista + banco.titulos.outrasReceitas),
-            },
-            depositos: {
-              receitaPrevista: arredondar(banco.depositos.receitaPrevista),
-              outrasReceitas: arredondar(banco.depositos.outrasReceitas),
-              total: arredondar(banco.depositos.receitaPrevista + banco.depositos.outrasReceitas),
-            },
-          }))
+          .map(([id, banco]) => {
+            const titulosTipos: TipoValor[] = Array.from(banco.titulos.entries())
+              .map(([tipoId, tipo]) => ({
+                tipoId,
+                tipoNome: tipo.tipoNome,
+                valor: arredondar(tipo.valor),
+              }))
+              .filter(t => t.valor > 0)
+              .sort((a, b) => b.valor - a.valor);
+
+            const depositosTipos: TipoValor[] = Array.from(banco.depositos.entries())
+              .map(([tipoId, tipo]) => ({
+                tipoId,
+                tipoNome: tipo.tipoNome,
+                valor: arredondar(tipo.valor),
+              }))
+              .filter(t => t.valor > 0)
+              .sort((a, b) => b.valor - a.valor);
+
+            return {
+              id,
+              nome: banco.nome,
+              titulos: {
+                tipos: titulosTipos,
+                total: arredondar(titulosTipos.reduce((sum, t) => sum + t.valor, 0)),
+              },
+              depositos: {
+                tipos: depositosTipos,
+                total: arredondar(depositosTipos.reduce((sum, t) => sum + t.valor, 0)),
+              },
+            };
+          })
           .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
         // Totais consolidados
@@ -590,14 +602,15 @@ const RelatorioCobrancaPage: React.FC = () => {
       relatorio.bancosCategorizado.forEach((banco) => {
         if (banco.titulos.total === 0) return;
 
+        const body = [
+          ...banco.titulos.tipos.map(tipo => [tipo.tipoNome, formatCurrency(tipo.valor)]),
+          ['Total', formatCurrency(banco.titulos.total)],
+        ];
+
         autoTable(doc, {
           startY: posY,
-          head: [[banco.nome]],
-          body: [
-            ['Receita Prevista', formatCurrency(banco.titulos.receitaPrevista)],
-            ['Outras Receitas', formatCurrency(banco.titulos.outrasReceitas)],
-            ['Total', formatCurrency(banco.titulos.total)],
-          ],
+          head: [[banco.nome, '']],
+          body,
           styles: { fontSize: 8, halign: 'right', cellPadding: 2 },
           headStyles: { fillColor: [31, 73, 125], textColor: 255, fontStyle: 'bold', halign: 'left' },
           columnStyles: { 0: { halign: 'left' }, 1: { fontStyle: 'bold' } },
@@ -628,14 +641,15 @@ const RelatorioCobrancaPage: React.FC = () => {
       relatorio.bancosCategorizado.forEach((banco) => {
         if (banco.depositos.total === 0) return;
 
+        const body = [
+          ...banco.depositos.tipos.map(tipo => [tipo.tipoNome, formatCurrency(tipo.valor)]),
+          ['Total', formatCurrency(banco.depositos.total)],
+        ];
+
         autoTable(doc, {
           startY: posY,
-          head: [[banco.nome]],
-          body: [
-            ['Receita Prevista', formatCurrency(banco.depositos.receitaPrevista)],
-            ['Outras Receitas', formatCurrency(banco.depositos.outrasReceitas)],
-            ['Total', formatCurrency(banco.depositos.total)],
-          ],
+          head: [[banco.nome, '']],
+          body,
           styles: { fontSize: 8, halign: 'right', cellPadding: 2 },
           headStyles: { fillColor: [34, 139, 34], textColor: 255, fontStyle: 'bold', halign: 'left' },
           columnStyles: { 0: { halign: 'left' }, 1: { fontStyle: 'bold' } },
@@ -995,19 +1009,15 @@ const RelatorioCobrancaPage: React.FC = () => {
                     .filter(banco => banco.titulos.total > 0)
                     .map((banco) => (
                       <Card key={`titulos-${banco.id}`} title={banco.nome}>
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Receita prevista</span>
-                            <span className="text-sm font-semibold text-gray-900">
-                              {formatCurrency(banco.titulos.receitaPrevista)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Outras receitas</span>
-                            <span className="text-sm font-semibold text-gray-900">
-                              {formatCurrency(banco.titulos.outrasReceitas)}
-                            </span>
-                          </div>
+                        <div className="space-y-2">
+                          {banco.titulos.tipos.map((tipo) => (
+                            <div key={`titulo-${banco.id}-${tipo.tipoId}`} className="flex justify-between items-center">
+                              <span className="text-sm text-gray-600">{tipo.tipoNome}</span>
+                              <span className="text-sm font-semibold text-gray-900">
+                                {formatCurrency(tipo.valor)}
+                              </span>
+                            </div>
+                          ))}
                           <div className="pt-2 border-t border-gray-200">
                             <div className="flex justify-between items-center">
                               <span className="text-sm font-bold text-gray-800">Total</span>
@@ -1032,19 +1042,15 @@ const RelatorioCobrancaPage: React.FC = () => {
                     .filter(banco => banco.depositos.total > 0)
                     .map((banco) => (
                       <Card key={`depositos-${banco.id}`} title={banco.nome}>
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Receita prevista</span>
-                            <span className="text-sm font-semibold text-gray-900">
-                              {formatCurrency(banco.depositos.receitaPrevista)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Outras receitas</span>
-                            <span className="text-sm font-semibold text-gray-900">
-                              {formatCurrency(banco.depositos.outrasReceitas)}
-                            </span>
-                          </div>
+                        <div className="space-y-2">
+                          {banco.depositos.tipos.map((tipo) => (
+                            <div key={`deposito-${banco.id}-${tipo.tipoId}`} className="flex justify-between items-center">
+                              <span className="text-sm text-gray-600">{tipo.tipoNome}</span>
+                              <span className="text-sm font-semibold text-gray-900">
+                                {formatCurrency(tipo.valor)}
+                              </span>
+                            </div>
+                          ))}
                           <div className="pt-2 border-t border-gray-200">
                             <div className="flex justify-between items-center">
                               <span className="text-sm font-bold text-gray-800">Total</span>
