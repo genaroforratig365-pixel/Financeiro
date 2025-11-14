@@ -754,7 +754,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
       },
       {
         chave: 'aplicacoes',
-        titulo: 'Aplicações/Resgates',
+        titulo: resumo.aplicacoesRealizadas < 0 ? 'Transferência para aplicação' : 'Resgate aplicação',
         realizado: resumo.aplicacoesRealizadas,
       },
       {
