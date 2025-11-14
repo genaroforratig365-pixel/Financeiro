@@ -356,11 +356,13 @@ export default function PrevistoRealizadoPage() {
 
         if (erroReceitas) throw erroReceitas;
 
-        // Filtrar apenas receitas previstas (tipos que incluem "RECEITA PREVISTA" ou "PREVISTA")
+        // Filtrar apenas receitas previstas (tipos que incluem "RECEITA PREVISTA" mas NÃO adiantados/atrasados)
         const receitasData = (receitasDataRaw || []).filter((rec: any) => {
           const tipoReceita = Array.isArray(rec.tpr_tipos_receita) ? rec.tpr_tipos_receita[0] : rec.tpr_tipos_receita;
           const tipoNome = tipoReceita?.tpr_nome ? String(tipoReceita.tpr_nome).toUpperCase() : '';
-          return tipoNome.includes('RECEITA PREVISTA') || tipoNome.includes('PREVISTA');
+          return (tipoNome.includes('RECEITA PREVISTA') || tipoNome.includes('PREVISTA'))
+            && !tipoNome.includes('ADIANTADO')
+            && !tipoNome.includes('ATRASADO');
         });
 
         // Armazenar receitas com informação da conta
@@ -375,11 +377,13 @@ export default function PrevistoRealizadoPage() {
 
         if (erroCobrancas) throw erroCobrancas;
 
-        // Filtrar apenas cobranças de receitas previstas (tipos que incluem "RECEITA PREVISTA" ou "PREVISTA")
+        // Filtrar apenas cobranças de receitas previstas (tipos que incluem "RECEITA PREVISTA" mas NÃO adiantados/atrasados)
         const cobrancasData = (cobrancasDataRaw || []).filter((cob: any) => {
           const tipoReceita = Array.isArray(cob.tpr_tipos_receita) ? cob.tpr_tipos_receita[0] : cob.tpr_tipos_receita;
           const tipoNome = tipoReceita?.tpr_nome ? String(tipoReceita.tpr_nome).toUpperCase() : '';
-          return tipoNome.includes('RECEITA PREVISTA') || tipoNome.includes('PREVISTA');
+          return (tipoNome.includes('RECEITA PREVISTA') || tipoNome.includes('PREVISTA'))
+            && !tipoNome.includes('ADIANTADO')
+            && !tipoNome.includes('ATRASADO');
         });
 
         // Buscar DESPESAS de pag_pagamentos_area

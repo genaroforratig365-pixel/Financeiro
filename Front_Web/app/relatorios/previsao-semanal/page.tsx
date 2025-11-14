@@ -305,7 +305,46 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
 
         const receitas = agruparPorCategoria(receitasItens, datasOrdenadas);
         const despesas = agruparPorCategoria(despesasItens, datasOrdenadas);
-        const saldoInicial = construirLinha(saldoInicialItens, datasOrdenadas, 'Saldo inicial');
+
+        let saldoInicial = construirLinha(saldoInicialItens, datasOrdenadas, 'Saldo inicial');
+
+        // Se não houver saldo inicial cadastrado, buscar do último dia anterior com saldos bancários
+        if (!saldoInicial || Object.keys(saldoInicial.valores).length === 0) {
+          const primeiraData = datasOrdenadas[0];
+          if (primeiraData) {
+            // Buscar saldos bancários do dia anterior
+            const dataBusca = new Date(`${primeiraData}T00:00:00`);
+            let saldoEncontrado = 0;
+            let encontrou = false;
+
+            // Buscar até 30 dias antes
+            for (let i = 1; i <= 30 && !encontrou; i++) {
+              const dataAnterior = new Date(dataBusca);
+              dataAnterior.setDate(dataAnterior.getDate() - i);
+              const dataAnteriorISO = dataAnterior.toISOString().split('T')[0];
+
+              const { data: saldosBancarios, error: erroSaldos } = await supabase
+                .from('sdb_saldo_banco')
+                .select('sdb_saldo')
+                .eq('sdb_data', dataAnteriorISO);
+
+              if (!erroSaldos && saldosBancarios && saldosBancarios.length > 0) {
+                saldoEncontrado = saldosBancarios.reduce((sum, item) => sum + Number(item.sdb_saldo || 0), 0);
+                encontrou = true;
+              }
+            }
+
+            if (encontrou) {
+              // Criar saldo inicial com o valor encontrado
+              saldoInicial = {
+                categoria: 'Saldo inicial',
+                valores: { [primeiraData]: Math.round(saldoEncontrado * 100) / 100 },
+                total: Math.round(saldoEncontrado * 100) / 100,
+              };
+            }
+          }
+        }
+
         const saldoDiario = construirLinha(saldoDiarioItens, datasOrdenadas, 'Saldo diário previsto');
 
         // Calcula saldo acumulado corretamente:
