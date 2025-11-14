@@ -314,16 +314,16 @@ export const Sidebar: React.FC = () => {
   };
 
   const getTitleColorClass = () => {
-    // Todos os títulos em vermelho suave com destaque
-    return 'text-[#fca9a9] font-bold';
+    // Todos os títulos em vermelho forte com destaque
+    return 'text-red-700 font-bold';
   };
 
   const getItemColorClass = (active: boolean) => {
-    // Fundo branco, texto vermelho suave
-    // Quando ativo, fica com fundo vermelho suave e texto mais escuro
+    // Fundo branco, texto vermelho forte
+    // Quando ativo, fica com fundo vermelho e texto branco
     return active
-      ? 'bg-[#fca9a9] text-red-900 shadow-sm font-semibold'
-      : 'text-[#fca9a9] hover:bg-red-50 hover:shadow-sm';
+      ? 'bg-red-600 text-white shadow-md font-semibold'
+      : 'text-red-600 hover:bg-red-50 hover:shadow-sm';
   };
 
   return (

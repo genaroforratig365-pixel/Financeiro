@@ -713,6 +713,8 @@ export default function LancamentoCobrancaPage() {
           codigo: banco.ban_codigo ?? null,
         }));
 
+        console.log('Bancos carregados da tabela ban_bancos:', bancosFormatados);
+
         setTipos(tiposFormatados);
         setContas(contasFormatadas);
         setBancos(bancosFormatados);
@@ -881,6 +883,7 @@ export default function LancamentoCobrancaPage() {
     Object.keys(valoresPorBanco).forEach((bancoIdStr) => {
       const bancoId = Number(bancoIdStr);
       const valoresBanco = valoresPorBanco[bancoId];
+      const bancoNome = bancos.find(b => b.id === bancoId)?.nome ?? 'Desconhecido';
 
       contasRelevantes.forEach((conta) => {
         const valoresConta = valoresBanco[conta.id] ?? {};
@@ -898,14 +901,22 @@ export default function LancamentoCobrancaPage() {
             !registroExistente &&
             !camposEditando.has(chave)
           ) {
-            registrosParaInserir.push({
+            const registro = {
               cob_ban_id: bancoId,
               cob_ctr_id: conta.id,
               cob_tpr_id: tipo.id,
               cob_usr_id: usuarioId,
               cob_data: dataReferencia,
               cob_valor: valorCalculado,
+            };
+            console.log('Preparando lançamento:', {
+              banco: `${bancoNome} (ID: ${bancoId})`,
+              conta: `${conta.nome} (ID: ${conta.id})`,
+              tipo: `${tipo.nome} (ID: ${tipo.id})`,
+              valor: valorCalculado,
+              registro
             });
+            registrosParaInserir.push(registro);
           }
         });
       });
@@ -924,8 +935,13 @@ export default function LancamentoCobrancaPage() {
       setMensagem(null);
       const supabase = getSupabaseClient();
 
-      const { error } = await supabase.from('cob_cobrancas').insert(registrosParaInserir);
-      if (error) throw error;
+      console.log('Enviando lançamentos para o banco de dados:', registrosParaInserir);
+      const { data: insertedData, error } = await supabase.from('cob_cobrancas').insert(registrosParaInserir).select();
+      if (error) {
+        console.error('Erro ao inserir lançamentos:', error);
+        throw error;
+      }
+      console.log('Lançamentos inseridos com sucesso:', insertedData);
 
       setMensagem({
         tipo: 'sucesso',
@@ -1462,19 +1478,27 @@ export default function LancamentoCobrancaPage() {
                     value={bancoSelecionadoId ?? ''}
                     onChange={(event) => {
                       const value = event.target.value;
-                      setBancoSelecionadoId(value ? Number(value) : null);
+                      const bancoId = value ? Number(value) : null;
+                      setBancoSelecionadoId(bancoId);
                       setMensagem(null);
+                      console.log('Banco selecionado:', { bancoId, nome: bancos.find(b => b.id === bancoId)?.nome });
                     }}
                     disabled={bancos.length === 0}
                   >
                     <option value="">Selecione um banco</option>
                     {bancos.map((banco) => (
                       <option key={banco.id} value={banco.id}>
-                        {banco.nome}
+                        {banco.nome} (ID: {banco.id})
                       </option>
                     ))}
                   </select>
                 </label>
+                {bancoSelecionado && (
+                  <div className="rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800 border border-blue-200">
+                    <strong>Banco selecionado:</strong> {bancoSelecionado.nome} | <strong>ban_id:</strong> {bancoSelecionado.id}
+                    {bancoSelecionado.codigo && ` | Código: ${bancoSelecionado.codigo}`}
+                  </div>
+                )}
               </div>
             </div>
 
