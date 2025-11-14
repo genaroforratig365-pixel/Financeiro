@@ -907,85 +907,78 @@ const RelatorioCobrancaPage: React.FC = () => {
 
               {/* Resumo por Conta de Receita */}
               <Card
-                title={<span className="text-base font-bold">Resumo por Conta de Receita (${formatarDataPt(relatorio.data)})</span>}
+                title={<span className="text-base font-bold">Resumo por Conta de Receita ({formatarDataPt(relatorio.data)})</span>}
                 subtitle="Separação por Títulos e Depósitos"
               >
-                <div className="space-y-4">
-                  {/* Títulos */}
-                  <div className="border-b border-gray-200 pb-3">
-                    <h4 className="font-semibold text-gray-700 mb-2 text-sm">Títulos</h4>
-                    <div className="bg-blue-50 -mx-2 px-2 py-2 rounded mb-2">
-                      <h5 className="text-xs font-bold text-blue-900 uppercase mb-1">Realizado</h5>
-                    </div>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-700 font-medium">Receita Prevista:</span>
-                        <span className="text-gray-900 font-semibold">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm border-collapse border border-gray-300">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="px-4 py-3 text-left font-bold text-gray-700 border border-gray-300">Categoria</th>
+                        <th className="px-4 py-3 text-right font-bold text-gray-700 border border-gray-300">Receita Prevista</th>
+                        <th className="px-4 py-3 text-right font-bold text-gray-700 border border-gray-300">Outras Receitas</th>
+                        <th className="px-4 py-3 text-right font-bold text-gray-700 border border-gray-300">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="hover:bg-blue-50">
+                        <td className="px-4 py-3 font-semibold text-gray-800 border border-gray-300">Títulos</td>
+                        <td className="px-4 py-3 text-right text-gray-900 border border-gray-300">
                           {formatCurrency(relatorio.totais.titulosTotal)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-700 font-medium">Outras Receitas:</span>
-                        <span className="text-gray-900 font-semibold">
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-900 border border-gray-300">
                           {formatCurrency(0)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between pt-2 mt-2 border-t border-gray-200">
-                        <span className="text-gray-800 font-bold">Total:</span>
-                        <span className="text-gray-900 font-bold text-base">
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-gray-900 border border-gray-300">
                           {formatCurrency(relatorio.totais.titulosTotal)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Depósitos */}
-                  <div className="border-b border-gray-200 pb-3">
-                    <h4 className="font-semibold text-gray-700 mb-2 text-sm">Depósitos</h4>
-                    <div className="bg-green-50 -mx-2 px-2 py-2 rounded mb-2">
-                      <h5 className="text-xs font-bold text-green-900 uppercase mb-1">Realizado</h5>
-                    </div>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-700 font-medium">Receita Prevista:</span>
-                        <span className="text-gray-900 font-semibold">
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-green-50">
+                        <td className="px-4 py-3 font-semibold text-gray-800 border border-gray-300">Depósitos</td>
+                        <td className="px-4 py-3 text-right text-gray-900 border border-gray-300">
                           {formatCurrency(relatorio.totais.depositosTotal)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-700 font-medium">Outras Receitas:</span>
-                        <span className="text-gray-900 font-semibold">
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-900 border border-gray-300">
                           {formatCurrency(0)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between pt-2 mt-2 border-t border-gray-200">
-                        <span className="text-gray-800 font-bold">Total:</span>
-                        <span className="text-gray-900 font-bold text-base">
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-gray-900 border border-gray-300">
                           {formatCurrency(relatorio.totais.depositosTotal)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                        </td>
+                      </tr>
+                      <tr className="bg-gray-50 font-bold">
+                        <td className="px-4 py-3 text-gray-900 border border-gray-300">TOTAL GERAL</td>
+                        <td className="px-4 py-3 text-right text-gray-900 border border-gray-300">
+                          {formatCurrency(relatorio.totais.titulosTotal + relatorio.totais.depositosTotal)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-900 border border-gray-300">
+                          {formatCurrency(0)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-lg text-primary-700 border border-gray-300">
+                          {formatCurrency(relatorio.totais.realizado)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
 
-                  {/* Total Geral com Previsto x Realizado */}
-                  <div className="bg-gray-50 -mx-4 -mb-3 px-4 py-3 rounded-b-lg">
-                    <h4 className="font-semibold text-gray-900 mb-3 text-sm">Total Previsto x Realizado</h4>
-                    <div className="space-y-2 text-sm">
+                  {/* Total Previsto x Realizado */}
+                  <div className="bg-gray-50 mt-4 px-4 py-3 rounded-lg border border-gray-200">
+                    <h4 className="font-semibold text-gray-900 mb-3 text-sm">Previsto x Realizado</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
                       <div className="flex justify-between items-center bg-white border border-blue-200 px-3 py-2 rounded">
-                        <span className="text-gray-800 font-semibold">Receita Prevista (Títulos + Depósitos):</span>
-                        <span className="text-blue-900 font-bold text-base">
+                        <span className="text-gray-700 font-medium">Previsto:</span>
+                        <span className="text-blue-900 font-bold">
                           {formatCurrency(relatorio.totais.previsto)}
                         </span>
                       </div>
                       <div className="flex justify-between items-center bg-white border border-green-200 px-3 py-2 rounded">
-                        <span className="text-gray-800 font-semibold">Receita Realizada:</span>
-                        <span className="text-green-900 font-bold text-base">
+                        <span className="text-gray-700 font-medium">Realizado:</span>
+                        <span className="text-green-900 font-bold">
                           {formatCurrency(relatorio.totais.realizado)}
                         </span>
                       </div>
                       <div className="flex justify-between items-center bg-white border border-purple-200 px-3 py-2 rounded">
-                        <span className="text-gray-800 font-semibold">% de Cobertura:</span>
-                        <span className="text-purple-900 font-bold text-lg">
+                        <span className="text-gray-700 font-medium">Cobertura:</span>
+                        <span className="text-purple-900 font-bold text-base">
                           {relatorio.totais.previsto > 0
                             ? `${((relatorio.totais.realizado / relatorio.totais.previsto) * 100).toFixed(1)}%`
                             : '0%'
