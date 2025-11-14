@@ -145,8 +145,8 @@ const SimpleLineChart: React.FC<{
   const escalaY = maxValor > 0 ? (height - paddingY * 2) / maxValor : 0;
 
   return (
-    <div className="space-y-3">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-80 w-full">
+    <div className="space-y-3 w-full">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-80 w-full max-w-full">
         <line
           x1={paddingX}
           y1={height - paddingY}
@@ -847,10 +847,12 @@ const PagamentosPage: React.FC = () => {
                         Selecione ao menos uma área para visualizar a evolução diária.
                       </div>
                     ) : (
-                      <SimpleLineChart
-                        labels={intervaloDatas.map((data) => formatarDataCurta(data))}
-                        series={linhasAreas}
-                      />
+                      <div className="w-full">
+                        <SimpleLineChart
+                          labels={intervaloDatas.map((data) => formatarDataCurta(data))}
+                          series={linhasAreas}
+                        />
+                      </div>
                     )}
                   </div>
                 )}

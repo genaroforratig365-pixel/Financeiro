@@ -743,6 +743,10 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
         {relatorio && !carregandoDados && (
           <>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Saldo Inicial</p>
+                <p className="mt-2 text-2xl font-semibold text-blue-900">{formatCurrency(saldoInicialTotal)}</p>
+              </div>
               <div className="rounded-lg border border-success-200 bg-success-50/60 p-4 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-wide text-success-700">Total de Receitas</p>
                 <p className={`mt-2 text-2xl font-semibold ${totalReceitas >= 0 ? 'text-success-800' : 'text-error-700'}`}>
@@ -755,17 +759,9 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
                   {formatCurrency(totalDespesas)}
                 </p>
               </div>
-              <div className={`rounded-lg border p-4 shadow-sm ${resultadoSemana >= 0 ? 'border-success-200 bg-success-50/70' : 'border-error-200 bg-error-50/70'}`}>
-                <p className={`text-xs font-semibold uppercase tracking-wide ${resultadoSemana >= 0 ? 'text-success-700' : 'text-error-700'}`}>
-                  Resultado da Semana
-                </p>
-                <p className={`mt-2 text-2xl font-semibold ${resultadoSemana >= 0 ? 'text-success-800' : 'text-error-700'}`}>
-                  {formatCurrency(resultadoSemana)}
-                </p>
-              </div>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Saldo Final Previsto</p>
-                <p className="mt-2 text-2xl font-semibold text-gray-900">{formatCurrency(saldoFinalPrevisto)}</p>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Saldo Final</p>
+                <p className="mt-2 text-2xl font-semibold text-blue-900">{formatCurrency(saldoFinalPrevisto)}</p>
               </div>
             </div>
 
@@ -855,9 +851,14 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
                         <td colSpan={relatorio.datas.length + 2} className="bg-gray-100"></td>
                       </tr>
 
+                      {/* Cabeçalho do grupo de saldos */}
+                      <tr className="bg-blue-100 text-blue-900">
+                        <td colSpan={relatorio.datas.length + 2} className="px-4 py-3 font-bold text-base">SALDOS</td>
+                      </tr>
+
                       {relatorio.saldoInicial && (
-                        <tr className="bg-blue-50 font-bold text-blue-900 border-t-2 border-blue-200">
-                          <td className="px-4 py-3">{relatorio.saldoInicial.categoria}</td>
+                        <tr className="bg-blue-50 font-bold text-blue-900">
+                          <td className="px-4 py-3">Saldo Inicial</td>
                           {relatorio.datas.map((data) => (
                             <td key={data} className="px-4 py-3 text-right">
                               {formatCurrency(relatorio.saldoInicial?.valores[data] ?? 0)}
@@ -869,7 +870,7 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
 
                       {relatorio.saldoDiario && (
                         <tr className="bg-blue-50 font-bold text-blue-900">
-                          <td className="px-4 py-3">{relatorio.saldoDiario.categoria}</td>
+                          <td className="px-4 py-3">Saldo do Dia</td>
                           {relatorio.datas.map((data) => (
                             <td key={data} className="px-4 py-3 text-right">
                               {formatCurrency(relatorio.saldoDiario?.valores[data] ?? 0)}
@@ -881,7 +882,7 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
 
                       {relatorio.saldoAcumulado && (
                         <tr className="bg-blue-100 font-bold text-blue-900 border-t-2 border-blue-300">
-                          <td className="px-4 py-3">{relatorio.saldoAcumulado.categoria}</td>
+                          <td className="px-4 py-3">Saldo Final</td>
                           {relatorio.datas.map((data) => (
                             <td key={data} className="px-4 py-3 text-right">
                               {formatCurrency(relatorio.saldoAcumulado?.valores[data] ?? 0)}

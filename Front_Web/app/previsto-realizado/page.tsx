@@ -146,7 +146,16 @@ export default function PrevistoRealizadoPage() {
 
         if (erroCobrancas) throw erroCobrancas;
 
-        // Agrupar por data (cob_cobrancas = RECEITAS, não despesas!)
+        // Buscar DESPESAS de pag_pagamentos_area
+        const { data: pagamentosData, error: erroPagamentos } = await supabase
+          .from('pag_pagamentos_area')
+          .select('pag_data, pag_valor')
+          .gte('pag_data', periodoInicio)
+          .lte('pag_data', periodoFim);
+
+        if (erroPagamentos) throw erroPagamentos;
+
+        // Agrupar por data
         const saldosPorData = new Map<string, { receitas: number; despesas: number }>();
 
         // rec_receitas → RECEITAS
@@ -165,6 +174,15 @@ export default function PrevistoRealizadoPage() {
             saldosPorData.set(data, { receitas: 0, despesas: 0 });
           }
           saldosPorData.get(data)!.receitas += Number(cob.cob_valor) || 0;
+        });
+
+        // pag_pagamentos_area → DESPESAS
+        (pagamentosData || []).forEach((pag: any) => {
+          const data = pag.pag_data;
+          if (!saldosPorData.has(data)) {
+            saldosPorData.set(data, { receitas: 0, despesas: 0 });
+          }
+          saldosPorData.get(data)!.despesas += Number(pag.pag_valor) || 0;
         });
 
         // Converter para array no formato esperado
