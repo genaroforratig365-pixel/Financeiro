@@ -350,6 +350,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
 
   const [previsaoExistente, setPrevisaoExistente] = useState<SemanaResumo | null>(null);
   const [carregandoPrevisao, setCarregandoPrevisao] = useState(false);
+  const [saldoBancarioAnterior, setSaldoBancarioAnterior] = useState<number>(0);
   const [modalResumo, setModalResumo] = useState<{
     iguais: number;
     modificados: number;
@@ -427,8 +428,10 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
 
   const saldoInicialValor = useMemo(() => {
     const linhaSaldo = linhas.find((linha) => linha.tipo === 'saldo_inicial');
-    return linhaSaldo?.valores[0]?.valor ?? 0;
-  }, [linhas]);
+    // Se houver linha saldo_inicial importada, usa esse valor
+    // Senão, usa o saldo bancário anterior automaticamente
+    return linhaSaldo?.valores[0]?.valor ?? saldoBancarioAnterior;
+  }, [linhas, saldoBancarioAnterior]);
 
   const saldoDiarioPrevisto = useMemo(
     () => totaisReceita.map((receita, index) => receita - (totaisGasto[index] ?? 0)),
@@ -616,6 +619,53 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
       carregarPrevisaoExistente(semanaSelecionada, usuario.usr_id);
     }
   }, [carregarPrevisaoExistente, semanaSelecionada, usuario]);
+
+  useEffect(() => {
+    const buscarSaldoBancarioAnterior = async () => {
+      try {
+        const datas = obterDatasDaSemana(semanaSelecionada);
+        if (datas.length === 0) return;
+
+        // Primeiro dia da semana selecionada
+        const dataInicio = datas[0];
+
+        const supabase = getSupabaseClient();
+
+        // Buscar os saldos mais recentes ANTES do início da semana
+        // Agrupamos por banco e pegamos a data mais recente de cada um
+        const { data: saldos, error } = await supabase
+          .from('sdb_saldo_banco')
+          .select('sdb_ban_id, sdb_saldo, sdb_data')
+          .lt('sdb_data', dataInicio)
+          .order('sdb_data', { ascending: false });
+
+        if (error) {
+          console.error('Erro ao buscar saldo bancário anterior:', error);
+          setSaldoBancarioAnterior(0);
+          return;
+        }
+
+        // Pegar o saldo mais recente de cada banco
+        const saldosPorBanco = new Map<number, number>();
+        (saldos || []).forEach((item: any) => {
+          const bancoId = Number(item.sdb_ban_id);
+          if (!saldosPorBanco.has(bancoId)) {
+            // Primeiro registro deste banco (o mais recente por causa da ordenação)
+            saldosPorBanco.set(bancoId, Number(item.sdb_saldo) || 0);
+          }
+        });
+
+        // Somar todos os saldos bancários mais recentes
+        const totalSaldo = Array.from(saldosPorBanco.values()).reduce((acc, saldo) => acc + saldo, 0);
+        setSaldoBancarioAnterior(totalSaldo);
+      } catch (erro) {
+        console.error('Erro ao calcular saldo bancário anterior:', erro);
+        setSaldoBancarioAnterior(0);
+      }
+    };
+
+    buscarSaldoBancarioAnterior();
+  }, [semanaSelecionada]);
 
   const atualizarLinha = useCallback(
     (id: string, atualizador: (linha: LinhaImportada) => LinhaImportada) => {
@@ -2239,6 +2289,10 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
           {/* Resumo financeiro */}
           <Card title="Resumo Financeiro">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Saldo inicial</p>
+                <p className="mt-2 text-2xl font-semibold text-gray-900">{formatCurrency(saldoInicialValor)}</p>
+              </div>
               <div className="rounded-lg border border-success-200 bg-success-50/60 p-4 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-wide text-success-700">Total de receitas</p>
                 <p className="mt-2 text-2xl font-semibold text-success-800">
@@ -2246,18 +2300,14 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                 </p>
               </div>
               <div className="rounded-lg border border-error-200 bg-error-50/70 p-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-error-700">Total de gastos</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-error-700">Total de despesas</p>
                 <p className="mt-2 text-2xl font-semibold text-error-800">
                   {formatCurrency(totaisGasto.reduce((acc, valor) => acc + valor, 0))}
                 </p>
               </div>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Saldo inicial</p>
-                <p className="mt-2 text-2xl font-semibold text-gray-900">{formatCurrency(saldoInicialValor)}</p>
-              </div>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Saldo acumulado final</p>
-                <p className="mt-2 text-2xl font-semibold text-gray-900">
+              <div className="rounded-lg border border-primary-200 bg-primary-50 p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary-700">Saldo final</p>
+                <p className="mt-2 text-2xl font-semibold text-primary-900">
                   {formatCurrency(saldoAcumuladoPrevisto[saldoAcumuladoPrevisto.length - 1] ?? 0)}
                 </p>
               </div>

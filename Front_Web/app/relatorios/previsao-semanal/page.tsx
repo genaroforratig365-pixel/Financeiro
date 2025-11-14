@@ -526,11 +526,13 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
           bodyStyles: { fontSize: 6 },
           margin: { left: 14, right: 14 },
           theme: 'grid',
-          styles: { cellPadding: 1.5 },
+          styles: { cellPadding: 1.5, lineWidth: 0.5, lineColor: [0, 0, 0] },
           columnStyles: {
             0: { halign: 'left', cellWidth: 45 },
             [headers.length - 1]: { fontStyle: 'bold' },
           },
+          tableLineWidth: 0.5,
+          tableLineColor: [0, 0, 0],
           didParseCell: (data) => {
             if (data.row.index === receitasData.length - 1) {
               data.cell.styles.fontStyle = 'bold';
@@ -550,11 +552,13 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
           bodyStyles: { fontSize: 6 },
           margin: { left: 14, right: 14 },
           theme: 'grid',
-          styles: { cellPadding: 1.5 },
+          styles: { cellPadding: 1.5, lineWidth: 0.5, lineColor: [0, 0, 0] },
           columnStyles: {
             0: { halign: 'left', cellWidth: 45 },
             [headers.length - 1]: { fontStyle: 'bold' },
           },
+          tableLineWidth: 0.5,
+          tableLineColor: [0, 0, 0],
           didParseCell: (data) => {
             if (data.row.index === despesasData.length - 1) {
               data.cell.styles.fontStyle = 'bold';
@@ -574,11 +578,13 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
           bodyStyles: { fontSize: 6 },
           margin: { left: 14, right: 14 },
           theme: 'grid',
-          styles: { cellPadding: 1.5 },
+          styles: { cellPadding: 1.5, lineWidth: 0.5, lineColor: [0, 0, 0] },
           columnStyles: {
             0: { halign: 'left', cellWidth: 45 },
             [headers.length - 1]: { fontStyle: 'bold' },
           },
+          tableLineWidth: 0.5,
+          tableLineColor: [0, 0, 0],
         });
       }
 

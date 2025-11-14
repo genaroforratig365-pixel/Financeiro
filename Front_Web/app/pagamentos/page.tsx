@@ -135,16 +135,36 @@ const SimpleLineChart: React.FC<{
   series: SerieLinha[];
   legenda?: boolean;
 }> = ({ labels, series, legenda = true }) => {
-  const width = 1100;
-  const height = 480;
-  const paddingX = 80;
-  const paddingY = 50;
+  const width = 900;
+  const height = 360;
+  const paddingX = 48;
+  const paddingY = 32;
   const passoX = labels.length > 1 ? (width - paddingX * 2) / (labels.length - 1) : 0;
   const valores = series.flatMap((serie) => serie.values);
   const maxValor = valores.length ? Math.max(...valores) : 0;
-  // Arredondar para o próximo múltiplo de 20000
-  const maxValorArredondado = Math.ceil(maxValor / 20000) * 20000;
+
+  // Arredondar para valores inteiros limpos (10k, 50k, 100k, 250k, etc)
+  const arredondarParaValorLimpo = (valor: number): number => {
+    if (valor === 0) return 100000;
+    if (valor <= 100000) return Math.ceil(valor / 10000) * 10000;
+    if (valor <= 500000) return Math.ceil(valor / 50000) * 50000;
+    if (valor <= 1000000) return Math.ceil(valor / 100000) * 100000;
+    return Math.ceil(valor / 250000) * 250000;
+  };
+
+  const maxValorArredondado = arredondarParaValorLimpo(maxValor);
   const escalaY = maxValorArredondado > 0 ? (height - paddingY * 2) / maxValorArredondado : 0;
+
+  // Determinar intervalo do eixo Y baseado no valor máximo arredondado
+  const determinarIntervaloY = (valorMax: number): number => {
+    if (valorMax <= 100000) return 10000;
+    if (valorMax <= 500000) return 50000;
+    if (valorMax <= 1000000) return 100000;
+    return 250000;
+  };
+
+  const intervaloY = determinarIntervaloY(maxValorArredondado);
+  const numPassosY = maxValorArredondado > 0 ? Math.floor(maxValorArredondado / intervaloY) + 1 : 1;
 
   return (
     <div className="space-y-3 w-full">
@@ -165,8 +185,8 @@ const SimpleLineChart: React.FC<{
           stroke="#d1d5db"
           strokeWidth={1}
         />
-        {Array.from({ length: Math.floor(maxValorArredondado / 20000) + 1 }, (_, i) => i).map((step) => {
-          const valor = step * 20000;
+        {Array.from({ length: numPassosY }, (_, i) => i).map((step) => {
+          const valor = step * intervaloY;
           const fracao = maxValorArredondado > 0 ? valor / maxValorArredondado : 0;
           const y = height - paddingY - fracao * (height - paddingY * 2);
           return (

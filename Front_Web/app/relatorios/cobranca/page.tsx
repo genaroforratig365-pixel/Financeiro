@@ -67,7 +67,10 @@ type TipoValor = {
 };
 
 type CategoriaResumo = {
-  tipos: TipoValor[];
+  tiposReceitaPrevista: TipoValor[];
+  tiposOutrasReceitas: TipoValor[];
+  totalReceitaPrevista: number;
+  totalOutrasReceitas: number;
   total: number;
 };
 
@@ -87,7 +90,11 @@ type RelatorioCobranca = {
     realizado: number;
     diferenca: number;
     titulosTotal: number;
+    titulosTotalReceitaPrevista: number;
+    titulosTotalOutrasReceitas: number;
     depositosTotal: number;
+    depositosTotalReceitaPrevista: number;
+    depositosTotalOutrasReceitas: number;
     percentualTitulos: number;
     percentualDepositos: number;
   };
@@ -397,8 +404,10 @@ const RelatorioCobrancaPage: React.FC = () => {
         // Processar categorização por Títulos e Depósitos
         type BancoCategoriaAcumulado = {
           nome: string;
-          titulos: Map<string, { tipoNome: string; valor: number }>;
-          depositos: Map<string, { tipoNome: string; valor: number }>;
+          titulosReceitaPrevista: Map<string, { tipoNome: string; valor: number }>;
+          titulosOutrasReceitas: Map<string, { tipoNome: string; valor: number }>;
+          depositosReceitaPrevista: Map<string, { tipoNome: string; valor: number }>;
+          depositosOutrasReceitas: Map<string, { tipoNome: string; valor: number }>;
         };
 
         const bancosCategorizadosMap = new Map<string, BancoCategoriaAcumulado>();
@@ -406,6 +415,7 @@ const RelatorioCobrancaPage: React.FC = () => {
         contasMap.forEach((conta) => {
           const contaCodigo = toString(conta.contaCodigo);
           const contaNome = toString(conta.contaNome).toUpperCase();
+          const tipoNome = toString(conta.tipoNome).toUpperCase();
 
           // Identificar se é Títulos ou Depósitos baseado no código ou nome da CONTA DE RECEITA
           const ehTitulos = contaNome.includes('TÍTULO') || contaNome.includes('TITULO') || contaCodigo.startsWith('301');
@@ -415,26 +425,49 @@ const RelatorioCobrancaPage: React.FC = () => {
             return; // Ignora contas que não são Títulos nem Depósitos
           }
 
+          // Identificar se é Receita Prevista ou Outras Receitas baseado no TIPO
+          const ehReceitaPrevista = tipoNome.includes('RECEITA PREVISTA') || tipoNome.includes('PREVISTA');
+
           const banco = bancosCategorizadosMap.get(conta.bancoId) ?? {
             nome: conta.bancoNome,
-            titulos: new Map(),
-            depositos: new Map(),
+            titulosReceitaPrevista: new Map(),
+            titulosOutrasReceitas: new Map(),
+            depositosReceitaPrevista: new Map(),
+            depositosOutrasReceitas: new Map(),
           };
 
           if (ehTitulos) {
-            const tipoExistente = banco.titulos.get(conta.tipoId) ?? {
-              tipoNome: conta.tipoNome,
-              valor: 0,
-            };
-            tipoExistente.valor += conta.realizado;
-            banco.titulos.set(conta.tipoId, tipoExistente);
+            if (ehReceitaPrevista) {
+              const tipoExistente = banco.titulosReceitaPrevista.get(conta.tipoId) ?? {
+                tipoNome: conta.tipoNome,
+                valor: 0,
+              };
+              tipoExistente.valor += conta.realizado;
+              banco.titulosReceitaPrevista.set(conta.tipoId, tipoExistente);
+            } else {
+              const tipoExistente = banco.titulosOutrasReceitas.get(conta.tipoId) ?? {
+                tipoNome: conta.tipoNome,
+                valor: 0,
+              };
+              tipoExistente.valor += conta.realizado;
+              banco.titulosOutrasReceitas.set(conta.tipoId, tipoExistente);
+            }
           } else if (ehDepositos) {
-            const tipoExistente = banco.depositos.get(conta.tipoId) ?? {
-              tipoNome: conta.tipoNome,
-              valor: 0,
-            };
-            tipoExistente.valor += conta.realizado;
-            banco.depositos.set(conta.tipoId, tipoExistente);
+            if (ehReceitaPrevista) {
+              const tipoExistente = banco.depositosReceitaPrevista.get(conta.tipoId) ?? {
+                tipoNome: conta.tipoNome,
+                valor: 0,
+              };
+              tipoExistente.valor += conta.realizado;
+              banco.depositosReceitaPrevista.set(conta.tipoId, tipoExistente);
+            } else {
+              const tipoExistente = banco.depositosOutrasReceitas.get(conta.tipoId) ?? {
+                tipoNome: conta.tipoNome,
+                valor: 0,
+              };
+              tipoExistente.valor += conta.realizado;
+              banco.depositosOutrasReceitas.set(conta.tipoId, tipoExistente);
+            }
           }
 
           bancosCategorizadosMap.set(conta.bancoId, banco);
@@ -442,7 +475,8 @@ const RelatorioCobrancaPage: React.FC = () => {
 
         const bancosCategorizado: BancoCategorizado[] = Array.from(bancosCategorizadosMap.entries())
           .map(([id, banco]) => {
-            const titulosTipos: TipoValor[] = Array.from(banco.titulos.entries())
+            // Títulos - Receita Prevista
+            const titulosReceitaPrevistaTipos: TipoValor[] = Array.from(banco.titulosReceitaPrevista.entries())
               .map(([tipoId, tipo]) => ({
                 tipoId,
                 tipoNome: tipo.tipoNome,
@@ -451,7 +485,8 @@ const RelatorioCobrancaPage: React.FC = () => {
               .filter(t => t.valor > 0)
               .sort((a, b) => b.valor - a.valor);
 
-            const depositosTipos: TipoValor[] = Array.from(banco.depositos.entries())
+            // Títulos - Outras Receitas
+            const titulosOutrasReceitasTipos: TipoValor[] = Array.from(banco.titulosOutrasReceitas.entries())
               .map(([tipoId, tipo]) => ({
                 tipoId,
                 tipoNome: tipo.tipoNome,
@@ -459,17 +494,48 @@ const RelatorioCobrancaPage: React.FC = () => {
               }))
               .filter(t => t.valor > 0)
               .sort((a, b) => b.valor - a.valor);
+
+            // Depósitos - Receita Prevista
+            const depositosReceitaPrevistaTipos: TipoValor[] = Array.from(banco.depositosReceitaPrevista.entries())
+              .map(([tipoId, tipo]) => ({
+                tipoId,
+                tipoNome: tipo.tipoNome,
+                valor: arredondar(tipo.valor),
+              }))
+              .filter(t => t.valor > 0)
+              .sort((a, b) => b.valor - a.valor);
+
+            // Depósitos - Outras Receitas
+            const depositosOutrasReceitasTipos: TipoValor[] = Array.from(banco.depositosOutrasReceitas.entries())
+              .map(([tipoId, tipo]) => ({
+                tipoId,
+                tipoNome: tipo.tipoNome,
+                valor: arredondar(tipo.valor),
+              }))
+              .filter(t => t.valor > 0)
+              .sort((a, b) => b.valor - a.valor);
+
+            const titulosTotalReceitaPrevista = arredondar(titulosReceitaPrevistaTipos.reduce((sum, t) => sum + t.valor, 0));
+            const titulosTotalOutrasReceitas = arredondar(titulosOutrasReceitasTipos.reduce((sum, t) => sum + t.valor, 0));
+            const depositosTotalReceitaPrevista = arredondar(depositosReceitaPrevistaTipos.reduce((sum, t) => sum + t.valor, 0));
+            const depositosTotalOutrasReceitas = arredondar(depositosOutrasReceitasTipos.reduce((sum, t) => sum + t.valor, 0));
 
             return {
               id,
               nome: banco.nome,
               titulos: {
-                tipos: titulosTipos,
-                total: arredondar(titulosTipos.reduce((sum, t) => sum + t.valor, 0)),
+                tiposReceitaPrevista: titulosReceitaPrevistaTipos,
+                tiposOutrasReceitas: titulosOutrasReceitasTipos,
+                totalReceitaPrevista: titulosTotalReceitaPrevista,
+                totalOutrasReceitas: titulosTotalOutrasReceitas,
+                total: arredondar(titulosTotalReceitaPrevista + titulosTotalOutrasReceitas),
               },
               depositos: {
-                tipos: depositosTipos,
-                total: arredondar(depositosTipos.reduce((sum, t) => sum + t.valor, 0)),
+                tiposReceitaPrevista: depositosReceitaPrevistaTipos,
+                tiposOutrasReceitas: depositosOutrasReceitasTipos,
+                totalReceitaPrevista: depositosTotalReceitaPrevista,
+                totalOutrasReceitas: depositosTotalOutrasReceitas,
+                total: arredondar(depositosTotalReceitaPrevista + depositosTotalOutrasReceitas),
               },
             };
           })
@@ -480,12 +546,23 @@ const RelatorioCobrancaPage: React.FC = () => {
         const totalRealizado = arredondar(bancos.reduce((acc, banco) => acc + banco.realizado, 0));
         const diferenca = arredondar(totalRealizado - totalPrevisto);
 
-        const titulosTotal = arredondar(
-          bancosCategorizado.reduce((acc, b) => acc + b.titulos.total, 0)
+        // Calcular totais separados por categoria (receita prevista vs outras receitas)
+        const titulosTotalReceitaPrevista = arredondar(
+          bancosCategorizado.reduce((acc, b) => acc + b.titulos.totalReceitaPrevista, 0)
         );
-        const depositosTotal = arredondar(
-          bancosCategorizado.reduce((acc, b) => acc + b.depositos.total, 0)
+        const titulosTotalOutrasReceitas = arredondar(
+          bancosCategorizado.reduce((acc, b) => acc + b.titulos.totalOutrasReceitas, 0)
         );
+        const titulosTotal = arredondar(titulosTotalReceitaPrevista + titulosTotalOutrasReceitas);
+
+        const depositosTotalReceitaPrevista = arredondar(
+          bancosCategorizado.reduce((acc, b) => acc + b.depositos.totalReceitaPrevista, 0)
+        );
+        const depositosTotalOutrasReceitas = arredondar(
+          bancosCategorizado.reduce((acc, b) => acc + b.depositos.totalOutrasReceitas, 0)
+        );
+        const depositosTotal = arredondar(depositosTotalReceitaPrevista + depositosTotalOutrasReceitas);
+
         const totalCategorizado = titulosTotal + depositosTotal;
         const percentualTitulos = totalCategorizado > 0 ? arredondar((titulosTotal / totalCategorizado) * 100) : 0;
         const percentualDepositos = totalCategorizado > 0 ? arredondar((depositosTotal / totalCategorizado) * 100) : 0;
@@ -499,7 +576,11 @@ const RelatorioCobrancaPage: React.FC = () => {
             realizado: totalRealizado,
             diferenca,
             titulosTotal,
+            titulosTotalReceitaPrevista,
+            titulosTotalOutrasReceitas,
             depositosTotal,
+            depositosTotalReceitaPrevista,
+            depositosTotalOutrasReceitas,
             percentualTitulos,
             percentualDepositos,
           },
@@ -556,7 +637,73 @@ const RelatorioCobrancaPage: React.FC = () => {
     doc.setFontSize(9);
     doc.text(`Data: ${formatarDataPt(relatorio.data)}`, margem, 18);
 
-    let posY = 26;
+    let posY = 24;
+
+    // ============ INDICADORES SUPERIORES ============
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('Indicadores do Dia', margem, posY);
+    posY += 2;
+
+    const cardWidth = larguraUtil / 3 - 2;
+    const cardHeight = 18;
+
+    // Card 1: Previsto
+    doc.setDrawColor(59, 130, 246); // blue
+    doc.setFillColor(239, 246, 255); // blue-50
+    doc.roundedRect(margem, posY, cardWidth, cardHeight, 2, 2, 'FD');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(55, 65, 81); // gray-700
+    doc.text('PREVISTO', margem + 2, posY + 4);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(30, 64, 175); // blue-800
+    doc.text(formatCurrency(relatorio.totais.previsto), margem + 2, posY + 10);
+
+    // Card 2: Realizado
+    const card2X = margem + cardWidth + 3;
+    doc.setDrawColor(34, 197, 94); // green
+    doc.setFillColor(240, 253, 244); // green-50
+    doc.roundedRect(card2X, posY, cardWidth, cardHeight, 2, 2, 'FD');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(55, 65, 81);
+    doc.text('REALIZADO', card2X + 2, posY + 4);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(21, 128, 61); // green-700
+    doc.text(formatCurrency(relatorio.totais.realizado), card2X + 2, posY + 10);
+
+    // Card 3: Cobertura
+    const card3X = card2X + cardWidth + 3;
+    const cobertura = relatorio.totais.previsto > 0
+      ? ((relatorio.totais.realizado / relatorio.totais.previsto) * 100).toFixed(1)
+      : '0.0';
+    doc.setDrawColor(147, 51, 234); // purple
+    doc.setFillColor(250, 245, 255); // purple-50
+    doc.roundedRect(card3X, posY, cardWidth, cardHeight, 2, 2, 'FD');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(55, 65, 81);
+    doc.text('% COBERTURA', card3X + 2, posY + 4);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(126, 34, 206); // purple-700
+    doc.text(`${cobertura}%`, card3X + 2, posY + 11);
+
+    // Linha divisória adicional nos cards
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6);
+    doc.setTextColor(107, 114, 128); // gray-500
+    doc.text('Títulos + Depósitos', margem + 2, posY + 15);
+    doc.text('Total do dia', card2X + 2, posY + 15);
+    doc.text('Meta alcançada', card3X + 2, posY + 15);
+
+    // Reset colors
+    doc.setTextColor(0, 0, 0);
+
+    posY += cardHeight + 8;
 
     // Seção: Resumo por Conta de Receita
     doc.setFont('helvetica', 'bold');
@@ -576,15 +723,18 @@ const RelatorioCobrancaPage: React.FC = () => {
       startY: posY + 2,
       head: [['Item', 'Valor']],
       body: [
-        ['Receita Prevista', formatCurrency(relatorio.totais.titulosTotal)],
-        ['Outras Receitas', formatCurrency(0)],
+        ['Receita Prevista', formatCurrency(relatorio.totais.titulosTotalReceitaPrevista)],
+        ['Outras Receitas', formatCurrency(relatorio.totais.titulosTotalOutrasReceitas)],
       ],
       foot: [['Total', formatCurrency(relatorio.totais.titulosTotal)]],
-      styles: { fontSize: 8, halign: 'right', cellPadding: 1.5 },
+      theme: 'grid',
+      styles: { fontSize: 8, halign: 'right', cellPadding: 1.5, lineWidth: 0.5, lineColor: [0, 0, 0] },
       headStyles: { fillColor: [31, 73, 125], textColor: 255, fontStyle: 'bold', fontSize: 8 },
       columnStyles: { 0: { halign: 'left' } },
       footStyles: { fontStyle: 'bold', fillColor: [240, 248, 255] },
       margin: { left: margem, right: larguraPagina / 2 + 2 },
+      tableLineWidth: 0.5,
+      tableLineColor: [0, 0, 0],
     });
 
     const titulosFinalY = (doc as any).lastAutoTable.finalY;
@@ -598,20 +748,23 @@ const RelatorioCobrancaPage: React.FC = () => {
       startY: posY + 2,
       head: [['Item', 'Valor']],
       body: [
-        ['Receita Prevista', formatCurrency(relatorio.totais.depositosTotal)],
-        ['Outras Receitas', formatCurrency(0)],
+        ['Receita Prevista', formatCurrency(relatorio.totais.depositosTotalReceitaPrevista)],
+        ['Outras Receitas', formatCurrency(relatorio.totais.depositosTotalOutrasReceitas)],
       ],
       foot: [['Total', formatCurrency(relatorio.totais.depositosTotal)]],
-      styles: { fontSize: 8, halign: 'right', cellPadding: 1.5 },
+      theme: 'grid',
+      styles: { fontSize: 8, halign: 'right', cellPadding: 1.5, lineWidth: 0.5, lineColor: [0, 0, 0] },
       headStyles: { fillColor: [34, 139, 34], textColor: 255, fontStyle: 'bold', fontSize: 8 },
       columnStyles: { 0: { halign: 'left' } },
       footStyles: { fontStyle: 'bold', fillColor: [240, 255, 240] },
       margin: { left: larguraPagina / 2 + 2, right: margem },
+      tableLineWidth: 0.5,
+      tableLineColor: [0, 0, 0],
     });
 
     posY = Math.max(titulosFinalY, (doc as any).lastAutoTable.finalY) + 8;
 
-    // Seção: Receitas em Títulos (bancos lado a lado)
+    // Seção: Receitas em Títulos (bancos lado a lado - CARDS UNIFORMES)
     const temTitulos = relatorio.bancosCategorizado.some(b => b.titulos.total > 0);
     if (temTitulos) {
       doc.setFont('helvetica', 'bold');
@@ -620,31 +773,48 @@ const RelatorioCobrancaPage: React.FC = () => {
       posY += 4;
 
       const bancosComTitulos = relatorio.bancosCategorizado.filter(b => b.titulos.total > 0);
-      const numColunas = Math.min(bancosComTitulos.length, 3);
-      const colWidth = larguraUtil / numColunas - 2;
+
+      // Cards uniformes em grid fixo de 3 colunas
+      const numColunas = 3;
+      const colWidth = (larguraUtil - 4) / numColunas; // 4mm de gaps entre cards
+      const cardHeightUniforme = 35; // Altura fixa para todos os cards
 
       bancosComTitulos.forEach((banco, index) => {
-        const colX = margem + (colWidth + 2) * (index % numColunas);
-        const startYPos = posY;
+        const row = Math.floor(index / numColunas);
+        const col = index % numColunas;
+        const colX = margem + (colWidth + 2) * col;
+        const startYPos = posY + (row * (cardHeightUniforme + 3));
 
+        // Combinar tipos de receita prevista e outras receitas
+        const todosTiposTitulos = [
+          ...banco.titulos.tiposReceitaPrevista,
+          ...banco.titulos.tiposOutrasReceitas
+        ];
+
+        // Usar autoTable mas com altura mínima definida
         autoTable(doc, {
           startY: startYPos,
           head: [[banco.nome, '']],
-          body: banco.titulos.tipos.map(tipo => [tipo.tipoNome, formatCurrency(tipo.valor)]),
+          body: todosTiposTitulos.map(tipo => [tipo.tipoNome, formatCurrency(tipo.valor)]),
           foot: [['Total', formatCurrency(banco.titulos.total)]],
-          styles: { fontSize: 7, halign: 'right', cellPadding: 1 },
-          headStyles: { fillColor: [31, 73, 125], textColor: 255, fontStyle: 'bold', fontSize: 7 },
-          columnStyles: { 0: { halign: 'left' } },
-          footStyles: { fontStyle: 'bold', fontSize: 7 },
+          theme: 'grid',
+          styles: { fontSize: 7, halign: 'right', cellPadding: 1.5, lineWidth: 0.5, lineColor: [0, 0, 0] },
+          headStyles: { fillColor: [31, 73, 125], textColor: 255, fontStyle: 'bold', fontSize: 8, halign: 'center' },
+          columnStyles: { 0: { halign: 'left', cellWidth: colWidth * 0.6 } },
+          footStyles: { fontStyle: 'bold', fontSize: 8, fillColor: [240, 248, 255] },
           margin: { left: colX, right: larguraPagina - colX - colWidth },
           tableWidth: colWidth,
+          tableLineWidth: 0.5,
+          tableLineColor: [0, 0, 0],
         });
       });
 
-      posY = (doc as any).lastAutoTable.finalY + 6;
+      // Calcular próxima posição baseada no número de linhas de cards
+      const numLinhas = Math.ceil(bancosComTitulos.length / numColunas);
+      posY += (numLinhas * (cardHeightUniforme + 3)) + 4;
     }
 
-    // Seção: Receitas em Depósitos (bancos lado a lado)
+    // Seção: Receitas em Depósitos (bancos lado a lado - CARDS UNIFORMES)
     const temDepositos = relatorio.bancosCategorizado.some(b => b.depositos.total > 0);
     if (temDepositos) {
       doc.setFont('helvetica', 'bold');
@@ -653,28 +823,43 @@ const RelatorioCobrancaPage: React.FC = () => {
       posY += 4;
 
       const bancosComDepositos = relatorio.bancosCategorizado.filter(b => b.depositos.total > 0);
-      const numColunas = Math.min(bancosComDepositos.length, 3);
-      const colWidth = larguraUtil / numColunas - 2;
+
+      // Cards uniformes em grid fixo de 3 colunas
+      const numColunas = 3;
+      const colWidth = (larguraUtil - 4) / numColunas;
+      const cardHeightUniforme = 35;
 
       bancosComDepositos.forEach((banco, index) => {
-        const colX = margem + (colWidth + 2) * (index % numColunas);
-        const startYPos = posY;
+        const row = Math.floor(index / numColunas);
+        const col = index % numColunas;
+        const colX = margem + (colWidth + 2) * col;
+        const startYPos = posY + (row * (cardHeightUniforme + 3));
+
+        // Combinar tipos de receita prevista e outras receitas
+        const todosTiposDepositos = [
+          ...banco.depositos.tiposReceitaPrevista,
+          ...banco.depositos.tiposOutrasReceitas
+        ];
 
         autoTable(doc, {
           startY: startYPos,
           head: [[banco.nome, '']],
-          body: banco.depositos.tipos.map(tipo => [tipo.tipoNome, formatCurrency(tipo.valor)]),
+          body: todosTiposDepositos.map(tipo => [tipo.tipoNome, formatCurrency(tipo.valor)]),
           foot: [['Total', formatCurrency(banco.depositos.total)]],
-          styles: { fontSize: 7, halign: 'right', cellPadding: 1 },
-          headStyles: { fillColor: [34, 139, 34], textColor: 255, fontStyle: 'bold', fontSize: 7 },
-          columnStyles: { 0: { halign: 'left' } },
-          footStyles: { fontStyle: 'bold', fontSize: 7 },
+          theme: 'grid',
+          styles: { fontSize: 7, halign: 'right', cellPadding: 1.5, lineWidth: 0.5, lineColor: [0, 0, 0] },
+          headStyles: { fillColor: [34, 139, 34], textColor: 255, fontStyle: 'bold', fontSize: 8, halign: 'center' },
+          columnStyles: { 0: { halign: 'left', cellWidth: colWidth * 0.6 } },
+          footStyles: { fontStyle: 'bold', fontSize: 8, fillColor: [240, 255, 240] },
           margin: { left: colX, right: larguraPagina - colX - colWidth },
           tableWidth: colWidth,
+          tableLineWidth: 0.5,
+          tableLineColor: [0, 0, 0],
         });
       });
 
-      posY = (doc as any).lastAutoTable.finalY + 6;
+      const numLinhas = Math.ceil(bancosComDepositos.length / numColunas);
+      posY += (numLinhas * (cardHeightUniforme + 3)) + 4;
     }
 
     // Seção: Total Previsto x Realizado
@@ -690,9 +875,12 @@ const RelatorioCobrancaPage: React.FC = () => {
         ['Receita Realizada', formatCurrency(relatorio.totais.realizado)],
         ['% de Cobertura', `${relatorio.totais.previsto > 0 ? ((relatorio.totais.realizado / relatorio.totais.previsto) * 100).toFixed(1) : '0'}%`],
       ],
-      styles: { fontSize: 9, halign: 'right', cellPadding: 2, fontStyle: 'bold' },
+      theme: 'grid',
+      styles: { fontSize: 9, halign: 'right', cellPadding: 2, fontStyle: 'bold', lineWidth: 0.5, lineColor: [0, 0, 0] },
       columnStyles: { 0: { halign: 'left', fontStyle: 'bold' }, 1: { fontStyle: 'bold' } },
       margin: { left: margem, right: margem },
+      tableLineWidth: 0.5,
+      tableLineColor: [0, 0, 0],
     });
 
     return doc;
@@ -892,85 +1080,78 @@ const RelatorioCobrancaPage: React.FC = () => {
 
               {/* Resumo por Conta de Receita */}
               <Card
-                title={<span className="text-base font-bold">Resumo por Conta de Receita (${formatarDataPt(relatorio.data)})</span>}
+                title={<span className="text-base font-bold">Resumo por Conta de Receita ({formatarDataPt(relatorio.data)})</span>}
                 subtitle="Separação por Títulos e Depósitos"
               >
-                <div className="space-y-4">
-                  {/* Títulos */}
-                  <div className="border-b border-gray-200 pb-3">
-                    <h4 className="font-semibold text-gray-700 mb-2 text-sm">Títulos</h4>
-                    <div className="bg-blue-50 -mx-2 px-2 py-2 rounded mb-2">
-                      <h5 className="text-xs font-bold text-blue-900 uppercase mb-1">Realizado</h5>
-                    </div>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-700 font-medium">Receita Prevista:</span>
-                        <span className="text-gray-900 font-semibold">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm border-collapse border border-gray-300">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="px-4 py-3 text-left font-bold text-gray-700 border border-gray-300">Categoria</th>
+                        <th className="px-4 py-3 text-right font-bold text-gray-700 border border-gray-300">Receita Prevista</th>
+                        <th className="px-4 py-3 text-right font-bold text-gray-700 border border-gray-300">Outras Receitas</th>
+                        <th className="px-4 py-3 text-right font-bold text-gray-700 border border-gray-300">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="hover:bg-blue-50">
+                        <td className="px-4 py-3 font-semibold text-gray-800 border border-gray-300">Títulos</td>
+                        <td className="px-4 py-3 text-right text-gray-900 border border-gray-300">
+                          {formatCurrency(relatorio.totais.titulosTotalReceitaPrevista)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-900 border border-gray-300">
+                          {formatCurrency(relatorio.totais.titulosTotalOutrasReceitas)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-gray-900 border border-gray-300">
                           {formatCurrency(relatorio.totais.titulosTotal)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-700 font-medium">Outras Receitas:</span>
-                        <span className="text-gray-900 font-semibold">
-                          {formatCurrency(0)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between pt-2 mt-2 border-t border-gray-200">
-                        <span className="text-gray-800 font-bold">Total:</span>
-                        <span className="text-gray-900 font-bold text-base">
-                          {formatCurrency(relatorio.totais.titulosTotal)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Depósitos */}
-                  <div className="border-b border-gray-200 pb-3">
-                    <h4 className="font-semibold text-gray-700 mb-2 text-sm">Depósitos</h4>
-                    <div className="bg-green-50 -mx-2 px-2 py-2 rounded mb-2">
-                      <h5 className="text-xs font-bold text-green-900 uppercase mb-1">Realizado</h5>
-                    </div>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-700 font-medium">Receita Prevista:</span>
-                        <span className="text-gray-900 font-semibold">
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-green-50">
+                        <td className="px-4 py-3 font-semibold text-gray-800 border border-gray-300">Depósitos</td>
+                        <td className="px-4 py-3 text-right text-gray-900 border border-gray-300">
+                          {formatCurrency(relatorio.totais.depositosTotalReceitaPrevista)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-900 border border-gray-300">
+                          {formatCurrency(relatorio.totais.depositosTotalOutrasReceitas)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-gray-900 border border-gray-300">
                           {formatCurrency(relatorio.totais.depositosTotal)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-700 font-medium">Outras Receitas:</span>
-                        <span className="text-gray-900 font-semibold">
-                          {formatCurrency(0)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between pt-2 mt-2 border-t border-gray-200">
-                        <span className="text-gray-800 font-bold">Total:</span>
-                        <span className="text-gray-900 font-bold text-base">
-                          {formatCurrency(relatorio.totais.depositosTotal)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                        </td>
+                      </tr>
+                      <tr className="bg-gray-50 font-bold">
+                        <td className="px-4 py-3 text-gray-900 border border-gray-300">TOTAL GERAL</td>
+                        <td className="px-4 py-3 text-right text-gray-900 border border-gray-300">
+                          {formatCurrency(relatorio.totais.titulosTotalReceitaPrevista + relatorio.totais.depositosTotalReceitaPrevista)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-900 border border-gray-300">
+                          {formatCurrency(relatorio.totais.titulosTotalOutrasReceitas + relatorio.totais.depositosTotalOutrasReceitas)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-lg text-primary-700 border border-gray-300">
+                          {formatCurrency(relatorio.totais.realizado)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
 
-                  {/* Total Geral com Previsto x Realizado */}
-                  <div className="bg-gray-50 -mx-4 -mb-3 px-4 py-3 rounded-b-lg">
-                    <h4 className="font-semibold text-gray-900 mb-3 text-sm">Total Previsto x Realizado</h4>
-                    <div className="space-y-2 text-sm">
+                  {/* Total Previsto x Realizado */}
+                  <div className="bg-gray-50 mt-4 px-4 py-3 rounded-lg border border-gray-200">
+                    <h4 className="font-semibold text-gray-900 mb-3 text-sm">Previsto x Realizado</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
                       <div className="flex justify-between items-center bg-white border border-blue-200 px-3 py-2 rounded">
-                        <span className="text-gray-800 font-semibold">Receita Prevista (Títulos + Depósitos):</span>
-                        <span className="text-blue-900 font-bold text-base">
+                        <span className="text-gray-700 font-medium">Previsto:</span>
+                        <span className="text-blue-900 font-bold">
                           {formatCurrency(relatorio.totais.previsto)}
                         </span>
                       </div>
                       <div className="flex justify-between items-center bg-white border border-green-200 px-3 py-2 rounded">
-                        <span className="text-gray-800 font-semibold">Receita Realizada:</span>
-                        <span className="text-green-900 font-bold text-base">
+                        <span className="text-gray-700 font-medium">Realizado:</span>
+                        <span className="text-green-900 font-bold">
                           {formatCurrency(relatorio.totais.realizado)}
                         </span>
                       </div>
                       <div className="flex justify-between items-center bg-white border border-purple-200 px-3 py-2 rounded">
-                        <span className="text-gray-800 font-semibold">% de Cobertura:</span>
-                        <span className="text-purple-900 font-bold text-lg">
+                        <span className="text-gray-700 font-medium">Cobertura:</span>
+                        <span className="text-purple-900 font-bold text-base">
                           {relatorio.totais.previsto > 0
                             ? `${((relatorio.totais.realizado / relatorio.totais.previsto) * 100).toFixed(1)}%`
                             : '0%'
@@ -993,7 +1174,7 @@ const RelatorioCobrancaPage: React.FC = () => {
                     .map((banco) => (
                       <Card key={`titulos-${banco.id}`} title={banco.nome}>
                         <div className="space-y-2">
-                          {banco.titulos.tipos.map((tipo) => (
+                          {[...banco.titulos.tiposReceitaPrevista, ...banco.titulos.tiposOutrasReceitas].map((tipo) => (
                             <div key={`titulo-${banco.id}-${tipo.tipoId}`} className="flex justify-between items-center">
                               <span className="text-sm text-gray-600">{tipo.tipoNome}</span>
                               <span className="text-sm font-semibold text-gray-900">
@@ -1026,7 +1207,7 @@ const RelatorioCobrancaPage: React.FC = () => {
                     .map((banco) => (
                       <Card key={`depositos-${banco.id}`} title={banco.nome}>
                         <div className="space-y-2">
-                          {banco.depositos.tipos.map((tipo) => (
+                          {[...banco.depositos.tiposReceitaPrevista, ...banco.depositos.tiposOutrasReceitas].map((tipo) => (
                             <div key={`deposito-${banco.id}-${tipo.tipoId}`} className="flex justify-between items-center">
                               <span className="text-sm text-gray-600">{tipo.tipoNome}</span>
                               <span className="text-sm font-semibold text-gray-900">

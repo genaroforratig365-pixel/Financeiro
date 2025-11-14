@@ -104,6 +104,7 @@ type RelatorioSaldoDiario = {
     saldoFinalRealizado: number;
     bancosPrevistos: number;
     bancosRealizados: number;
+    aplicacoesRealizadas: number;
   };
 };
 
@@ -223,7 +224,7 @@ const calcularPercentual = (previsto: number, realizado: number): number | null 
   if (Math.abs(previsto) < 0.0001) {
     return null;
   }
-  const diferenca = previsto - realizado;
+  const diferenca = realizado - previsto;
   return (diferenca / previsto) * 100;
 };
 
@@ -422,14 +423,29 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
           }
         });
 
+        // Calcular aplicações realizadas separadamente
+        let aplicacoesRealizadas = 0;
+
         normalizeRelation(pagamentosArea).forEach((item) => {
           const areaId = toString(item.pag_are_id, 'sem-area');
           const areaRel = normalizeRelation(item.are_areas)[0];
           const titulo = areaRel?.are_nome ? toString(areaRel.are_nome) : 'Área não informada';
           const chave = `${areaId}-${titulo.toLowerCase()}`;
-          const existente = mapaGastos.get(chave) ?? { titulo, previsto: 0, realizado: 0 };
-          existente.realizado += arredondar(toNumber(item.pag_valor));
-          mapaGastos.set(chave, existente);
+          const valor = arredondar(toNumber(item.pag_valor));
+
+          // Verificar se é área de aplicação
+          const tituloNormalizado = titulo.trim().toUpperCase();
+          const ehAplicacao = tituloNormalizado.includes('APLICACAO') || tituloNormalizado.includes('APLICAÇÃO');
+
+          if (ehAplicacao) {
+            // Se for aplicação, apenas somar no total de aplicações (não adicionar em gastos por área)
+            aplicacoesRealizadas += valor;
+          } else {
+            // Se NÃO for aplicação, adicionar normalmente em gastos por área
+            const existente = mapaGastos.get(chave) ?? { titulo, previsto: 0, realizado: 0 };
+            existente.realizado += valor;
+            mapaGastos.set(chave, existente);
+          }
         });
 
         // Remover duplicatas usando um Set para rastrear rec_id únicos
@@ -512,6 +528,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
             saldoFinalRealizado,
             bancosPrevistos: totalBancosPrevistos,
             bancosRealizados: totalBancosRealizados,
+            aplicacoesRealizadas: arredondar(aplicacoesRealizadas),
           },
         });
         setErro(null);
@@ -617,7 +634,13 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
                     }>
                       {formatCurrency(linha.desvio)}
                     </td>
-                    <td>{formatarPercentual(linha.percentual)}</td>
+                    <td className={
+                      inverterCores
+                        ? (linha.desvio >= 0 ? 'report-value--negativo' : 'report-value--positivo')
+                        : (linha.desvio >= 0 ? 'report-value--positivo' : 'report-value--negativo')
+                    }>
+                      {formatarPercentual(linha.percentual)}
+                    </td>
                   </tr>
                 ))
               ) : (
@@ -643,7 +666,13 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
                     }>
                       {formatCurrency(totalDesvio)}
                     </td>
-                    <td>{formatarPercentual(totalPercentual)}</td>
+                    <td className={
+                      inverterCores
+                        ? (totalDesvio >= 0 ? 'report-value--negativo' : 'report-value--positivo')
+                        : (totalDesvio >= 0 ? 'report-value--positivo' : 'report-value--negativo')
+                    }>
+                      {formatarPercentual(totalPercentual)}
+                    </td>
                   </tr>
                 ) : (
                   <tr>
@@ -708,6 +737,11 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
         chave: 'resultado',
         titulo: 'Resultado do Dia (Receitas - Despesas)',
         realizado: resumo.resultadoRealizado,
+      },
+      {
+        chave: 'aplicacoes',
+        titulo: 'Aplicações/Resgates',
+        realizado: resumo.aplicacoesRealizadas,
       },
       {
         chave: 'saldo-final',
@@ -826,7 +860,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
         body: corpo,
         foot: rodape,
         theme: 'grid',
-        styles: { fontSize: 9, cellPadding: 1.5, halign: 'right' },
+        styles: { fontSize: 9, cellPadding: 1.5, halign: 'right', lineWidth: 0.5, lineColor: [0, 0, 0] },
         headStyles: {
           fillColor: tabelaAccentPdfColors[accent] ?? tabelaAccentPdfColors.azul,
           textColor: 255,
@@ -841,6 +875,8 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
         },
         margin: { left: margemHorizontal, right: margemHorizontal },
         footStyles: { fontStyle: 'bold', fillColor: [255, 255, 255], textColor: [33, 37, 41], fontSize: 9 },
+        tableLineWidth: 0.5,
+        tableLineColor: [0, 0, 0],
       });
 
       posicaoAtual = (doc as any).lastAutoTable.finalY;

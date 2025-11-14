@@ -40,6 +40,12 @@ interface AreaOption {
   nome: string;
 }
 
+interface ContaReceitaOption {
+  id: number;
+  codigo: string;
+  nome: string;
+}
+
 interface DadosGrafico {
   data: string;
   previsto: number;
@@ -231,10 +237,14 @@ export default function PrevistoRealizadoPage() {
   const [carregando, setCarregando] = useState(true);
   const [previsoes, setPrevisoes] = useState<PrevisaoItem[]>([]);
   const [saldos, setSaldos] = useState<SaldoRealizado[]>([]);
+  const [pagamentosRealizados, setPagamentosRealizados] = useState<any[]>([]);
+  const [receitasRealizadas, setReceitasRealizadas] = useState<any[]>([]);
   const [periodoInicio, setPeriodoInicio] = useState('');
   const [periodoFim, setPeriodoFim] = useState('');
   const [areas, setAreas] = useState<AreaOption[]>([]);
   const [areaFiltro, setAreaFiltro] = useState<number | null>(null);
+  const [contasReceita, setContasReceita] = useState<ContaReceitaOption[]>([]);
+  const [contaReceitaFiltro, setContaReceitaFiltro] = useState<number | null>(null);
   const [tipoFiltro, setTipoFiltro] = useState<'todos' | 'receita' | 'gasto'>('todos');
   const [tipoGrafico, setTipoGrafico] = useState<'linhas' | 'barras'>('barras');
 
@@ -272,7 +282,28 @@ export default function PrevistoRealizadoPage() {
       }
     };
 
+    const carregarContasReceita = async () => {
+      try {
+        const supabase = getSupabaseClient();
+        const { data, error } = await supabase
+          .from('ctr_contas_receita')
+          .select('ctr_id, ctr_codigo, ctr_nome')
+          .order('ctr_codigo');
+
+        if (error) throw error;
+
+        setContasReceita((data || []).map((c: any) => ({
+          id: c.ctr_id,
+          codigo: c.ctr_codigo,
+          nome: c.ctr_nome
+        })));
+      } catch (erro) {
+        console.error('Erro ao carregar contas de receita:', erro);
+      }
+    };
+
     carregarAreas();
+    carregarContasReceita();
   }, []);
 
   useEffect(() => {
@@ -316,28 +347,45 @@ export default function PrevistoRealizadoPage() {
         });
 
         // Buscar saldos realizados - calculando diretamente das tabelas
-        // Buscar receitas de rec_receitas
-        const { data: receitasData, error: erroReceitas } = await supabase
+        // Buscar receitas de rec_receitas (com conta de receita e tipo)
+        const { data: receitasDataRaw, error: erroReceitas } = await supabase
           .from('rec_receitas')
-          .select('rec_data, rec_valor')
+          .select('rec_data, rec_valor, rec_ctr_id, tpr_tipos_receita(tpr_nome)')
           .gte('rec_data', periodoInicio)
           .lte('rec_data', periodoFim);
 
         if (erroReceitas) throw erroReceitas;
 
+        // Filtrar apenas receitas previstas (tipos que incluem "RECEITA PREVISTA" ou "PREVISTA")
+        const receitasData = (receitasDataRaw || []).filter((rec: any) => {
+          const tipoReceita = Array.isArray(rec.tpr_tipos_receita) ? rec.tpr_tipos_receita[0] : rec.tpr_tipos_receita;
+          const tipoNome = tipoReceita?.tpr_nome ? String(tipoReceita.tpr_nome).toUpperCase() : '';
+          return tipoNome.includes('RECEITA PREVISTA') || tipoNome.includes('PREVISTA');
+        });
+
+        // Armazenar receitas com informação da conta
+        setReceitasRealizadas(receitasData || []);
+
         // Buscar cobranças (TAMBÉM SÃO RECEITAS - lançamento de cobrança)
-        const { data: cobrancasData, error: erroCobrancas } = await supabase
+        const { data: cobrancasDataRaw, error: erroCobrancas } = await supabase
           .from('cob_cobrancas')
-          .select('cob_data, cob_valor')
+          .select('cob_data, cob_valor, tpr_tipos_receita(tpr_nome)')
           .gte('cob_data', periodoInicio)
           .lte('cob_data', periodoFim);
 
         if (erroCobrancas) throw erroCobrancas;
 
+        // Filtrar apenas cobranças de receitas previstas (tipos que incluem "RECEITA PREVISTA" ou "PREVISTA")
+        const cobrancasData = (cobrancasDataRaw || []).filter((cob: any) => {
+          const tipoReceita = Array.isArray(cob.tpr_tipos_receita) ? cob.tpr_tipos_receita[0] : cob.tpr_tipos_receita;
+          const tipoNome = tipoReceita?.tpr_nome ? String(tipoReceita.tpr_nome).toUpperCase() : '';
+          return tipoNome.includes('RECEITA PREVISTA') || tipoNome.includes('PREVISTA');
+        });
+
         // Buscar DESPESAS de pag_pagamentos_area
         const { data: pagamentosData, error: erroPagamentos } = await supabase
           .from('pag_pagamentos_area')
-          .select('pag_data, pag_valor')
+          .select('pag_data, pag_valor, pag_are_id')
           .gte('pag_data', periodoInicio)
           .lte('pag_data', periodoFim);
 
@@ -385,6 +433,7 @@ export default function PrevistoRealizadoPage() {
 
         setPrevisoes(previsoesFormatadas);
         setSaldos(saldosCalculados);
+        setPagamentosRealizados(pagamentosData || []);
       } catch (erro) {
         console.error('Erro ao carregar dados:', erro);
       } finally {
@@ -429,7 +478,13 @@ export default function PrevistoRealizadoPage() {
         .reduce((sum, p) => sum + p.valor, 0);
 
       const realizado_receitas = saldoData?.receitas || 0;
-      const realizado_despesas = saldoData?.despesas || 0;
+
+      // Filtrar despesas realizadas por área se houver filtro ativo
+      const realizado_despesas = areaFiltro !== null
+        ? pagamentosRealizados
+            .filter((pag: any) => pag.pag_data === data && pag.pag_are_id === areaFiltro)
+            .reduce((sum: number, pag: any) => sum + (Number(pag.pag_valor) || 0), 0)
+        : (saldoData?.despesas || 0);
 
       const saldo_previsto = previsto_receitas - previsto_despesas;
       const saldo_realizado = realizado_receitas - realizado_despesas;
@@ -452,7 +507,7 @@ export default function PrevistoRealizadoPage() {
         variacao_saldo: calcVariacao(saldo_realizado, saldo_previsto)
       };
     });
-  }, [previsoesFiltradas, saldos]);
+  }, [previsoesFiltradas, saldos, pagamentosRealizados, areaFiltro]);
 
   const totais = useMemo(() => {
     return dadosComparativos.reduce(
@@ -496,8 +551,12 @@ export default function PrevistoRealizadoPage() {
     }));
   }, [dadosComparativos]);
 
-  const renderVariacao = (variacao: number) => {
-    const cor = variacao >= 0 ? 'text-success-700' : 'text-error-700';
+  const renderVariacao = (variacao: number, tipo: 'receita' | 'despesa' | 'saldo' = 'receita') => {
+    // Para receitas e saldo: positivo = verde, negativo = vermelho
+    // Para despesas: positivo = vermelho (gastou mais), negativo = verde (gastou menos)
+    const cor = tipo === 'despesa'
+      ? (variacao >= 0 ? 'text-error-700' : 'text-success-700')
+      : (variacao >= 0 ? 'text-success-700' : 'text-error-700');
     const sinal = variacao >= 0 ? '+' : '';
     return (
       <span className={`text-sm font-semibold ${cor}`}>
@@ -512,6 +571,67 @@ export default function PrevistoRealizadoPage() {
     return Math.max(maxReceitas, maxDespesas);
   }, [dadosGraficoReceitas, dadosGraficoDespesas]);
 
+  // Dados por conta de receita (quando conta está selecionada)
+  const dadosContaReceita = useMemo((): ComparativoData[] => {
+    if (contaReceitaFiltro === null) return [];
+
+    const todasDatas = new Set<string>();
+    previsoes.forEach(p => todasDatas.add(p.data));
+    receitasRealizadas.forEach(r => todasDatas.add(r.rec_data));
+
+    const datasOrdenadas = Array.from(todasDatas).sort();
+
+    return datasOrdenadas.map(data => {
+      // Previsões para essa conta e data
+      const previsoesData = previsoes.filter(
+        p => p.data === data && p.tipo === 'receita'
+      );
+
+      const previsto_receitas = previsoesData.reduce((sum, p) => sum + p.valor, 0);
+
+      // Receitas realizadas para essa conta e data
+      const realizado_receitas = receitasRealizadas
+        .filter((r: any) => r.rec_data === data && r.rec_ctr_id === contaReceitaFiltro)
+        .reduce((sum: number, r: any) => sum + (Number(r.rec_valor) || 0), 0);
+
+      const calcVariacao = (real: number, prev: number) => {
+        if (prev === 0) return real !== 0 ? 100 : 0;
+        return ((real - prev) / Math.abs(prev)) * 100;
+      };
+
+      return {
+        data,
+        previsto_receitas,
+        realizado_receitas,
+        variacao_receitas: calcVariacao(realizado_receitas, previsto_receitas),
+        previsto_despesas: 0,
+        realizado_despesas: 0,
+        variacao_despesas: 0,
+        saldo_previsto: previsto_receitas,
+        saldo_realizado: realizado_receitas,
+        variacao_saldo: calcVariacao(realizado_receitas, previsto_receitas)
+      };
+    });
+  }, [previsoes, receitasRealizadas, contaReceitaFiltro]);
+
+  const totaisContaReceita = useMemo(() => {
+    return dadosContaReceita.reduce(
+      (acc, d) => ({
+        previsto_receitas: acc.previsto_receitas + d.previsto_receitas,
+        realizado_receitas: acc.realizado_receitas + d.realizado_receitas
+      }),
+      { previsto_receitas: 0, realizado_receitas: 0 }
+    );
+  }, [dadosContaReceita]);
+
+  const dadosGraficoContaReceita = useMemo(() => {
+    return dadosContaReceita.map(d => ({
+      data: formatarData(d.data),
+      previsto: d.previsto_receitas,
+      realizado: d.realizado_receitas
+    }));
+  }, [dadosContaReceita]);
+
   return (
     <>
       <Header
@@ -522,7 +642,7 @@ export default function PrevistoRealizadoPage() {
       <div className="page-content space-y-6">
         {/* Filtros de período e área */}
         <Card title="Filtros de Análise">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
               <label className="text-sm font-medium text-gray-700 block mb-1">
                 Data Início
@@ -557,6 +677,23 @@ export default function PrevistoRealizadoPage() {
                 <option value="">Todas as áreas</option>
                 {areas.map(area => (
                   <option key={area.id} value={area.id}>{area.nome}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1">
+                Conta de Receita
+              </label>
+              <select
+                value={contaReceitaFiltro ?? ''}
+                onChange={(e) => setContaReceitaFiltro(e.target.value ? Number(e.target.value) : null)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              >
+                <option value="">Todas as contas</option>
+                {contasReceita.map(conta => (
+                  <option key={conta.id} value={conta.id}>
+                    {conta.codigo} - {conta.nome}
+                  </option>
                 ))}
               </select>
             </div>
@@ -608,7 +745,8 @@ export default function PrevistoRealizadoPage() {
                         ? 0
                         : ((totais.realizado_receitas - totais.previsto_receitas) /
                             Math.abs(totais.previsto_receitas)) *
-                          100
+                          100,
+                      'receita'
                     )}
                   </div>
                 </div>
@@ -635,7 +773,8 @@ export default function PrevistoRealizadoPage() {
                         ? 0
                         : ((totais.realizado_despesas - totais.previsto_despesas) /
                             Math.abs(totais.previsto_despesas)) *
-                          100
+                          100,
+                      'despesa'
                     )}
                   </div>
                 </div>
@@ -666,17 +805,302 @@ export default function PrevistoRealizadoPage() {
                         ? 0
                         : ((totais.saldo_realizado - totais.saldo_previsto) /
                             Math.abs(totais.saldo_previsto)) *
-                          100
+                          100,
+                      'saldo'
                     )}
                   </div>
                 </div>
               </Card>
             </div>
 
+            {/* Cards Detalhados por Área (quando área está selecionada) */}
+            {areaFiltro !== null && (
+              <>
+                <h2 className="text-xl font-bold text-gray-900 mt-8">
+                  Análise Detalhada - {areas.find(a => a.id === areaFiltro)?.nome}
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Card 1: Receitas da Área */}
+                  <Card title="Receitas - Detalhamento" variant="success">
+                    <div className="space-y-4">
+                      {/* Tabela de Receitas */}
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs">
+                          <thead className="bg-green-50">
+                            <tr>
+                              <th className="px-2 py-1 text-left font-semibold text-gray-700">Data</th>
+                              <th className="px-2 py-1 text-right font-semibold text-gray-700">Previsto</th>
+                              <th className="px-2 py-1 text-right font-semibold text-gray-700">Realizado</th>
+                              <th className="px-2 py-1 text-center font-semibold text-gray-700">Var.</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {dadosComparativos.map((item) => (
+                              <tr key={item.data} className="hover:bg-green-50">
+                                <td className="px-2 py-1 text-gray-900">{formatarData(item.data)}</td>
+                                <td className="px-2 py-1 text-right text-gray-600">
+                                  {formatCurrency(item.previsto_receitas)}
+                                </td>
+                                <td className="px-2 py-1 text-right font-semibold text-success-700">
+                                  {formatCurrency(item.realizado_receitas)}
+                                </td>
+                                <td className="px-2 py-1 text-center">
+                                  {renderVariacao(item.variacao_receitas, 'receita')}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="bg-green-100 font-bold">
+                            <tr>
+                              <td className="px-2 py-1 text-gray-900">Total</td>
+                              <td className="px-2 py-1 text-right text-gray-900">
+                                {formatCurrency(totais.previsto_receitas)}
+                              </td>
+                              <td className="px-2 py-1 text-right text-success-700">
+                                {formatCurrency(totais.realizado_receitas)}
+                              </td>
+                              <td className="px-2 py-1 text-center">
+                                {renderVariacao(
+                                  totais.previsto_receitas === 0
+                                    ? 0
+                                    : ((totais.realizado_receitas - totais.previsto_receitas) /
+                                        Math.abs(totais.previsto_receitas)) *
+                                      100,
+                                  'receita'
+                                )}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+
+                      {/* Gráfico de Receitas */}
+                      <div className="border-t pt-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                          Evolução no Período
+                        </h4>
+                        {tipoGrafico === 'barras' ? (
+                          <BarrasVerticaisChart
+                            dados={dadosGraficoReceitas}
+                            corPrevisto="#3b82f6"
+                            corRealizado="#10b981"
+                            labelPrevisto="Previsto"
+                            labelRealizado="Realizado"
+                          />
+                        ) : (
+                          <LinhasChart
+                            dados={dadosGraficoReceitas}
+                            corPrevisto="#3b82f6"
+                            corRealizado="#10b981"
+                            labelPrevisto="Previsto"
+                            labelRealizado="Realizado"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Card 2: Despesas da Área */}
+                  <Card title="Despesas - Detalhamento" variant="danger">
+                    <div className="space-y-4">
+                      {/* Tabela de Despesas */}
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs">
+                          <thead className="bg-red-50">
+                            <tr>
+                              <th className="px-2 py-1 text-left font-semibold text-gray-700">Data</th>
+                              <th className="px-2 py-1 text-right font-semibold text-gray-700">Previsto</th>
+                              <th className="px-2 py-1 text-right font-semibold text-gray-700">Realizado</th>
+                              <th className="px-2 py-1 text-center font-semibold text-gray-700">Var.</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {dadosComparativos.map((item) => (
+                              <tr key={item.data} className="hover:bg-red-50">
+                                <td className="px-2 py-1 text-gray-900">{formatarData(item.data)}</td>
+                                <td className="px-2 py-1 text-right text-gray-600">
+                                  {formatCurrency(item.previsto_despesas)}
+                                </td>
+                                <td className="px-2 py-1 text-right font-semibold text-error-700">
+                                  {formatCurrency(item.realizado_despesas)}
+                                </td>
+                                <td className="px-2 py-1 text-center">
+                                  {renderVariacao(item.variacao_despesas, 'despesa')}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="bg-red-100 font-bold">
+                            <tr>
+                              <td className="px-2 py-1 text-gray-900">Total</td>
+                              <td className="px-2 py-1 text-right text-gray-900">
+                                {formatCurrency(totais.previsto_despesas)}
+                              </td>
+                              <td className="px-2 py-1 text-right text-error-700">
+                                {formatCurrency(totais.realizado_despesas)}
+                              </td>
+                              <td className="px-2 py-1 text-center">
+                                {renderVariacao(
+                                  totais.previsto_despesas === 0
+                                    ? 0
+                                    : ((totais.realizado_despesas - totais.previsto_despesas) /
+                                        Math.abs(totais.previsto_despesas)) *
+                                      100,
+                                  'despesa'
+                                )}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+
+                      {/* Gráfico de Despesas */}
+                      <div className="border-t pt-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                          Evolução no Período
+                        </h4>
+                        {tipoGrafico === 'barras' ? (
+                          <BarrasVerticaisChart
+                            dados={dadosGraficoDespesas}
+                            corPrevisto="#f97316"
+                            corRealizado="#ef4444"
+                            labelPrevisto="Previsto"
+                            labelRealizado="Realizado"
+                          />
+                        ) : (
+                          <LinhasChart
+                            dados={dadosGraficoDespesas}
+                            corPrevisto="#f97316"
+                            corRealizado="#ef4444"
+                            labelPrevisto="Previsto"
+                            labelRealizado="Realizado"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              </>
+            )}
+
+            {/* Card Detalhado por Conta de Receita (quando conta está selecionada) */}
+            {contaReceitaFiltro !== null && (
+              <>
+                <h2 className="text-xl font-bold text-gray-900 mt-8">
+                  Análise por Conta de Receita - {contasReceita.find(c => c.id === contaReceitaFiltro)?.codigo} - {contasReceita.find(c => c.id === contaReceitaFiltro)?.nome}
+                </h2>
+                <Card title="Receitas - Previsto x Realizado por Conta" variant="primary">
+                  <div className="space-y-4">
+                    {/* Totais Resumidos */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-blue-50 rounded-lg">
+                      <div>
+                        <p className="text-xs text-gray-600 mb-1">Total Previsto</p>
+                        <p className="text-xl font-bold text-gray-900">
+                          {formatCurrency(totaisContaReceita.previsto_receitas)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600 mb-1">Total Realizado</p>
+                        <p className="text-xl font-bold text-primary-700">
+                          {formatCurrency(totaisContaReceita.realizado_receitas)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600 mb-1">Variação</p>
+                        {renderVariacao(
+                          totaisContaReceita.previsto_receitas === 0
+                            ? 0
+                            : ((totaisContaReceita.realizado_receitas - totaisContaReceita.previsto_receitas) /
+                                Math.abs(totaisContaReceita.previsto_receitas)) *
+                              100,
+                          'receita'
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Tabela Detalhada */}
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-xs">
+                        <thead className="bg-blue-50">
+                          <tr>
+                            <th className="px-2 py-1 text-left font-semibold text-gray-700">Data</th>
+                            <th className="px-2 py-1 text-right font-semibold text-gray-700">Previsto</th>
+                            <th className="px-2 py-1 text-right font-semibold text-gray-700">Realizado</th>
+                            <th className="px-2 py-1 text-center font-semibold text-gray-700">Var.</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {dadosContaReceita.map((item) => (
+                            <tr key={item.data} className="hover:bg-blue-50">
+                              <td className="px-2 py-1 text-gray-900">{formatarData(item.data)}</td>
+                              <td className="px-2 py-1 text-right text-gray-600">
+                                {formatCurrency(item.previsto_receitas)}
+                              </td>
+                              <td className="px-2 py-1 text-right font-semibold text-primary-700">
+                                {formatCurrency(item.realizado_receitas)}
+                              </td>
+                              <td className="px-2 py-1 text-center">
+                                {renderVariacao(item.variacao_receitas, 'receita')}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-blue-100 font-bold">
+                          <tr>
+                            <td className="px-2 py-1 text-gray-900">Total</td>
+                            <td className="px-2 py-1 text-right text-gray-900">
+                              {formatCurrency(totaisContaReceita.previsto_receitas)}
+                            </td>
+                            <td className="px-2 py-1 text-right text-primary-700">
+                              {formatCurrency(totaisContaReceita.realizado_receitas)}
+                            </td>
+                            <td className="px-2 py-1 text-center">
+                              {renderVariacao(
+                                totaisContaReceita.previsto_receitas === 0
+                                  ? 0
+                                  : ((totaisContaReceita.realizado_receitas - totaisContaReceita.previsto_receitas) /
+                                      Math.abs(totaisContaReceita.previsto_receitas)) *
+                                    100,
+                                'receita'
+                              )}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+
+                    {/* Gráfico */}
+                    <div className="border-t pt-4">
+                      <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                        Evolução no Período
+                      </h4>
+                      {tipoGrafico === 'barras' ? (
+                        <BarrasVerticaisChart
+                          dados={dadosGraficoContaReceita}
+                          corPrevisto="#3b82f6"
+                          corRealizado="#2563eb"
+                          labelPrevisto="Previsto"
+                          labelRealizado="Realizado"
+                        />
+                      ) : (
+                        <LinhasChart
+                          dados={dadosGraficoContaReceita}
+                          corPrevisto="#3b82f6"
+                          corRealizado="#2563eb"
+                          labelPrevisto="Previsto"
+                          labelRealizado="Realizado"
+                        />
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              </>
+            )}
+
             {/* Seletor de Tipo de Gráfico */}
             <Card>
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Visualização dos Gráficos</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Visualização dos Gráficos Gerais</h3>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setTipoGrafico('barras')}
@@ -789,7 +1213,7 @@ export default function PrevistoRealizadoPage() {
                             {formatCurrency(item.realizado_receitas)}
                           </td>
                           <td className="px-3 py-2 text-center">
-                            {renderVariacao(item.variacao_receitas)}
+                            {renderVariacao(item.variacao_receitas, 'receita')}
                           </td>
                           <td className="px-3 py-2 text-right text-gray-600">
                             {formatCurrency(item.previsto_despesas)}
@@ -798,7 +1222,7 @@ export default function PrevistoRealizadoPage() {
                             {formatCurrency(item.realizado_despesas)}
                           </td>
                           <td className="px-3 py-2 text-center">
-                            {renderVariacao(item.variacao_despesas)}
+                            {renderVariacao(item.variacao_despesas, 'despesa')}
                           </td>
                           <td className="px-3 py-2 text-right text-gray-600">
                             {formatCurrency(item.saldo_previsto)}
@@ -811,7 +1235,7 @@ export default function PrevistoRealizadoPage() {
                             {formatCurrency(item.saldo_realizado)}
                           </td>
                           <td className="px-3 py-2 text-center">
-                            {renderVariacao(item.variacao_saldo)}
+                            {renderVariacao(item.variacao_saldo, 'saldo')}
                           </td>
                         </tr>
                       ))
