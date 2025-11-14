@@ -496,8 +496,12 @@ export default function PrevistoRealizadoPage() {
     }));
   }, [dadosComparativos]);
 
-  const renderVariacao = (variacao: number) => {
-    const cor = variacao >= 0 ? 'text-success-700' : 'text-error-700';
+  const renderVariacao = (variacao: number, tipo: 'receita' | 'despesa' | 'saldo' = 'receita') => {
+    // Para receitas e saldo: positivo = verde, negativo = vermelho
+    // Para despesas: positivo = vermelho (gastou mais), negativo = verde (gastou menos)
+    const cor = tipo === 'despesa'
+      ? (variacao >= 0 ? 'text-error-700' : 'text-success-700')
+      : (variacao >= 0 ? 'text-success-700' : 'text-error-700');
     const sinal = variacao >= 0 ? '+' : '';
     return (
       <span className={`text-sm font-semibold ${cor}`}>
@@ -608,7 +612,8 @@ export default function PrevistoRealizadoPage() {
                         ? 0
                         : ((totais.realizado_receitas - totais.previsto_receitas) /
                             Math.abs(totais.previsto_receitas)) *
-                          100
+                          100,
+                      'receita'
                     )}
                   </div>
                 </div>
@@ -635,7 +640,8 @@ export default function PrevistoRealizadoPage() {
                         ? 0
                         : ((totais.realizado_despesas - totais.previsto_despesas) /
                             Math.abs(totais.previsto_despesas)) *
-                          100
+                          100,
+                      'despesa'
                     )}
                   </div>
                 </div>
@@ -666,7 +672,8 @@ export default function PrevistoRealizadoPage() {
                         ? 0
                         : ((totais.saldo_realizado - totais.saldo_previsto) /
                             Math.abs(totais.saldo_previsto)) *
-                          100
+                          100,
+                      'saldo'
                     )}
                   </div>
                 </div>
@@ -789,7 +796,7 @@ export default function PrevistoRealizadoPage() {
                             {formatCurrency(item.realizado_receitas)}
                           </td>
                           <td className="px-3 py-2 text-center">
-                            {renderVariacao(item.variacao_receitas)}
+                            {renderVariacao(item.variacao_receitas, 'receita')}
                           </td>
                           <td className="px-3 py-2 text-right text-gray-600">
                             {formatCurrency(item.previsto_despesas)}
@@ -798,7 +805,7 @@ export default function PrevistoRealizadoPage() {
                             {formatCurrency(item.realizado_despesas)}
                           </td>
                           <td className="px-3 py-2 text-center">
-                            {renderVariacao(item.variacao_despesas)}
+                            {renderVariacao(item.variacao_despesas, 'despesa')}
                           </td>
                           <td className="px-3 py-2 text-right text-gray-600">
                             {formatCurrency(item.saldo_previsto)}
@@ -811,7 +818,7 @@ export default function PrevistoRealizadoPage() {
                             {formatCurrency(item.saldo_realizado)}
                           </td>
                           <td className="px-3 py-2 text-center">
-                            {renderVariacao(item.variacao_saldo)}
+                            {renderVariacao(item.variacao_saldo, 'saldo')}
                           </td>
                         </tr>
                       ))

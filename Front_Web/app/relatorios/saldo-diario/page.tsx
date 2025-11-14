@@ -617,7 +617,13 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
                     }>
                       {formatCurrency(linha.desvio)}
                     </td>
-                    <td>{formatarPercentual(linha.percentual)}</td>
+                    <td className={
+                      inverterCores
+                        ? (linha.desvio >= 0 ? 'report-value--negativo' : 'report-value--positivo')
+                        : (linha.desvio >= 0 ? 'report-value--positivo' : 'report-value--negativo')
+                    }>
+                      {formatarPercentual(linha.percentual)}
+                    </td>
                   </tr>
                 ))
               ) : (
@@ -643,7 +649,13 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
                     }>
                       {formatCurrency(totalDesvio)}
                     </td>
-                    <td>{formatarPercentual(totalPercentual)}</td>
+                    <td className={
+                      inverterCores
+                        ? (totalDesvio >= 0 ? 'report-value--negativo' : 'report-value--positivo')
+                        : (totalDesvio >= 0 ? 'report-value--positivo' : 'report-value--negativo')
+                    }>
+                      {formatarPercentual(totalPercentual)}
+                    </td>
                   </tr>
                 ) : (
                   <tr>
