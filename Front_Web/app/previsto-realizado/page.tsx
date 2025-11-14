@@ -459,6 +459,10 @@ export default function PrevistoRealizadoPage() {
     const todasDatas = new Set<string>();
     previsoesFiltradas.forEach(p => todasDatas.add(p.data));
     saldos.forEach(s => todasDatas.add(s.data));
+    // Adicionar datas do previsto NÃO filtrado para receitas quando filtrar apenas área de despesa
+    if (areaFiltro !== null && tipoFiltro !== 'receita') {
+      previsoes.filter(p => p.tipo === 'receita').forEach(p => todasDatas.add(p.data));
+    }
 
     const datasOrdenadas = Array.from(todasDatas).sort();
 
@@ -466,15 +470,25 @@ export default function PrevistoRealizadoPage() {
       const previsoesData = previsoesFiltradas.filter(p => p.data === data);
       const saldoData = saldos.find(s => s.data === data);
 
-      const previsto_receitas = previsoesData
-        .filter(p => p.tipo === 'receita')
-        .reduce((sum, p) => sum + p.valor, 0);
+      // Previsto de receitas: se filtrou apenas área de despesa, manter todas receitas previstas
+      const previsto_receitas = (areaFiltro !== null && tipoFiltro !== 'receita')
+        ? previsoes
+            .filter(p => p.data === data && p.tipo === 'receita')
+            .reduce((sum, p) => sum + p.valor, 0)
+        : previsoesData
+            .filter(p => p.tipo === 'receita')
+            .reduce((sum, p) => sum + p.valor, 0);
 
       const previsto_despesas = previsoesData
         .filter(p => p.tipo === 'gasto')
         .reduce((sum, p) => sum + p.valor, 0);
 
-      const realizado_receitas = saldoData?.receitas || 0;
+      // Filtrar receitas realizadas por conta de receita se houver filtro
+      const realizado_receitas = contaReceitaFiltro !== null
+        ? receitasRealizadas
+            .filter((rec: any) => rec.rec_data === data && rec.rec_ctr_id === contaReceitaFiltro)
+            .reduce((sum: number, rec: any) => sum + (Number(rec.rec_valor) || 0), 0)
+        : (saldoData?.receitas || 0);
 
       // Filtrar despesas realizadas por área se houver filtro ativo
       const realizado_despesas = areaFiltro !== null
@@ -504,7 +518,7 @@ export default function PrevistoRealizadoPage() {
         variacao_saldo: calcVariacao(saldo_realizado, saldo_previsto)
       };
     });
-  }, [previsoesFiltradas, saldos, pagamentosRealizados, areaFiltro]);
+  }, [previsoesFiltradas, previsoes, saldos, pagamentosRealizados, receitasRealizadas, areaFiltro, tipoFiltro, contaReceitaFiltro]);
 
   const totais = useMemo(() => {
     return dadosComparativos.reduce(

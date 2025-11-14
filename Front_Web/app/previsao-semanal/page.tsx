@@ -1512,6 +1512,18 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
 
         if (deletarErro) throw deletarErro;
 
+        // Verifica se todos os itens foram realmente deletados
+        const { data: itensRestantes, error: verificarErro } = await supabase
+          .from('pvi_previsao_itens')
+          .select('pvi_id')
+          .eq('pvi_pvs_id', semanaId);
+
+        if (verificarErro) throw verificarErro;
+
+        if (itensRestantes && itensRestantes.length > 0) {
+          throw new Error(`Falha ao deletar todos os itens. ${itensRestantes.length} item(ns) ainda existe(m).`);
+        }
+
         // Atualiza status da semana
         const { error: atualizarErro } = await supabase
           .from('pvs_semanas')
@@ -2048,7 +2060,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                             {formatarDataPt(data)}
                           </th>
                         ))}
-                        {modoInclusao && (
+                        {(modoInclusao || modoEdicao) && (
                           <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-success-700">
                             Ações
                           </th>
@@ -2135,7 +2147,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                                 />
                               </td>
                             ))}
-                            {modoInclusao && (
+                            {(modoInclusao || modoEdicao) && (
                               <td className="px-3 py-2 align-top text-center">
                                 <button
                                   type="button"
@@ -2150,7 +2162,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                           </tr>
                           {linha.erros.length > 0 && (
                             <tr>
-                              <td colSpan={3 + datasTabela.length + (modoInclusao ? 1 : 0)} className="bg-error-50 px-3 py-2 text-xs text-error-700">
+                              <td colSpan={3 + datasTabela.length + (modoInclusao || modoEdicao ? 1 : 0)} className="bg-error-50 px-3 py-2 text-xs text-error-700">
                                 {linha.erros.join(' ')}
                               </td>
                             </tr>
@@ -2200,7 +2212,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                           {formatarDataPt(data)}
                         </th>
                       ))}
-                      {modoInclusao && (
+                      {(modoInclusao || modoEdicao) && (
                         <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-error-700">
                           Ações
                         </th>
@@ -2257,7 +2269,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                                 />
                               </td>
                             ))}
-                            {modoInclusao && (
+                            {(modoInclusao || modoEdicao) && (
                               <td className="px-3 py-2 align-top text-center">
                                 <button
                                   type="button"
@@ -2272,7 +2284,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
                           </tr>
                           {linha.erros.length > 0 && (
                             <tr>
-                              <td colSpan={2 + datasTabela.length + (modoInclusao ? 1 : 0)} className="bg-error-50 px-3 py-2 text-xs text-error-700">
+                              <td colSpan={2 + datasTabela.length + (modoInclusao || modoEdicao ? 1 : 0)} className="bg-error-50 px-3 py-2 text-xs text-error-700">
                                 {linha.erros.join(' ')}
                               </td>
                             </tr>
