@@ -350,6 +350,7 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
 
   const [previsaoExistente, setPrevisaoExistente] = useState<SemanaResumo | null>(null);
   const [carregandoPrevisao, setCarregandoPrevisao] = useState(false);
+  const [saldoBancarioAnterior, setSaldoBancarioAnterior] = useState<number>(0);
   const [modalResumo, setModalResumo] = useState<{
     iguais: number;
     modificados: number;
@@ -427,8 +428,10 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
 
   const saldoInicialValor = useMemo(() => {
     const linhaSaldo = linhas.find((linha) => linha.tipo === 'saldo_inicial');
-    return linhaSaldo?.valores[0]?.valor ?? 0;
-  }, [linhas]);
+    // Se houver linha saldo_inicial importada, usa esse valor
+    // Senão, usa o saldo bancário anterior automaticamente
+    return linhaSaldo?.valores[0]?.valor ?? saldoBancarioAnterior;
+  }, [linhas, saldoBancarioAnterior]);
 
   const saldoDiarioPrevisto = useMemo(
     () => totaisReceita.map((receita, index) => receita - (totaisGasto[index] ?? 0)),
@@ -616,6 +619,43 @@ const LancamentoPrevisaoSemanalPage: React.FC = () => {
       carregarPrevisaoExistente(semanaSelecionada, usuario.usr_id);
     }
   }, [carregarPrevisaoExistente, semanaSelecionada, usuario]);
+
+  useEffect(() => {
+    const buscarSaldoBancarioAnterior = async () => {
+      try {
+        const datas = obterDatasDaSemana(semanaSelecionada);
+        if (datas.length === 0) return;
+
+        // Data anterior ao início da semana (domingo da semana anterior)
+        const dataInicio = new Date(`${datas[0]}T00:00:00`);
+        dataInicio.setDate(dataInicio.getDate() - 1);
+        const dataAnterior = dataInicio.toISOString().split('T')[0];
+
+        const supabase = getSupabaseClient();
+
+        // Buscar saldos de todos os bancos na data anterior
+        const { data: saldos, error } = await supabase
+          .from('sdb_saldo_banco')
+          .select('sdb_saldo')
+          .eq('sdb_data', dataAnterior);
+
+        if (error) {
+          console.error('Erro ao buscar saldo bancário anterior:', error);
+          setSaldoBancarioAnterior(0);
+          return;
+        }
+
+        // Somar todos os saldos bancários
+        const totalSaldo = (saldos || []).reduce((acc, item) => acc + (Number(item.sdb_saldo) || 0), 0);
+        setSaldoBancarioAnterior(totalSaldo);
+      } catch (erro) {
+        console.error('Erro ao calcular saldo bancário anterior:', erro);
+        setSaldoBancarioAnterior(0);
+      }
+    };
+
+    buscarSaldoBancarioAnterior();
+  }, [semanaSelecionada]);
 
   const atualizarLinha = useCallback(
     (id: string, atualizador: (linha: LinhaImportada) => LinhaImportada) => {
