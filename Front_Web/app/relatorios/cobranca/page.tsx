@@ -770,7 +770,7 @@ const RelatorioCobrancaPage: React.FC = () => {
 
     posY = Math.max(titulosFinalY, (doc as any).lastAutoTable.finalY) + 8;
 
-    // Seção: Receitas em Títulos (bancos lado a lado - CARDS UNIFORMES)
+    // Seção: Receitas em Títulos (formato tabular - tipos x bancos)
     const temTitulos = relatorio.bancosCategorizado.some(b => b.titulos.total > 0);
     if (temTitulos) {
       doc.setFont('helvetica', 'bold');
@@ -780,47 +780,62 @@ const RelatorioCobrancaPage: React.FC = () => {
 
       const bancosComTitulos = relatorio.bancosCategorizado.filter(b => b.titulos.total > 0);
 
-      // Cards uniformes em grid fixo de 3 colunas
-      const numColunas = 3;
-      const colWidth = (larguraUtil - 4) / numColunas; // 4mm de gaps entre cards
-      const cardHeightUniforme = 35; // Altura fixa para todos os cards
-
-      bancosComTitulos.forEach((banco, index) => {
-        const row = Math.floor(index / numColunas);
-        const col = index % numColunas;
-        const colX = margem + (colWidth + 2) * col;
-        const startYPos = posY + (row * (cardHeightUniforme + 3));
-
-        // Combinar tipos de receita prevista e outras receitas
-        const todosTiposTitulos = [
-          ...banco.titulos.tiposReceitaPrevista,
-          ...banco.titulos.tiposOutrasReceitas
-        ];
-
-        // Usar autoTable mas com altura mínima definida
-        autoTable(doc, {
-          startY: startYPos,
-          head: [[banco.nome, '']],
-          body: todosTiposTitulos.map(tipo => [tipo.tipoNome, formatCurrency(tipo.valor)]),
-          foot: [['Total', formatCurrency(banco.titulos.total)]],
-          theme: 'grid',
-          styles: { fontSize: 7, halign: 'right', cellPadding: 1.5, lineWidth: 0.5, lineColor: [0, 0, 0] },
-          headStyles: { fillColor: [31, 73, 125], textColor: 255, fontStyle: 'bold', fontSize: 8, halign: 'center' },
-          columnStyles: { 0: { halign: 'left', cellWidth: colWidth * 0.6 } },
-          footStyles: { fontStyle: 'bold', fontSize: 8, fillColor: [240, 248, 255] },
-          margin: { left: colX, right: larguraPagina - colX - colWidth },
-          tableWidth: colWidth,
-          tableLineWidth: 0.5,
-          tableLineColor: [0, 0, 0],
+      // Coletar todos os tipos únicos
+      const tiposSet = new Set<string>();
+      bancosComTitulos.forEach(banco => {
+        [...banco.titulos.tiposReceitaPrevista, ...banco.titulos.tiposOutrasReceitas].forEach(tipo => {
+          tiposSet.add(tipo.tipoNome);
         });
       });
+      const todosOsTipos = Array.from(tiposSet).sort();
 
-      // Calcular próxima posição baseada no número de linhas de cards
-      const numLinhas = Math.ceil(bancosComTitulos.length / numColunas);
-      posY += (numLinhas * (cardHeightUniforme + 3)) + 4;
+      // Montar cabeçalho: [Tipo, Banco1, Banco2, ..., Total]
+      const headersTitulos = ['Tipo de Receita', ...bancosComTitulos.map(b => b.nome), 'Total'];
+
+      // Montar body: cada linha é um tipo com valores por banco
+      const bodyTitulos = todosOsTipos.map(tipoNome => {
+        const linha = [tipoNome];
+        let totalTipo = 0;
+
+        bancosComTitulos.forEach(banco => {
+          const todosTiposBanco = [...banco.titulos.tiposReceitaPrevista, ...banco.titulos.tiposOutrasReceitas];
+          const tipoEncontrado = todosTiposBanco.find(t => t.tipoNome === tipoNome);
+          const valor = tipoEncontrado ? tipoEncontrado.valor : 0;
+          linha.push(formatCurrency(valor));
+          totalTipo += valor;
+        });
+
+        linha.push(formatCurrency(totalTipo));
+        return linha;
+      });
+
+      // Footer: Total por banco
+      const footerTitulos = ['TOTAL'];
+      bancosComTitulos.forEach(banco => {
+        footerTitulos.push(formatCurrency(banco.titulos.total));
+      });
+      const totalGeralTitulos = bancosComTitulos.reduce((sum, b) => sum + b.titulos.total, 0);
+      footerTitulos.push(formatCurrency(totalGeralTitulos));
+
+      autoTable(doc, {
+        startY: posY,
+        head: [headersTitulos],
+        body: bodyTitulos,
+        foot: [footerTitulos],
+        theme: 'grid',
+        styles: { fontSize: 7, halign: 'right', cellPadding: 1.5, lineWidth: 0.5, lineColor: [0, 0, 0] },
+        headStyles: { fillColor: [31, 73, 125], textColor: 255, fontStyle: 'bold', fontSize: 8, halign: 'center' },
+        columnStyles: { 0: { halign: 'left', cellWidth: 35 } },
+        footStyles: { fontStyle: 'bold', fontSize: 8, fillColor: [240, 248, 255] },
+        margin: { left: margem, right: margem },
+        tableLineWidth: 0.5,
+        tableLineColor: [0, 0, 0],
+      });
+
+      posY = (doc as any).lastAutoTable.finalY + 6;
     }
 
-    // Seção: Receitas em Depósitos (bancos lado a lado - CARDS UNIFORMES)
+    // Seção: Receitas em Depósitos (formato tabular - tipos x bancos)
     const temDepositos = relatorio.bancosCategorizado.some(b => b.depositos.total > 0);
     if (temDepositos) {
       doc.setFont('helvetica', 'bold');
@@ -830,42 +845,59 @@ const RelatorioCobrancaPage: React.FC = () => {
 
       const bancosComDepositos = relatorio.bancosCategorizado.filter(b => b.depositos.total > 0);
 
-      // Cards uniformes em grid fixo de 3 colunas
-      const numColunas = 3;
-      const colWidth = (larguraUtil - 4) / numColunas;
-      const cardHeightUniforme = 35;
-
-      bancosComDepositos.forEach((banco, index) => {
-        const row = Math.floor(index / numColunas);
-        const col = index % numColunas;
-        const colX = margem + (colWidth + 2) * col;
-        const startYPos = posY + (row * (cardHeightUniforme + 3));
-
-        // Combinar tipos de receita prevista e outras receitas
-        const todosTiposDepositos = [
-          ...banco.depositos.tiposReceitaPrevista,
-          ...banco.depositos.tiposOutrasReceitas
-        ];
-
-        autoTable(doc, {
-          startY: startYPos,
-          head: [[banco.nome, '']],
-          body: todosTiposDepositos.map(tipo => [tipo.tipoNome, formatCurrency(tipo.valor)]),
-          foot: [['Total', formatCurrency(banco.depositos.total)]],
-          theme: 'grid',
-          styles: { fontSize: 7, halign: 'right', cellPadding: 1.5, lineWidth: 0.5, lineColor: [0, 0, 0] },
-          headStyles: { fillColor: [34, 139, 34], textColor: 255, fontStyle: 'bold', fontSize: 8, halign: 'center' },
-          columnStyles: { 0: { halign: 'left', cellWidth: colWidth * 0.6 } },
-          footStyles: { fontStyle: 'bold', fontSize: 8, fillColor: [240, 255, 240] },
-          margin: { left: colX, right: larguraPagina - colX - colWidth },
-          tableWidth: colWidth,
-          tableLineWidth: 0.5,
-          tableLineColor: [0, 0, 0],
+      // Coletar todos os tipos únicos
+      const tiposSet = new Set<string>();
+      bancosComDepositos.forEach(banco => {
+        [...banco.depositos.tiposReceitaPrevista, ...banco.depositos.tiposOutrasReceitas].forEach(tipo => {
+          tiposSet.add(tipo.tipoNome);
         });
       });
+      const todosOsTipos = Array.from(tiposSet).sort();
 
-      const numLinhas = Math.ceil(bancosComDepositos.length / numColunas);
-      posY += (numLinhas * (cardHeightUniforme + 3)) + 4;
+      // Montar cabeçalho: [Tipo, Banco1, Banco2, ..., Total]
+      const headersDepositos = ['Tipo de Receita', ...bancosComDepositos.map(b => b.nome), 'Total'];
+
+      // Montar body: cada linha é um tipo com valores por banco
+      const bodyDepositos = todosOsTipos.map(tipoNome => {
+        const linha = [tipoNome];
+        let totalTipo = 0;
+
+        bancosComDepositos.forEach(banco => {
+          const todosTiposBanco = [...banco.depositos.tiposReceitaPrevista, ...banco.depositos.tiposOutrasReceitas];
+          const tipoEncontrado = todosTiposBanco.find(t => t.tipoNome === tipoNome);
+          const valor = tipoEncontrado ? tipoEncontrado.valor : 0;
+          linha.push(formatCurrency(valor));
+          totalTipo += valor;
+        });
+
+        linha.push(formatCurrency(totalTipo));
+        return linha;
+      });
+
+      // Footer: Total por banco
+      const footerDepositos = ['TOTAL'];
+      bancosComDepositos.forEach(banco => {
+        footerDepositos.push(formatCurrency(banco.depositos.total));
+      });
+      const totalGeralDepositos = bancosComDepositos.reduce((sum, b) => sum + b.depositos.total, 0);
+      footerDepositos.push(formatCurrency(totalGeralDepositos));
+
+      autoTable(doc, {
+        startY: posY,
+        head: [headersDepositos],
+        body: bodyDepositos,
+        foot: [footerDepositos],
+        theme: 'grid',
+        styles: { fontSize: 7, halign: 'right', cellPadding: 1.5, lineWidth: 0.5, lineColor: [0, 0, 0] },
+        headStyles: { fillColor: [34, 139, 34], textColor: 255, fontStyle: 'bold', fontSize: 8, halign: 'center' },
+        columnStyles: { 0: { halign: 'left', cellWidth: 35 } },
+        footStyles: { fontStyle: 'bold', fontSize: 8, fillColor: [240, 255, 240] },
+        margin: { left: margem, right: margem },
+        tableLineWidth: 0.5,
+        tableLineColor: [0, 0, 0],
+      });
+
+      posY = (doc as any).lastAutoTable.finalY + 6;
     }
 
     // Seção: Total Previsto x Realizado
