@@ -347,33 +347,22 @@ export default function PrevistoRealizadoPage() {
         });
 
         // Buscar saldos realizados - calculando diretamente das tabelas
-        // Buscar receitas de rec_receitas (com conta de receita e tipo)
-        const { data: receitasDataRaw, error: erroReceitas } = await supabase
+        // Buscar TODAS receitas de rec_receitas (não tem tipo de receita direto)
+        const { data: receitasData, error: erroReceitas } = await supabase
           .from('rec_receitas')
-          .select('rec_data, rec_valor, rec_ctr_id, tpr_tipos_receita(tpr_nome)')
+          .select('rec_data, rec_valor, rec_ctr_id')
           .gte('rec_data', periodoInicio)
           .lte('rec_data', periodoFim);
 
         if (erroReceitas) throw erroReceitas;
 
-        // Filtrar apenas receitas previstas (tipos que incluem "RECEITA PREVISTA" mas NÃO adiantados/atrasados)
-        const receitasData = (receitasDataRaw || []).filter((rec: any) => {
-          const tipoReceita = Array.isArray(rec.tpr_tipos_receita) ? rec.tpr_tipos_receita[0] : rec.tpr_tipos_receita;
-          const tipoNome = tipoReceita?.tpr_nome ? String(tipoReceita.tpr_nome).toUpperCase() : '';
-          return (tipoNome.includes('RECEITA PREVISTA') || tipoNome.includes('PREVISTA'))
-            && !tipoNome.includes('ADIANTADO')
-            && !tipoNome.includes('ADIANTADOS')
-            && !tipoNome.includes('ATRASADO')
-            && !tipoNome.includes('ATRASADOS');
-        });
-
-        // Armazenar receitas com informação da conta
+        // Armazenar receitas
         setReceitasRealizadas(receitasData || []);
 
         // Buscar cobranças (TAMBÉM SÃO RECEITAS - lançamento de cobrança)
         const { data: cobrancasDataRaw, error: erroCobrancas } = await supabase
           .from('cob_cobrancas')
-          .select('cob_data, cob_valor, tpr_tipos_receita(tpr_nome)')
+          .select('cob_data, cob_valor, cob_tpr_id, tpr_tipos_receita!cob_tpr_id(tpr_nome)')
           .gte('cob_data', periodoInicio)
           .lte('cob_data', periodoFim);
 

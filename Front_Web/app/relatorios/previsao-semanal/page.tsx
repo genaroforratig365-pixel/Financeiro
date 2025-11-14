@@ -345,7 +345,27 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
           }
         }
 
-        const saldoDiario = construirLinha(saldoDiarioItens, datasOrdenadas, 'Saldo diário previsto');
+        let saldoDiario = construirLinha(saldoDiarioItens, datasOrdenadas, 'Saldo diário previsto');
+
+        // Se não houver saldo diário importado, calcular automaticamente (receitas - despesas por dia)
+        if (!saldoDiario || Object.keys(saldoDiario.valores).length === 0) {
+          const valores: Record<string, number> = {};
+          let totalSaldoDiario = 0;
+
+          datasOrdenadas.forEach((data) => {
+            const receitasDia = receitas.reduce((sum, row) => sum + (row.valores[data] ?? 0), 0);
+            const despesasDia = despesas.reduce((sum, row) => sum + (row.valores[data] ?? 0), 0);
+            const saldoDia = Math.round((receitasDia - despesasDia) * 100) / 100;
+            valores[data] = saldoDia;
+            totalSaldoDiario += saldoDia;
+          });
+
+          saldoDiario = {
+            categoria: 'Saldo diário previsto',
+            valores,
+            total: Math.round(totalSaldoDiario * 100) / 100,
+          };
+        }
 
         // Calcula saldo acumulado corretamente:
         // Primeiro dia: saldo inicial + saldo diário calculado
@@ -557,73 +577,132 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
       }
 
       if (receitasData.length > 0) {
+        // Título da seção RECEITAS
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('RECEITAS', 14, yPos);
+        yPos += 5;
+
+        // Configurar estilos de coluna para centralizar datas e total
+        const columnStylesReceitas: any = {
+          0: { halign: 'left', cellWidth: 40 },
+        };
+        // Centralizar todas as colunas de data (1 até length-2) e a coluna total (length-1)
+        for (let i = 1; i < headers.length; i++) {
+          columnStylesReceitas[i] = { halign: 'center', cellWidth: i === headers.length - 1 ? 'auto' : 18 };
+          if (i === headers.length - 1) {
+            columnStylesReceitas[i].fontStyle = 'bold';
+          }
+        }
+
         autoTable(doc, {
           startY: yPos,
           head: [headers],
           body: receitasData,
-          headStyles: { fillColor: [34, 197, 94], textColor: 255, fontStyle: 'bold', fontSize: 7 },
-          bodyStyles: { fontSize: 6 },
+          headStyles: { fillColor: [34, 197, 94], textColor: 255, fontStyle: 'bold', fontSize: 8, halign: 'center' },
+          bodyStyles: { fontSize: 7 },
           margin: { left: 14, right: 14 },
           theme: 'grid',
-          styles: { cellPadding: 1.5, lineWidth: 0.5, lineColor: [0, 0, 0] },
-          columnStyles: {
-            0: { halign: 'left', cellWidth: 45 },
-            [headers.length - 1]: { fontStyle: 'bold' },
-          },
+          styles: { cellPadding: 1.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
+          columnStyles: columnStylesReceitas,
           tableLineWidth: 0.5,
           tableLineColor: [0, 0, 0],
           didParseCell: (data) => {
+            // Primeira coluna (categoria) sempre à esquerda
+            if (data.column.index === 0) {
+              data.cell.styles.halign = 'left';
+            }
             if (data.row.index === receitasData.length - 1) {
               data.cell.styles.fontStyle = 'bold';
               data.cell.styles.fillColor = [220, 252, 231];
             }
           },
         });
-        yPos = (doc as any).lastAutoTable.finalY + 3;
+        yPos = (doc as any).lastAutoTable.finalY + 5;
       }
 
       if (despesasData.length > 0) {
+        // Título da seção GASTOS
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('GASTOS', 14, yPos);
+        yPos += 5;
+
+        // Configurar estilos de coluna para centralizar datas e total
+        const columnStylesDespesas: any = {
+          0: { halign: 'left', cellWidth: 40 },
+        };
+        // Centralizar todas as colunas de data (1 até length-2) e a coluna total (length-1)
+        for (let i = 1; i < headers.length; i++) {
+          columnStylesDespesas[i] = { halign: 'center', cellWidth: i === headers.length - 1 ? 'auto' : 18 };
+          if (i === headers.length - 1) {
+            columnStylesDespesas[i].fontStyle = 'bold';
+          }
+        }
+
         autoTable(doc, {
           startY: yPos,
           head: [headers],
           body: despesasData,
-          headStyles: { fillColor: [239, 68, 68], textColor: 255, fontStyle: 'bold', fontSize: 7 },
-          bodyStyles: { fontSize: 6 },
+          headStyles: { fillColor: [239, 68, 68], textColor: 255, fontStyle: 'bold', fontSize: 8, halign: 'center' },
+          bodyStyles: { fontSize: 7 },
           margin: { left: 14, right: 14 },
           theme: 'grid',
-          styles: { cellPadding: 1.5, lineWidth: 0.5, lineColor: [0, 0, 0] },
-          columnStyles: {
-            0: { halign: 'left', cellWidth: 45 },
-            [headers.length - 1]: { fontStyle: 'bold' },
-          },
+          styles: { cellPadding: 1.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
+          columnStyles: columnStylesDespesas,
           tableLineWidth: 0.5,
           tableLineColor: [0, 0, 0],
           didParseCell: (data) => {
+            // Primeira coluna (categoria) sempre à esquerda
+            if (data.column.index === 0) {
+              data.cell.styles.halign = 'left';
+            }
             if (data.row.index === despesasData.length - 1) {
               data.cell.styles.fontStyle = 'bold';
               data.cell.styles.fillColor = [254, 226, 226];
             }
           },
         });
-        yPos = (doc as any).lastAutoTable.finalY + 3;
+        yPos = (doc as any).lastAutoTable.finalY + 5;
       }
 
       if (saldosData.length > 0) {
+        // Título da seção SALDOS
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('SALDOS', 14, yPos);
+        yPos += 5;
+
+        // Configurar estilos de coluna para centralizar datas e total
+        const columnStylesSaldos: any = {
+          0: { halign: 'left', cellWidth: 40 },
+        };
+        // Centralizar todas as colunas de data (1 até length-2) e a coluna total (length-1)
+        for (let i = 1; i < headers.length; i++) {
+          columnStylesSaldos[i] = { halign: 'center', cellWidth: i === headers.length - 1 ? 'auto' : 18 };
+          if (i === headers.length - 1) {
+            columnStylesSaldos[i].fontStyle = 'bold';
+          }
+        }
+
         autoTable(doc, {
           startY: yPos,
           head: [headers],
           body: saldosData,
-          headStyles: { fillColor: [100, 116, 139], textColor: 255, fontStyle: 'bold', fontSize: 7 },
-          bodyStyles: { fontSize: 6 },
+          headStyles: { fillColor: [100, 116, 139], textColor: 255, fontStyle: 'bold', fontSize: 8, halign: 'center' },
+          bodyStyles: { fontSize: 7 },
           margin: { left: 14, right: 14 },
           theme: 'grid',
-          styles: { cellPadding: 1.5, lineWidth: 0.5, lineColor: [0, 0, 0] },
-          columnStyles: {
-            0: { halign: 'left', cellWidth: 45 },
-            [headers.length - 1]: { fontStyle: 'bold' },
-          },
+          styles: { cellPadding: 1.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
+          columnStyles: columnStylesSaldos,
           tableLineWidth: 0.5,
           tableLineColor: [0, 0, 0],
+          didParseCell: (data) => {
+            // Primeira coluna (categoria) sempre à esquerda
+            if (data.column.index === 0) {
+              data.cell.styles.halign = 'left';
+            }
+          },
         });
       }
 

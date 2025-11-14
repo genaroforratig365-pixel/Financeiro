@@ -499,7 +499,11 @@ export default function LancamentoCobrancaPage() {
           if (!tipo) return;
 
           const tipoNomeUpper = tipo.nome.toUpperCase();
-          const ehReceitaPrevista = tipoNomeUpper.includes('PREVIS') || tipo.codigo.startsWith('301');
+          const ehReceitaPrevista = (tipoNomeUpper.includes('RECEITA PREVISTA') || tipoNomeUpper.includes('PREVISTA'))
+            && !tipoNomeUpper.includes('ADIANTADO')
+            && !tipoNomeUpper.includes('ADIANTADOS')
+            && !tipoNomeUpper.includes('ATRASADO')
+            && !tipoNomeUpper.includes('ATRASADOS');
 
           if (ehTitulo) {
             if (ehReceitaPrevista) {
@@ -555,7 +559,11 @@ export default function LancamentoCobrancaPage() {
           if (!tipo) return;
 
           const tipoNomeUpper = tipo.nome.toUpperCase();
-          const ehReceitaPrevista = tipoNomeUpper.includes('PREVIS') || tipo.codigo.startsWith('301');
+          const ehReceitaPrevista = (tipoNomeUpper.includes('RECEITA PREVISTA') || tipoNomeUpper.includes('PREVISTA'))
+            && !tipoNomeUpper.includes('ADIANTADO')
+            && !tipoNomeUpper.includes('ADIANTADOS')
+            && !tipoNomeUpper.includes('ATRASADO')
+            && !tipoNomeUpper.includes('ATRASADOS');
 
           if (ehTitulo) {
             if (ehReceitaPrevista) {
@@ -1264,9 +1272,7 @@ export default function LancamentoCobrancaPage() {
                     </p>
                   </div>
                   <div className="px-4 py-3">
-                    {(resumoContaReceitaFormulario.titulosReceitaPrevista + resumoContaReceitaFormulario.titulosOutrasReceitas +
-                      resumoContaReceitaFormulario.depositosReceitaPrevista + resumoContaReceitaFormulario.depositosOutrasReceitas +
-                      resumoContaReceitaSalvo.titulosReceitaPrevista + resumoContaReceitaSalvo.titulosOutrasReceitas +
+                    {(resumoContaReceitaSalvo.titulosReceitaPrevista + resumoContaReceitaSalvo.titulosOutrasReceitas +
                       resumoContaReceitaSalvo.depositosReceitaPrevista + resumoContaReceitaSalvo.depositosOutrasReceitas) === 0 ? (
                       <p className="text-sm text-gray-500">Nenhum valor informado</p>
                     ) : (
@@ -1277,39 +1283,21 @@ export default function LancamentoCobrancaPage() {
                           <div className="space-y-1 text-xs">
                             <div className="flex justify-between">
                               <span className="text-gray-600">Receita Prevista:</span>
-                              <div className="space-x-2">
-                                <span className="text-primary-700 font-medium">
-                                  {formatCurrency(resumoContaReceitaFormulario.titulosReceitaPrevista)}
-                                </span>
-                                <span className="text-gray-400">|</span>
-                                <span className="text-gray-900 font-medium">
-                                  {formatCurrency(resumoContaReceitaSalvo.titulosReceitaPrevista)}
-                                </span>
-                              </div>
+                              <span className="text-gray-900 font-medium">
+                                {formatCurrency(resumoContaReceitaSalvo.titulosReceitaPrevista)}
+                              </span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-gray-600">Outras Receitas:</span>
-                              <div className="space-x-2">
-                                <span className="text-primary-700 font-medium">
-                                  {formatCurrency(resumoContaReceitaFormulario.titulosOutrasReceitas)}
-                                </span>
-                                <span className="text-gray-400">|</span>
-                                <span className="text-gray-900 font-medium">
-                                  {formatCurrency(resumoContaReceitaSalvo.titulosOutrasReceitas)}
-                                </span>
-                              </div>
+                              <span className="text-gray-900 font-medium">
+                                {formatCurrency(resumoContaReceitaSalvo.titulosOutrasReceitas)}
+                              </span>
                             </div>
                             <div className="flex justify-between pt-1 border-t border-gray-100">
                               <span className="text-gray-700 font-semibold">Total:</span>
-                              <div className="space-x-2">
-                                <span className="text-primary-800 font-bold">
-                                  {formatCurrency(resumoContaReceitaFormulario.titulosReceitaPrevista + resumoContaReceitaFormulario.titulosOutrasReceitas)}
-                                </span>
-                                <span className="text-gray-400">|</span>
-                                <span className="text-gray-900 font-bold">
-                                  {formatCurrency(resumoContaReceitaSalvo.titulosReceitaPrevista + resumoContaReceitaSalvo.titulosOutrasReceitas)}
-                                </span>
-                              </div>
+                              <span className="text-gray-900 font-bold">
+                                {formatCurrency(resumoContaReceitaSalvo.titulosReceitaPrevista + resumoContaReceitaSalvo.titulosOutrasReceitas)}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -1320,39 +1308,21 @@ export default function LancamentoCobrancaPage() {
                           <div className="space-y-1 text-xs">
                             <div className="flex justify-between">
                               <span className="text-gray-600">Receita Prevista:</span>
-                              <div className="space-x-2">
-                                <span className="text-primary-700 font-medium">
-                                  {formatCurrency(resumoContaReceitaFormulario.depositosReceitaPrevista)}
-                                </span>
-                                <span className="text-gray-400">|</span>
-                                <span className="text-gray-900 font-medium">
-                                  {formatCurrency(resumoContaReceitaSalvo.depositosReceitaPrevista)}
-                                </span>
-                              </div>
+                              <span className="text-gray-900 font-medium">
+                                {formatCurrency(resumoContaReceitaSalvo.depositosReceitaPrevista)}
+                              </span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-gray-600">Outras Receitas:</span>
-                              <div className="space-x-2">
-                                <span className="text-primary-700 font-medium">
-                                  {formatCurrency(resumoContaReceitaFormulario.depositosOutrasReceitas)}
-                                </span>
-                                <span className="text-gray-400">|</span>
-                                <span className="text-gray-900 font-medium">
-                                  {formatCurrency(resumoContaReceitaSalvo.depositosOutrasReceitas)}
-                                </span>
-                              </div>
+                              <span className="text-gray-900 font-medium">
+                                {formatCurrency(resumoContaReceitaSalvo.depositosOutrasReceitas)}
+                              </span>
                             </div>
                             <div className="flex justify-between pt-1 border-t border-gray-100">
                               <span className="text-gray-700 font-semibold">Total:</span>
-                              <div className="space-x-2">
-                                <span className="text-primary-800 font-bold">
-                                  {formatCurrency(resumoContaReceitaFormulario.depositosReceitaPrevista + resumoContaReceitaFormulario.depositosOutrasReceitas)}
-                                </span>
-                                <span className="text-gray-400">|</span>
-                                <span className="text-gray-900 font-bold">
-                                  {formatCurrency(resumoContaReceitaSalvo.depositosReceitaPrevista + resumoContaReceitaSalvo.depositosOutrasReceitas)}
-                                </span>
-                              </div>
+                              <span className="text-gray-900 font-bold">
+                                {formatCurrency(resumoContaReceitaSalvo.depositosReceitaPrevista + resumoContaReceitaSalvo.depositosOutrasReceitas)}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -1363,32 +1333,15 @@ export default function LancamentoCobrancaPage() {
                           <div className="space-y-1 text-xs">
                             <div className="flex justify-between">
                               <span className="text-gray-600">Receita Prevista:</span>
-                              <div className="space-x-2">
-                                <span className="text-primary-700 font-medium">
-                                  {formatCurrency(resumoContaReceitaFormulario.titulosReceitaPrevista + resumoContaReceitaFormulario.depositosReceitaPrevista)}
-                                </span>
-                                <span className="text-gray-400">|</span>
-                                <span className="text-gray-900 font-medium">
-                                  {formatCurrency(resumoContaReceitaSalvo.titulosReceitaPrevista + resumoContaReceitaSalvo.depositosReceitaPrevista)}
-                                </span>
-                              </div>
+                              <span className="text-gray-900 font-medium">
+                                {formatCurrency(resumoContaReceitaSalvo.titulosReceitaPrevista + resumoContaReceitaSalvo.depositosReceitaPrevista)}
+                              </span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-gray-600">Outras Receitas:</span>
-                              <div className="space-x-2">
-                                <span className="text-primary-700 font-medium">
-                                  {formatCurrency(resumoContaReceitaFormulario.titulosOutrasReceitas + resumoContaReceitaFormulario.depositosOutrasReceitas)}
-                                </span>
-                                <span className="text-gray-400">|</span>
-                                <span className="text-gray-900 font-medium">
-                                  {formatCurrency(resumoContaReceitaSalvo.titulosOutrasReceitas + resumoContaReceitaSalvo.depositosOutrasReceitas)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="pt-2 mt-2 border-t border-gray-300 text-xs">
-                            <div className="flex items-center justify-between text-gray-500">
-                              <span className="italic">Digitado | Salvo</span>
+                              <span className="text-gray-900 font-medium">
+                                {formatCurrency(resumoContaReceitaSalvo.titulosOutrasReceitas + resumoContaReceitaSalvo.depositosOutrasReceitas)}
+                              </span>
                             </div>
                           </div>
                         </div>
