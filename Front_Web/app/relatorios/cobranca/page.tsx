@@ -30,7 +30,6 @@ type PrevisaoRow = {
   pvi_ctr_id?: unknown;
   pvi_ban_id?: unknown;
   ctr_contas_receita?: MaybeArray<{ ctr_nome?: unknown; ctr_codigo?: unknown } | null>;
-  ban_bancos?: MaybeArray<{ ban_id?: unknown; ban_nome?: unknown; ban_codigo?: unknown } | null>;
   tpr_tipos_receita?: MaybeArray<{ tpr_id?: unknown; tpr_nome?: unknown; tpr_codigo?: unknown } | null>;
 };
 
@@ -39,7 +38,6 @@ type CobrancaRow = {
   cob_ctr_id?: unknown;
   cob_ban_id?: unknown;
   ctr_contas_receita?: MaybeArray<{ ctr_nome?: unknown; ctr_codigo?: unknown } | null>;
-  ban_bancos?: MaybeArray<{ ban_id?: unknown; ban_nome?: unknown; ban_codigo?: unknown } | null>;
   tpr_tipos_receita?: MaybeArray<{ tpr_id?: unknown; tpr_nome?: unknown; tpr_codigo?: unknown } | null>;
 };
 
@@ -181,17 +179,29 @@ const RelatorioCobrancaPage: React.FC = () => {
         setCarregandoDados(true);
         const supabase = getSupabaseClient();
 
+        // Buscar bancos primeiro para fazer o mapeamento manual
+        const { data: bancosData, error: bancosError } = await supabase
+          .from('ban_bancos')
+          .select('ban_id, ban_nome, ban_codigo');
+
+        if (bancosError) throw bancosError;
+
+        const bancosMap = new Map<number, { nome: string; codigo: string }>();
+        (bancosData || []).forEach((banco) => {
+          bancosMap.set(banco.ban_id, { nome: banco.ban_nome, codigo: banco.ban_codigo || '' });
+        });
+
         const [previsoesRes, cobrancasRes] = await Promise.all([
           supabase
             .from('pvi_previsao_itens')
             .select(
-              'pvi_valor, pvi_ctr_id, pvi_ban_id, ctr_contas_receita(ctr_nome, ctr_codigo), ban_bancos(ban_id, ban_nome, ban_codigo), tpr_tipos_receita(tpr_id, tpr_nome, tpr_codigo)',
+              'pvi_valor, pvi_ctr_id, pvi_ban_id, ctr_contas_receita(ctr_nome, ctr_codigo), tpr_tipos_receita(tpr_id, tpr_nome, tpr_codigo)',
             )
             .eq('pvi_tipo', 'receita')
             .eq('pvi_data', data),
           supabase
             .from('cob_cobrancas')
-            .select('cob_valor, cob_ctr_id, cob_ban_id, ctr_contas_receita(ctr_nome, ctr_codigo), ban_bancos(ban_id, ban_nome, ban_codigo), tpr_tipos_receita(tpr_id, tpr_nome, tpr_codigo)')
+            .select('cob_valor, cob_ctr_id, cob_ban_id, ctr_contas_receita(ctr_nome, ctr_codigo), tpr_tipos_receita(tpr_id, tpr_nome, tpr_codigo)')
             .eq('cob_data', data),
         ]);
 
@@ -228,10 +238,10 @@ const RelatorioCobrancaPage: React.FC = () => {
           const contaId = toNumber(item.pvi_ctr_id, 0);
           const contaChave = construirChave(contaId, contaNome, 'conta');
 
-          const bancoRel = normalizeRelation(item.ban_bancos)[0];
-          const bancoNome = bancoRel?.ban_nome ? toString(bancoRel.ban_nome) : 'Banco não informado';
-          // Prioriza o ban_id do registro relacionado, depois usa pvi_ban_id
-          const bancoIdNumero = bancoRel?.ban_id ? toNumber(bancoRel.ban_id) : toNumber(item.pvi_ban_id, NaN);
+          // IMPORTANTE: Usar pvi_ban_id diretamente e buscar no bancosMap
+          const bancoIdNumero = toNumber(item.pvi_ban_id, NaN);
+          const bancoInfo = Number.isFinite(bancoIdNumero) ? bancosMap.get(bancoIdNumero) : null;
+          const bancoNome = bancoInfo?.nome || 'Banco não informado';
           const bancoChave = construirChave(bancoIdNumero, bancoNome, 'banco');
 
           const tipoRel = normalizeRelation(item.tpr_tipos_receita)[0];
@@ -275,10 +285,10 @@ const RelatorioCobrancaPage: React.FC = () => {
           const contaId = toNumber(item.cob_ctr_id, 0);
           const contaChave = construirChave(contaId, contaNome, 'conta');
 
-          const bancoRel = normalizeRelation(item.ban_bancos)[0];
-          const bancoNome = bancoRel?.ban_nome ? toString(bancoRel.ban_nome) : 'Banco não informado';
-          // Prioriza o ban_id do registro relacionado, depois usa cob_ban_id
-          const bancoIdNumero = bancoRel?.ban_id ? toNumber(bancoRel.ban_id) : toNumber(item.cob_ban_id, NaN);
+          // IMPORTANTE: Usar cob_ban_id diretamente e buscar no bancosMap
+          const bancoIdNumero = toNumber(item.cob_ban_id, NaN);
+          const bancoInfo = Number.isFinite(bancoIdNumero) ? bancosMap.get(bancoIdNumero) : null;
+          const bancoNome = bancoInfo?.nome || 'Banco não informado';
           const bancoChave = construirChave(bancoIdNumero, bancoNome, 'banco');
 
           const tipoRel = normalizeRelation(item.tpr_tipos_receita)[0];
@@ -317,14 +327,14 @@ const RelatorioCobrancaPage: React.FC = () => {
           tipos: Map<string, { nome: string; previsto: number; realizado: number }>;
         };
 
-        const bancosMap = new Map<string, BancoAcumulado>();
+        const bancosAcumuladosMap = new Map<string, BancoAcumulado>();
 
         contasMap.forEach((conta) => {
           if (conta.previsto === 0 && conta.realizado === 0) {
             return;
           }
 
-          const banco = bancosMap.get(conta.bancoId) ?? {
+          const banco = bancosAcumuladosMap.get(conta.bancoId) ?? {
             nome: conta.bancoNome,
             previsto: 0,
             realizado: 0,
@@ -345,10 +355,10 @@ const RelatorioCobrancaPage: React.FC = () => {
           tipo.previsto += conta.previsto;
           tipo.realizado += conta.realizado;
           banco.tipos.set(conta.tipoId, tipo);
-          bancosMap.set(conta.bancoId, banco);
+          bancosAcumuladosMap.set(conta.bancoId, banco);
         });
 
-        const bancos: BancoResumo[] = Array.from(bancosMap.entries())
+        const bancos: BancoResumo[] = Array.from(bancosAcumuladosMap.entries())
           .map(([id, banco]) => {
             const tipos: TipoResumo[] = Array.from(banco.tipos.entries())
               .map(([tipoId, tipo]) => {
