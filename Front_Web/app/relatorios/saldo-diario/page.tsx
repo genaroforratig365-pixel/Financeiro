@@ -734,7 +734,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
     doc.setFontSize(8);
     doc.text(`Data: ${formatarDataPt(relatorio.data)}`, margemHorizontal, 17);
 
-    const resumoLinha = `Rec: ${formatCurrency(relatorio.resumo.totalReceitasRealizadas)} | Desp: ${formatCurrency(relatorio.resumo.totalDespesasRealizadas)} | Result: ${formatCurrency(relatorio.resumo.resultadoRealizado)} | Bancos: ${formatCurrency(relatorio.resumo.bancosRealizados)}`;
+    const resumoLinha = `Saldo Inicial: ${formatCurrency(relatorio.resumo.saldoInicialRealizado)} | Rec: ${formatCurrency(relatorio.resumo.totalReceitasRealizadas)} | Desp: ${formatCurrency(relatorio.resumo.totalDespesasRealizadas)} | Saldo do dia: ${formatCurrency(relatorio.resumo.resultadoRealizado)} | Bancos: ${formatCurrency(relatorio.resumo.bancosRealizados)}`;
     doc.setFontSize(7);
     const resumoQuebrado = doc.splitTextToSize(resumoLinha, larguraUtil);
     doc.text(resumoQuebrado, margemHorizontal, 21);
@@ -856,7 +856,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
       totalLabel: 'Total de Receitas',
     });
 
-    adicionarTabela('Resultado de Saldo de Caixa do Dia', linhasResultadoCaixa, {
+    adicionarTabela('Saldo do dia (receitas - despesas)', linhasResultadoCaixa, {
       accent: 'laranja',
       showTotals: false,
     });
@@ -1030,7 +1030,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
             </div>
 
             <div className="mt-6">
-              {renderTabelaComparativa('Resultado de Saldo de Caixa do Dia', linhasResultadoCaixa, {
+              {renderTabelaComparativa('Saldo do dia (receitas - despesas)', linhasResultadoCaixa, {
                 accent: 'laranja',
                 showTotals: false,
               })}
