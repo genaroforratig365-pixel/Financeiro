@@ -585,11 +585,11 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
 
         // Configurar estilos de coluna para centralizar datas e total
         const columnStylesReceitas: any = {
-          0: { halign: 'left', cellWidth: 40 },
+          0: { halign: 'left', cellWidth: 65 },
         };
         // Centralizar todas as colunas de data (1 até length-2) e a coluna total (length-1)
         for (let i = 1; i < headers.length; i++) {
-          columnStylesReceitas[i] = { halign: 'center', cellWidth: i === headers.length - 1 ? 'auto' : 18 };
+          columnStylesReceitas[i] = { halign: 'center', cellWidth: i === headers.length - 1 ? 'auto' : 16 };
           if (i === headers.length - 1) {
             columnStylesReceitas[i].fontStyle = 'bold';
           }
@@ -599,8 +599,8 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
           startY: yPos,
           head: [headers],
           body: receitasData,
-          headStyles: { fillColor: [34, 197, 94], textColor: 255, fontStyle: 'bold', fontSize: 8, halign: 'center' },
-          bodyStyles: { fontSize: 7 },
+          headStyles: { fillColor: [34, 197, 94], textColor: 255, fontStyle: 'bold', fontSize: 9, halign: 'center' },
+          bodyStyles: { fontSize: 8 },
           margin: { left: 14, right: 14 },
           theme: 'grid',
           styles: { cellPadding: 1.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
@@ -630,11 +630,11 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
 
         // Configurar estilos de coluna para centralizar datas e total
         const columnStylesDespesas: any = {
-          0: { halign: 'left', cellWidth: 40 },
+          0: { halign: 'left', cellWidth: 65 },
         };
         // Centralizar todas as colunas de data (1 até length-2) e a coluna total (length-1)
         for (let i = 1; i < headers.length; i++) {
-          columnStylesDespesas[i] = { halign: 'center', cellWidth: i === headers.length - 1 ? 'auto' : 18 };
+          columnStylesDespesas[i] = { halign: 'center', cellWidth: i === headers.length - 1 ? 'auto' : 16 };
           if (i === headers.length - 1) {
             columnStylesDespesas[i].fontStyle = 'bold';
           }
@@ -644,8 +644,8 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
           startY: yPos,
           head: [headers],
           body: despesasData,
-          headStyles: { fillColor: [239, 68, 68], textColor: 255, fontStyle: 'bold', fontSize: 8, halign: 'center' },
-          bodyStyles: { fontSize: 7 },
+          headStyles: { fillColor: [239, 68, 68], textColor: 255, fontStyle: 'bold', fontSize: 9, halign: 'center' },
+          bodyStyles: { fontSize: 8 },
           margin: { left: 14, right: 14 },
           theme: 'grid',
           styles: { cellPadding: 1.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
@@ -675,11 +675,11 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
 
         // Configurar estilos de coluna para centralizar datas e total
         const columnStylesSaldos: any = {
-          0: { halign: 'left', cellWidth: 40 },
+          0: { halign: 'left', cellWidth: 65 },
         };
         // Centralizar todas as colunas de data (1 até length-2) e a coluna total (length-1)
         for (let i = 1; i < headers.length; i++) {
-          columnStylesSaldos[i] = { halign: 'center', cellWidth: i === headers.length - 1 ? 'auto' : 18 };
+          columnStylesSaldos[i] = { halign: 'center', cellWidth: i === headers.length - 1 ? 'auto' : 16 };
           if (i === headers.length - 1) {
             columnStylesSaldos[i].fontStyle = 'bold';
           }
@@ -689,8 +689,8 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
           startY: yPos,
           head: [headers],
           body: saldosData,
-          headStyles: { fillColor: [100, 116, 139], textColor: 255, fontStyle: 'bold', fontSize: 8, halign: 'center' },
-          bodyStyles: { fontSize: 7 },
+          headStyles: { fillColor: [100, 116, 139], textColor: 255, fontStyle: 'bold', fontSize: 9, halign: 'center' },
+          bodyStyles: { fontSize: 8 },
           margin: { left: 14, right: 14 },
           theme: 'grid',
           styles: { cellPadding: 1.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
