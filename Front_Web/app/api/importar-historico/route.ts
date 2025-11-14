@@ -269,15 +269,25 @@ export async function POST(request: NextRequest) {
         if (origem.includes('pagamentos por área') || origem.includes('pagamentos por area')) {
           const areaId = obterIdArea(area);
           if (areaId && valorReal > 0) {
-            const { error: insertError } = await supabase.from('pag_pagamentos_area').insert({
+            const registro = {
               pag_data: data,
               pag_are_id: areaId,
               pag_valor: valorReal,
               pag_usr_id: usuario.usr_id,
-            });
-            if (insertError) throw insertError;
+            };
+            console.log('[IMPORTAÇÃO] Inserindo pagamento por área:', { area, areaId, valor: valorReal, registro });
+            const { data: insertedData, error: insertError } = await supabase
+              .from('pag_pagamentos_area')
+              .insert(registro)
+              .select();
+            if (insertError) {
+              console.error('[IMPORTAÇÃO] Erro ao inserir pagamento:', insertError);
+              throw insertError;
+            }
+            console.log('[IMPORTAÇÃO] Pagamento inserido com sucesso:', insertedData);
             sucesso++;
           } else if (!areaId) {
+            console.warn('[IMPORTAÇÃO] Área não encontrada:', area);
             avisos.push(`Área não encontrada: ${area}`);
           }
           continue;
