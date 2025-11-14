@@ -424,6 +424,8 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
         });
 
         // Calcular aplicações realizadas separadamente
+        // Transferência para aplicação: negativo (saída)
+        // Resgate de aplicação: positivo (entrada)
         let aplicacoesRealizadas = 0;
 
         normalizeRelation(pagamentosArea).forEach((item) => {
@@ -438,8 +440,20 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
           const ehAplicacao = tituloNormalizado.includes('APLICACAO') || tituloNormalizado.includes('APLICAÇÃO');
 
           if (ehAplicacao) {
-            // Se for aplicação, apenas somar no total de aplicações (não adicionar em gastos por área)
-            aplicacoesRealizadas += valor;
+            // Verificar se é transferência (saída) ou resgate (entrada)
+            const ehResgate = tituloNormalizado.includes('RESGATE');
+            const ehTransferencia = tituloNormalizado.includes('TRANSFERENCIA') || tituloNormalizado.includes('TRANSFERÊNCIA');
+
+            if (ehResgate) {
+              // Resgate: valor positivo (entrada de dinheiro)
+              aplicacoesRealizadas += valor;
+            } else if (ehTransferencia) {
+              // Transferência: valor negativo (saída de dinheiro)
+              aplicacoesRealizadas -= valor;
+            } else {
+              // Se não especificado, assumir transferência (saída)
+              aplicacoesRealizadas -= valor;
+            }
           } else {
             // Se NÃO for aplicação, adicionar normalmente em gastos por área
             const existente = mapaGastos.get(chave) ?? { titulo, previsto: 0, realizado: 0 };
@@ -505,9 +519,9 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
         // Usar o saldo anterior baseado na última data disponível nos registros bancários
         const saldoInicialRealizado = arredondar(saldoAnteriorCalculado);
 
-        // Calcular saldo final do dia: saldo anterior + receitas realizadas - despesas realizadas
+        // Calcular saldo final do dia: saldo anterior + receitas realizadas - despesas realizadas + aplicações (resgates/transferências)
         const saldoFinalRealizado = arredondar(
-          saldoInicialRealizado + totalReceitasRealizadas - totalDespesasRealizadas
+          saldoInicialRealizado + totalReceitasRealizadas - totalDespesasRealizadas + aplicacoesRealizadas
         );
 
         setRelatorio({
@@ -609,7 +623,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
                 </tr>
               ) : (
                 <tr>
-                  <th className="text-center">Banco / Conta</th>
+                  <th className="text-center">Movimento</th>
                   <th className="text-center">Realizado</th>
                 </tr>
               )}
@@ -796,7 +810,7 @@ const RelatorioSaldoDiarioPage: React.FC = () => {
       const cabecalho =
         layout === 'comparativo'
           ? [['Categoria', 'Previsto', 'Realizado', 'Diferença', '%']]
-          : [['Banco / Conta', 'Realizado']];
+          : [['Movimento', 'Realizado']];
 
       const linhasComparativas =
         layout === 'comparativo'

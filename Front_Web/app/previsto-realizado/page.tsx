@@ -362,7 +362,9 @@ export default function PrevistoRealizadoPage() {
           const tipoNome = tipoReceita?.tpr_nome ? String(tipoReceita.tpr_nome).toUpperCase() : '';
           return (tipoNome.includes('RECEITA PREVISTA') || tipoNome.includes('PREVISTA'))
             && !tipoNome.includes('ADIANTADO')
-            && !tipoNome.includes('ATRASADO');
+            && !tipoNome.includes('ADIANTADOS')
+            && !tipoNome.includes('ATRASADO')
+            && !tipoNome.includes('ATRASADOS');
         });
 
         // Armazenar receitas com informação da conta
@@ -383,7 +385,9 @@ export default function PrevistoRealizadoPage() {
           const tipoNome = tipoReceita?.tpr_nome ? String(tipoReceita.tpr_nome).toUpperCase() : '';
           return (tipoNome.includes('RECEITA PREVISTA') || tipoNome.includes('PREVISTA'))
             && !tipoNome.includes('ADIANTADO')
-            && !tipoNome.includes('ATRASADO');
+            && !tipoNome.includes('ADIANTADOS')
+            && !tipoNome.includes('ATRASADO')
+            && !tipoNome.includes('ATRASADOS');
         });
 
         // Buscar DESPESAS de pag_pagamentos_area

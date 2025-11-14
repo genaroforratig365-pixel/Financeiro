@@ -429,7 +429,9 @@ const RelatorioCobrancaPage: React.FC = () => {
           // Receita Prevista: tipos que contêm "RECEITA PREVISTA" MAS NÃO são adiantados ou atrasados
           const ehReceitaPrevista = (tipoNome.includes('RECEITA PREVISTA') || tipoNome.includes('PREVISTA'))
             && !tipoNome.includes('ADIANTADO')
-            && !tipoNome.includes('ATRASADO');
+            && !tipoNome.includes('ADIANTADOS')
+            && !tipoNome.includes('ATRASADO')
+            && !tipoNome.includes('ATRASADOS');
 
           const banco = bancosCategorizadosMap.get(conta.bancoId) ?? {
             nome: conta.bancoNome,
