@@ -746,58 +746,45 @@ const RelatorioCobrancaPage: React.FC = () => {
     doc.text('Resumo por Conta de Receita - Realizado', margem, posY);
     posY += 6;
 
-    // Títulos e Depósitos lado a lado
-    const colunaWidth = larguraUtil / 2 - 2;
-
-    // TÍTULOS (Esquerda)
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.text('Títulos', margem, posY);
+    // Títulos e Depósitos em uma única tabela
+    const totalReceitaPrevistaGeral = relatorio.totais.titulosTotalReceitaPrevista + relatorio.totais.depositosTotalReceitaPrevista;
+    const totalOutrasReceitasGeral = relatorio.totais.titulosTotalOutrasReceitas + relatorio.totais.depositosTotalOutrasReceitas;
+    const totalGeral = relatorio.totais.titulosTotal + relatorio.totais.depositosTotal;
 
     autoTable(doc, {
-      startY: posY + 2,
-      head: [['Tipo de Receita', 'Valor']],
+      startY: posY,
+      head: [['Tipo de Receita', 'Títulos', 'Depósitos', 'Total']],
       body: [
-        ['Receita Prevista', formatCurrency(relatorio.totais.titulosTotalReceitaPrevista)],
-        ['Outras Receitas', formatCurrency(relatorio.totais.titulosTotalOutrasReceitas)],
+        [
+          'Receita Prevista',
+          formatCurrency(relatorio.totais.titulosTotalReceitaPrevista),
+          formatCurrency(relatorio.totais.depositosTotalReceitaPrevista),
+          formatCurrency(totalReceitaPrevistaGeral)
+        ],
+        [
+          'Outras Receitas',
+          formatCurrency(relatorio.totais.titulosTotalOutrasReceitas),
+          formatCurrency(relatorio.totais.depositosTotalOutrasReceitas),
+          formatCurrency(totalOutrasReceitasGeral)
+        ],
       ],
-      foot: [['Total', formatCurrency(relatorio.totais.titulosTotal)]],
+      foot: [[
+        'Total',
+        formatCurrency(relatorio.totais.titulosTotal),
+        formatCurrency(relatorio.totais.depositosTotal),
+        formatCurrency(totalGeral)
+      ]],
       theme: 'grid',
       styles: { fontSize: 8, halign: 'center', cellPadding: 1.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
-      headStyles: { fillColor: [31, 73, 125], textColor: 255, fontStyle: 'bold', fontSize: 8, halign: 'center' },
+      headStyles: { fillColor: [100, 116, 139], textColor: 255, fontStyle: 'bold', fontSize: 8, halign: 'center' },
       columnStyles: { 0: { halign: 'left' } },
-      footStyles: { fontStyle: 'bold', fillColor: [220, 235, 250], textColor: [0, 0, 0] },
-      margin: { left: margem, right: larguraPagina / 2 + 2 },
+      footStyles: { fontStyle: 'bold', fillColor: [226, 232, 240], textColor: [0, 0, 0] },
+      margin: { left: margem, right: margem },
       tableLineWidth: 0.1,
       tableLineColor: [0, 0, 0],
     });
 
-    const titulosFinalY = (doc as any).lastAutoTable.finalY;
-
-    // DEPÓSITOS (Direita)
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.text('Depósitos', larguraPagina / 2 + 2, posY);
-
-    autoTable(doc, {
-      startY: posY + 2,
-      head: [['Tipo de Receita', 'Valor']],
-      body: [
-        ['Receita Prevista', formatCurrency(relatorio.totais.depositosTotalReceitaPrevista)],
-        ['Outras Receitas', formatCurrency(relatorio.totais.depositosTotalOutrasReceitas)],
-      ],
-      foot: [['Total', formatCurrency(relatorio.totais.depositosTotal)]],
-      theme: 'grid',
-      styles: { fontSize: 8, halign: 'center', cellPadding: 1.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
-      headStyles: { fillColor: [34, 139, 34], textColor: 255, fontStyle: 'bold', fontSize: 8, halign: 'center' },
-      columnStyles: { 0: { halign: 'left' } },
-      footStyles: { fontStyle: 'bold', fillColor: [220, 250, 220], textColor: [0, 0, 0] },
-      margin: { left: larguraPagina / 2 + 2, right: margem },
-      tableLineWidth: 0.1,
-      tableLineColor: [0, 0, 0],
-    });
-
-    posY = Math.max(titulosFinalY, (doc as any).lastAutoTable.finalY) + 8;
+    posY = (doc as any).lastAutoTable.finalY + 8;
 
     // Coletar todos os tipos únicos de títulos E depósitos para garantir mesma ordem
     const todosTiposUnicos = new Set<string>();
