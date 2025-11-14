@@ -136,7 +136,7 @@ const SimpleLineChart: React.FC<{
   legenda?: boolean;
 }> = ({ labels, series, legenda = true }) => {
   const width = 900;
-  const height = 260;
+  const height = 360;
   const paddingX = 48;
   const paddingY = 32;
   const passoX = labels.length > 1 ? (width - paddingX * 2) / (labels.length - 1) : 0;
@@ -146,7 +146,7 @@ const SimpleLineChart: React.FC<{
 
   return (
     <div className="space-y-3">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-64 w-full">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-80 w-full">
         <line
           x1={paddingX}
           y1={height - paddingY}
@@ -819,6 +819,7 @@ const PagamentosPage: React.FC = () => {
             <Card
                 title="Evolução Diária por Área de Despesa (Realizado)"
                 subtitle="Selecione as áreas para comparar a tendência diária"
+                variant="danger"
               >
                 {chavesAreas.length === 0 ? (
                   <p className="text-sm text-gray-500">Nenhuma série disponível para o período informado.</p>

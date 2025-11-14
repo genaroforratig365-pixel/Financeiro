@@ -543,175 +543,157 @@ const RelatorioCobrancaPage: React.FC = () => {
     }
 
     const doc = new jsPDF('portrait', 'mm', 'a4');
-    const margem = 14;
+    const margem = 12;
     const larguraPagina = doc.internal.pageSize.getWidth();
+    const larguraUtil = larguraPagina - 2 * margem;
 
     // Cabeçalho
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.text('Relatório de Cobrança', margem, 14);
+    doc.setFontSize(14);
+    doc.text('Relatório de Cobrança', margem, 12);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.text(`Data: ${formatarDataPt(relatorio.data)}`, margem, 22);
+    doc.setFontSize(9);
+    doc.text(`Data: ${formatarDataPt(relatorio.data)}`, margem, 18);
 
-    let posY = 30;
+    let posY = 26;
 
-    // Resumo por Banco
+    // Seção: Resumo por Conta de Receita
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text('Resumo por Banco', margem, posY);
-    posY += 2;
+    doc.setFontSize(10);
+    doc.text('Resumo por Conta de Receita - Realizado', margem, posY);
+    posY += 6;
 
-    const resumoBancoBody = relatorio.bancos.length === 0
-      ? [['Nenhum banco com movimentação', '-']]
-      : relatorio.bancos.map((banco) => [
-          banco.nome,
-          formatCurrency(banco.realizado),
-        ]);
+    // Títulos e Depósitos lado a lado
+    const colunaWidth = larguraUtil / 2 - 2;
 
-    resumoBancoBody.push(['Total', formatCurrency(relatorio.totais.realizado)]);
+    // TÍTULOS (Esquerda)
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('Títulos', margem, posY);
 
     autoTable(doc, {
-      startY: posY,
-      head: [['Banco', 'Realizado']],
-      body: resumoBancoBody,
-      styles: { fontSize: 9, halign: 'right', cellPadding: 2 },
-      headStyles: { fillColor: [220, 53, 69], textColor: 255, fontStyle: 'bold' },
+      startY: posY + 2,
+      head: [['Item', 'Valor']],
+      body: [
+        ['Receita Prevista', formatCurrency(relatorio.totais.titulosTotal)],
+        ['Outras Receitas', formatCurrency(0)],
+      ],
+      foot: [['Total', formatCurrency(relatorio.totais.titulosTotal)]],
+      styles: { fontSize: 8, halign: 'right', cellPadding: 1.5 },
+      headStyles: { fillColor: [31, 73, 125], textColor: 255, fontStyle: 'bold', fontSize: 8 },
       columnStyles: { 0: { halign: 'left' } },
-      footStyles: { fontStyle: 'bold', fillColor: [240, 240, 240] },
-      alternateRowStyles: { fillColor: [252, 252, 252] },
-      margin: { left: margem, right: larguraPagina / 2 + 4 },
+      footStyles: { fontStyle: 'bold', fillColor: [240, 248, 255] },
+      margin: { left: margem, right: larguraPagina / 2 + 2 },
     });
 
-    posY = (doc as any).lastAutoTable.finalY + 10;
+    const titulosFinalY = (doc as any).lastAutoTable.finalY;
 
-    // Receitas em Títulos (só mostra se houver títulos)
+    // DEPÓSITOS (Direita)
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('Depósitos', larguraPagina / 2 + 2, posY);
+
+    autoTable(doc, {
+      startY: posY + 2,
+      head: [['Item', 'Valor']],
+      body: [
+        ['Receita Prevista', formatCurrency(relatorio.totais.depositosTotal)],
+        ['Outras Receitas', formatCurrency(0)],
+      ],
+      foot: [['Total', formatCurrency(relatorio.totais.depositosTotal)]],
+      styles: { fontSize: 8, halign: 'right', cellPadding: 1.5 },
+      headStyles: { fillColor: [34, 139, 34], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+      columnStyles: { 0: { halign: 'left' } },
+      footStyles: { fontStyle: 'bold', fillColor: [240, 255, 240] },
+      margin: { left: larguraPagina / 2 + 2, right: margem },
+    });
+
+    posY = Math.max(titulosFinalY, (doc as any).lastAutoTable.finalY) + 8;
+
+    // Seção: Receitas em Títulos (bancos lado a lado)
     const temTitulos = relatorio.bancosCategorizado.some(b => b.titulos.total > 0);
     if (temTitulos) {
-      if (posY > doc.internal.pageSize.getHeight() - 60) {
-        doc.addPage();
-        posY = 20;
-      }
-
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(12);
-      doc.text('Receitas em Títulos', margem, posY);
-      posY += 2;
+      doc.setFontSize(10);
+      doc.text('Receitas em Títulos por Banco', margem, posY);
+      posY += 4;
 
-      relatorio.bancosCategorizado.forEach((banco) => {
-        if (banco.titulos.total === 0) return;
+      const bancosComTitulos = relatorio.bancosCategorizado.filter(b => b.titulos.total > 0);
+      const numColunas = Math.min(bancosComTitulos.length, 3);
+      const colWidth = larguraUtil / numColunas - 2;
 
-        const body = [
-          ...banco.titulos.tipos.map(tipo => [tipo.tipoNome, formatCurrency(tipo.valor)]),
-          ['Total', formatCurrency(banco.titulos.total)],
-        ];
+      bancosComTitulos.forEach((banco, index) => {
+        const colX = margem + (colWidth + 2) * (index % numColunas);
+        const startYPos = posY;
 
         autoTable(doc, {
-          startY: posY,
+          startY: startYPos,
           head: [[banco.nome, '']],
-          body,
-          styles: { fontSize: 8, halign: 'right', cellPadding: 2 },
-          headStyles: { fillColor: [31, 73, 125], textColor: 255, fontStyle: 'bold', halign: 'left' },
-          columnStyles: { 0: { halign: 'left' }, 1: { fontStyle: 'bold' } },
-          footStyles: { fontStyle: 'bold' },
-          margin: { left: margem, right: margem },
-          tableWidth: (larguraPagina - 2 * margem) / 3 - 2,
+          body: banco.titulos.tipos.map(tipo => [tipo.tipoNome, formatCurrency(tipo.valor)]),
+          foot: [['Total', formatCurrency(banco.titulos.total)]],
+          styles: { fontSize: 7, halign: 'right', cellPadding: 1 },
+          headStyles: { fillColor: [31, 73, 125], textColor: 255, fontStyle: 'bold', fontSize: 7 },
+          columnStyles: { 0: { halign: 'left' } },
+          footStyles: { fontStyle: 'bold', fontSize: 7 },
+          margin: { left: colX, right: larguraPagina - colX - colWidth },
+          tableWidth: colWidth,
         });
-
-        posY = (doc as any).lastAutoTable.finalY + 6;
       });
 
-      posY += 4;
+      posY = (doc as any).lastAutoTable.finalY + 6;
     }
 
-    // Receitas em Depósitos (só mostra se houver depósitos)
+    // Seção: Receitas em Depósitos (bancos lado a lado)
     const temDepositos = relatorio.bancosCategorizado.some(b => b.depositos.total > 0);
     if (temDepositos) {
-      if (posY > doc.internal.pageSize.getHeight() - 60) {
-        doc.addPage();
-        posY = 20;
-      }
-
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(12);
-      doc.text('Receitas em Depósitos', margem, posY);
-      posY += 2;
+      doc.setFontSize(10);
+      doc.text('Receitas em Depósitos por Banco', margem, posY);
+      posY += 4;
 
-      relatorio.bancosCategorizado.forEach((banco) => {
-        if (banco.depositos.total === 0) return;
+      const bancosComDepositos = relatorio.bancosCategorizado.filter(b => b.depositos.total > 0);
+      const numColunas = Math.min(bancosComDepositos.length, 3);
+      const colWidth = larguraUtil / numColunas - 2;
 
-        const body = [
-          ...banco.depositos.tipos.map(tipo => [tipo.tipoNome, formatCurrency(tipo.valor)]),
-          ['Total', formatCurrency(banco.depositos.total)],
-        ];
+      bancosComDepositos.forEach((banco, index) => {
+        const colX = margem + (colWidth + 2) * (index % numColunas);
+        const startYPos = posY;
 
         autoTable(doc, {
-          startY: posY,
+          startY: startYPos,
           head: [[banco.nome, '']],
-          body,
-          styles: { fontSize: 8, halign: 'right', cellPadding: 2 },
-          headStyles: { fillColor: [34, 139, 34], textColor: 255, fontStyle: 'bold', halign: 'left' },
-          columnStyles: { 0: { halign: 'left' }, 1: { fontStyle: 'bold' } },
-          margin: { left: margem, right: margem },
-          tableWidth: (larguraPagina - 2 * margem) / 3 - 2,
+          body: banco.depositos.tipos.map(tipo => [tipo.tipoNome, formatCurrency(tipo.valor)]),
+          foot: [['Total', formatCurrency(banco.depositos.total)]],
+          styles: { fontSize: 7, halign: 'right', cellPadding: 1 },
+          headStyles: { fillColor: [34, 139, 34], textColor: 255, fontStyle: 'bold', fontSize: 7 },
+          columnStyles: { 0: { halign: 'left' } },
+          footStyles: { fontStyle: 'bold', fontSize: 7 },
+          margin: { left: colX, right: larguraPagina - colX - colWidth },
+          tableWidth: colWidth,
         });
-
-        posY = (doc as any).lastAutoTable.finalY + 6;
       });
 
-      posY += 4;
+      posY = (doc as any).lastAutoTable.finalY + 6;
     }
 
-    // Resumo Final
-    if (posY > doc.internal.pageSize.getHeight() - 70) {
-      doc.addPage();
-      posY = 20;
-    }
-
+    // Seção: Total Previsto x Realizado
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text('Resumo Final', margem, posY);
+    doc.setFontSize(10);
+    doc.text('Total Previsto x Realizado', margem, posY);
     posY += 2;
 
     autoTable(doc, {
       startY: posY,
-      head: [['Categoria', 'Valor', '% Total']],
       body: [
-        ['Receitas em Títulos', formatCurrency(relatorio.totais.titulosTotal), `${relatorio.totais.percentualTitulos.toFixed(1)}%`],
-        ['Receitas em Depósitos', formatCurrency(relatorio.totais.depositosTotal), `${relatorio.totais.percentualDepositos.toFixed(1)}%`],
+        ['Receita Prevista (Títulos + Depósitos)', formatCurrency(relatorio.totais.previsto)],
+        ['Receita Realizada', formatCurrency(relatorio.totais.realizado)],
+        ['% de Cobertura', `${relatorio.totais.previsto > 0 ? ((relatorio.totais.realizado / relatorio.totais.previsto) * 100).toFixed(1) : '0'}%`],
       ],
-      styles: { fontSize: 9, halign: 'right', cellPadding: 2 },
-      headStyles: { fillColor: [100, 100, 100], textColor: 255, fontStyle: 'bold' },
-      columnStyles: { 0: { halign: 'left' } },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      margin: { left: margem, right: margem },
-    });
-
-    posY = (doc as any).lastAutoTable.finalY + 6;
-
-    autoTable(doc, {
-      startY: posY,
-      head: [['Comparativo do Dia', 'Valor']],
-      body: [
-        ['Receitas Previstas', formatCurrency(relatorio.totais.previsto)],
-        ['Receitas Realizadas', formatCurrency(relatorio.totais.realizado)],
-        ['Diferença', formatCurrency(relatorio.totais.diferenca)],
-        ['Cobertura (%)', `${((relatorio.totais.realizado / relatorio.totais.previsto) * 100).toFixed(1)}%`],
-      ],
-      styles: { fontSize: 9, halign: 'right', cellPadding: 2 },
-      headStyles: { fillColor: [220, 53, 69], textColor: 255, fontStyle: 'bold' },
+      styles: { fontSize: 9, halign: 'right', cellPadding: 2, fontStyle: 'bold' },
       columnStyles: { 0: { halign: 'left', fontStyle: 'bold' }, 1: { fontStyle: 'bold' } },
       margin: { left: margem, right: margem },
     });
-
-    posY = (doc as any).lastAutoTable.finalY + 8;
-
-    // Total Geral
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.text('Total Geral Realizado:', margem, posY);
-    doc.text(formatCurrency(relatorio.totais.realizado), larguraPagina - margem, posY, { align: 'right' });
 
     return doc;
   }, [relatorio]);
@@ -910,29 +892,32 @@ const RelatorioCobrancaPage: React.FC = () => {
 
               {/* Resumo por Conta de Receita */}
               <Card
-                title={`Resumo por Conta de Receita (${formatarDataPt(relatorio.data)})`}
+                title={<span className="text-base font-bold">Resumo por Conta de Receita (${formatarDataPt(relatorio.data)})</span>}
                 subtitle="Separação por Títulos e Depósitos"
               >
                 <div className="space-y-4">
                   {/* Títulos */}
                   <div className="border-b border-gray-200 pb-3">
                     <h4 className="font-semibold text-gray-700 mb-2 text-sm">Títulos</h4>
-                    <div className="space-y-1 text-xs">
+                    <div className="bg-blue-50 -mx-2 px-2 py-2 rounded mb-2">
+                      <h5 className="text-xs font-bold text-blue-900 uppercase mb-1">Realizado</h5>
+                    </div>
+                    <div className="space-y-1 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Receita Prevista:</span>
-                        <span className="text-gray-900 font-medium">
+                        <span className="text-gray-700 font-medium">Receita Prevista:</span>
+                        <span className="text-gray-900 font-semibold">
                           {formatCurrency(relatorio.totais.titulosTotal)}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Outras Receitas:</span>
-                        <span className="text-gray-900 font-medium">
+                        <span className="text-gray-700 font-medium">Outras Receitas:</span>
+                        <span className="text-gray-900 font-semibold">
                           {formatCurrency(0)}
                         </span>
                       </div>
-                      <div className="flex justify-between pt-1 border-t border-gray-100">
-                        <span className="text-gray-700 font-semibold">Total:</span>
-                        <span className="text-gray-900 font-bold">
+                      <div className="flex justify-between pt-2 mt-2 border-t border-gray-200">
+                        <span className="text-gray-800 font-bold">Total:</span>
+                        <span className="text-gray-900 font-bold text-base">
                           {formatCurrency(relatorio.totais.titulosTotal)}
                         </span>
                       </div>
@@ -942,22 +927,25 @@ const RelatorioCobrancaPage: React.FC = () => {
                   {/* Depósitos */}
                   <div className="border-b border-gray-200 pb-3">
                     <h4 className="font-semibold text-gray-700 mb-2 text-sm">Depósitos</h4>
-                    <div className="space-y-1 text-xs">
+                    <div className="bg-green-50 -mx-2 px-2 py-2 rounded mb-2">
+                      <h5 className="text-xs font-bold text-green-900 uppercase mb-1">Realizado</h5>
+                    </div>
+                    <div className="space-y-1 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Receita Prevista:</span>
-                        <span className="text-gray-900 font-medium">
+                        <span className="text-gray-700 font-medium">Receita Prevista:</span>
+                        <span className="text-gray-900 font-semibold">
                           {formatCurrency(relatorio.totais.depositosTotal)}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Outras Receitas:</span>
-                        <span className="text-gray-900 font-medium">
+                        <span className="text-gray-700 font-medium">Outras Receitas:</span>
+                        <span className="text-gray-900 font-semibold">
                           {formatCurrency(0)}
                         </span>
                       </div>
-                      <div className="flex justify-between pt-1 border-t border-gray-100">
-                        <span className="text-gray-700 font-semibold">Total:</span>
-                        <span className="text-gray-900 font-bold">
+                      <div className="flex justify-between pt-2 mt-2 border-t border-gray-200">
+                        <span className="text-gray-800 font-bold">Total:</span>
+                        <span className="text-gray-900 font-bold text-base">
                           {formatCurrency(relatorio.totais.depositosTotal)}
                         </span>
                       </div>
@@ -966,32 +954,27 @@ const RelatorioCobrancaPage: React.FC = () => {
 
                   {/* Total Geral com Previsto x Realizado */}
                   <div className="bg-gray-50 -mx-4 -mb-3 px-4 py-3 rounded-b-lg">
-                    <h4 className="font-semibold text-gray-900 mb-2 text-sm">Total Geral</h4>
-                    <div className="space-y-2 text-xs">
-                      <div className="flex justify-between bg-blue-100 px-2 py-1 rounded">
-                        <span className="text-blue-800 font-medium">Previsto:</span>
-                        <span className="text-blue-900 font-bold">
+                    <h4 className="font-semibold text-gray-900 mb-3 text-sm">Total Previsto x Realizado</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between items-center bg-white border border-blue-200 px-3 py-2 rounded">
+                        <span className="text-gray-800 font-semibold">Receita Prevista (Títulos + Depósitos):</span>
+                        <span className="text-blue-900 font-bold text-base">
                           {formatCurrency(relatorio.totais.previsto)}
                         </span>
                       </div>
-                      <div className="flex justify-between bg-green-100 px-2 py-1 rounded">
-                        <span className="text-green-800 font-medium">Realizado:</span>
-                        <span className="text-green-900 font-bold">
+                      <div className="flex justify-between items-center bg-white border border-green-200 px-3 py-2 rounded">
+                        <span className="text-gray-800 font-semibold">Receita Realizada:</span>
+                        <span className="text-green-900 font-bold text-base">
                           {formatCurrency(relatorio.totais.realizado)}
                         </span>
                       </div>
-                      <div className={`flex justify-between px-2 py-1 rounded ${
-                        relatorio.totais.diferenca >= 0 ? 'bg-green-50' : 'bg-red-50'
-                      }`}>
-                        <span className={`font-medium ${
-                          relatorio.totais.diferenca >= 0 ? 'text-green-800' : 'text-red-800'
-                        }`}>
-                          Diferença:
-                        </span>
-                        <span className={`font-bold ${
-                          relatorio.totais.diferenca >= 0 ? 'text-green-900' : 'text-red-900'
-                        }`}>
-                          {formatCurrency(relatorio.totais.diferenca)}
+                      <div className="flex justify-between items-center bg-white border border-purple-200 px-3 py-2 rounded">
+                        <span className="text-gray-800 font-semibold">% de Cobertura:</span>
+                        <span className="text-purple-900 font-bold text-lg">
+                          {relatorio.totais.previsto > 0
+                            ? `${((relatorio.totais.realizado / relatorio.totais.previsto) * 100).toFixed(1)}%`
+                            : '0%'
+                          }
                         </span>
                       </div>
                     </div>
