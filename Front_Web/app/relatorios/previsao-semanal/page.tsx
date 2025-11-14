@@ -589,7 +589,7 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
         };
         // Centralizar todas as colunas de data (1 até length-2) e a coluna total (length-1)
         for (let i = 1; i < headers.length; i++) {
-          columnStylesReceitas[i] = { halign: 'center', cellWidth: i === headers.length - 1 ? 'auto' : 16 };
+          columnStylesReceitas[i] = { halign: 'center', cellWidth: 16 };
           if (i === headers.length - 1) {
             columnStylesReceitas[i].fontStyle = 'bold';
           }
@@ -603,7 +603,7 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
           bodyStyles: { fontSize: 8 },
           margin: { left: 14, right: 14 },
           theme: 'grid',
-          styles: { cellPadding: 1.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
+          styles: { cellPadding: 1, lineWidth: 0.1, lineColor: [0, 0, 0] },
           columnStyles: columnStylesReceitas,
           tableLineWidth: 0.5,
           tableLineColor: [0, 0, 0],
@@ -618,7 +618,7 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
             }
           },
         });
-        yPos = (doc as any).lastAutoTable.finalY + 5;
+        yPos = (doc as any).lastAutoTable.finalY + 3;
       }
 
       if (despesasData.length > 0) {
@@ -634,7 +634,7 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
         };
         // Centralizar todas as colunas de data (1 até length-2) e a coluna total (length-1)
         for (let i = 1; i < headers.length; i++) {
-          columnStylesDespesas[i] = { halign: 'center', cellWidth: i === headers.length - 1 ? 'auto' : 16 };
+          columnStylesDespesas[i] = { halign: 'center', cellWidth: 16 };
           if (i === headers.length - 1) {
             columnStylesDespesas[i].fontStyle = 'bold';
           }
@@ -648,7 +648,7 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
           bodyStyles: { fontSize: 8 },
           margin: { left: 14, right: 14 },
           theme: 'grid',
-          styles: { cellPadding: 1.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
+          styles: { cellPadding: 1, lineWidth: 0.1, lineColor: [0, 0, 0] },
           columnStyles: columnStylesDespesas,
           tableLineWidth: 0.5,
           tableLineColor: [0, 0, 0],
@@ -663,7 +663,7 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
             }
           },
         });
-        yPos = (doc as any).lastAutoTable.finalY + 5;
+        yPos = (doc as any).lastAutoTable.finalY + 3;
       }
 
       if (saldosData.length > 0) {
@@ -679,7 +679,7 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
         };
         // Centralizar todas as colunas de data (1 até length-2) e a coluna total (length-1)
         for (let i = 1; i < headers.length; i++) {
-          columnStylesSaldos[i] = { halign: 'center', cellWidth: i === headers.length - 1 ? 'auto' : 16 };
+          columnStylesSaldos[i] = { halign: 'center', cellWidth: 16 };
           if (i === headers.length - 1) {
             columnStylesSaldos[i].fontStyle = 'bold';
           }
@@ -693,7 +693,7 @@ const RelatorioPrevisaoSemanalPage: React.FC = () => {
           bodyStyles: { fontSize: 8 },
           margin: { left: 14, right: 14 },
           theme: 'grid',
-          styles: { cellPadding: 1.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
+          styles: { cellPadding: 1, lineWidth: 0.1, lineColor: [0, 0, 0] },
           columnStyles: columnStylesSaldos,
           tableLineWidth: 0.5,
           tableLineColor: [0, 0, 0],
